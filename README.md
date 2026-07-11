@@ -424,20 +424,17 @@ ResolveHub uses a relational SQL Server database containing more than 25 connect
 
 ## Documentation
 
-The following documentation and design artifacts are available in this repository.
+The following project documentation and design artifacts are available in this repository.
 
 | Document | Access | Description |
 |----------|--------|-------------|
-| **Project Overview** | [`docs/project-overview/`](docs/project-overview/) | Defines the project purpose, scope, objectives, users, and responsibilities. |
-| **Requirement Analysis** | [`docs/requirement-analysis/`](docs/requirement-analysis/) | Contains the functional and non-functional system requirements. |
-| **Database Requirements** | [`database/`](database/) | Documents the required data entities, relationships, and database standards. |
-| **Database Schema** | **[View PDF](docs/database/ResolveHub.pdf)** | SQL Server database schema in PDF format. |
-| **Entity Relationship Diagram (ERD)** | **[View ERD](docs/database/ResolveHub-ERD.png)** | Complete ERD showing entities, relationships, primary keys, foreign keys, and cardinalities. |
-| **UI Wireframes** | **[Open Folder](docs/ui-wireframes/)** | Contains the user interface wireframes designed for the system. |
-| **Workflow Diagrams** | **[Open Folder](docs/workflow-diagrams/)** | Contains the business process and system workflow diagrams. |
-| **API Documentation** | [`docs/api/`](docs/api/) | Will document API endpoints, requests, responses, and authorization. |
-| **Architecture Documentation** | [`docs/architecture/`](docs/architecture/) | Will describe the frontend, backend, database, and overall system architecture. |
-
+| **Project Overview** | **[View PDF](docs/project-overview/Project%20Overview.pdf)** | Defines the project purpose, scope, objectives, stakeholders, and overall system vision. |
+| **Requirement Analysis** | **[View PDF](docs/requirement-analysis/Requirement%20analysis.pdf)** | Contains the functional requirements, non-functional requirements, business rules, and system specifications. |
+| **Database Requirements** | **[View PDF](docs/database/Database%20Information%20of%20the%20project.pdf)** | Describes the database design requirements, entities, constraints, and development standards. |
+| **Database Schema** | **[View PDF](docs/database/ResolveHub.pdf)** | Complete SQL Server database schema containing all tables, attributes, primary keys, foreign keys, and relationships. |
+| **Entity Relationship Diagram (ERD)** | **[View ERD](docs/database/ResolveHub-ERD.png)** | Complete ERD illustrating entities, relationships, cardinalities, primary keys, and foreign keys. |
+| **UI Wireframes** | **[Open Folder](docs/ui-wireframes/)** | Contains the application's interface wireframes, including dashboards, ticket management, authentication, notifications, reports, and user profiles. |
+| **Workflow Diagrams** | **[Open Folder](docs/workflow-diagrams/)** | Contains system workflow diagrams covering authentication, ticket submission, assignment, resolution, administration, and AI-assisted processes. |
 ---
 
 ## Quality Requirements
