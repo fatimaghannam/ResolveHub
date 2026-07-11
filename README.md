@@ -422,17 +422,21 @@ ResolveHub uses a relational SQL Server database containing more than 25 connect
 
 ## Documentation
 
-| Document | Location | Description |
-|---|---|---|
-| **Project Overview** | `docs/project-overview/` | Defines the project purpose, scope, objectives, users, and responsibilities. |
-| **Requirement Analysis** | `docs/requirement-analysis/` | Contains the functional and non-functional system requirements. |
-| **Database Requirements** | `database/` | Documents the required data, entities, and database standards. |
-| **Database Schema** | SQL Server database schema (PDF) | **[View PDF](design/database-schema/ResolveHub.pdf)** |
-| **Entity Relationship Diagram (ERD)** | Complete ERD showing entities and relationships | **[View ERD](design/erd/ResolveHub-ERD.png)** |
-| **UI Wireframes** | `design/ui-wireframes/` | Contains the application interface designs. |
-| **Workflow Diagrams** | `design/workflow-diagrams/` | Describes the main system and ticket workflows. |
-| **API Documentation** | `docs/api/` | Will document API routes, requests, responses, and authorization rules. |
-| **Architecture Documentation** | `docs/architecture/` | Will describe the frontend, backend, database, and service architecture. |
+## Documentation
+
+The following documentation and design artifacts are available in this repository.
+
+| Document | Access | Description |
+|----------|--------|-------------|
+| **Project Overview** | [`docs/project-overview/`](docs/project-overview/) | Defines the project purpose, scope, objectives, users, and responsibilities. |
+| **Requirement Analysis** | [`docs/requirement-analysis/`](docs/requirement-analysis/) | Contains the functional and non-functional system requirements. |
+| **Database Requirements** | [`database/`](database/) | Documents the required data entities, relationships, and database standards. |
+| **Database Schema** | **[View PDF](docs/database/ResolveHub.pdf)** | SQL Server database schema in PDF format. |
+| **Entity Relationship Diagram (ERD)** | **[View ERD](docs/database/ResolveHub-ERD.png)** | Complete ERD showing entities, relationships, primary keys, foreign keys, and cardinalities. |
+| **UI Wireframes** | **[Open Folder](docs/ui-wireframes/)** | Contains the user interface wireframes designed for the system. |
+| **Workflow Diagrams** | **[Open Folder](docs/workflow-diagrams/)** | Contains the business process and system workflow diagrams. |
+| **API Documentation** | [`docs/api/`](docs/api/) | Will document API endpoints, requests, responses, and authorization. |
+| **Architecture Documentation** | [`docs/architecture/`](docs/architecture/) | Will describe the frontend, backend, database, and overall system architecture. |
 
 ---
 
