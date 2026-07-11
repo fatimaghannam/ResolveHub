@@ -428,7 +428,7 @@ ResolveHub uses a relational SQL Server database containing more than 25 connect
 | **Requirement Analysis** | `docs/requirement-analysis/` | Contains the functional and non-functional system requirements. |
 | **Database Requirements** | `database/` | Documents the required data, entities, and database standards. |
 | **Database Schema** | SQL Server database schema (PDF) | **[View PDF](design/database-schema/ResolveHub.pdf)** |
-| **Entity Relationship Diagram (ERD)** | Complete ERD showing entities and relationships | **[View ERD](design/erd/ResolveHub.png)** |
+| **Entity Relationship Diagram (ERD)** | Complete ERD showing entities and relationships | **[View ERD](design/erd/ResolveHub-ERD.png)** |
 | **UI Wireframes** | `design/ui-wireframes/` | Contains the application interface designs. |
 | **Workflow Diagrams** | `design/workflow-diagrams/` | Describes the main system and ticket workflows. |
 | **API Documentation** | `docs/api/` | Will document API routes, requests, responses, and authorization rules. |
