@@ -426,12 +426,12 @@ The following project documentation and design artifacts are available in this r
 | Document | Access | Description |
 |----------|--------|-------------|
 | **Project Overview** | **[View PDF](docs/project-overview/Project%20Overview.pdf)** | Defines the project purpose, scope, objectives, stakeholders, and overall system vision. |
-| **Requirement Analysis** | **[View PDF](docs/requirement-analysis/Requirement%20analysis.pdf)** | Contains the functional requirements, non-functional requirements, business rules, and system specifications. |
+| **Requirement Analysis** | **[View PDF](docs/requirement-analysis/Requirement%20analysis.pdf)** | Contains the functional requirements and non-functional requirements. |
 | **Database Requirements** | **[View PDF](docs/database/Database%20Information%20of%20the%20project.pdf)** | Describes the database design requirements, entities, constraints, and development standards. |
 | **Database Schema** | **[View PDF](docs/database/ResolveHub.pdf)** | Complete SQL Server database schema containing all tables, attributes, primary keys, foreign keys, and relationships. |
 | **Entity Relationship Diagram (ERD)** | **[View ERD](docs/database/ResolveHub-ERD.png)** | Complete ERD illustrating entities, relationships, cardinalities, primary keys, and foreign keys. |
 | **UI Wireframes** | **[Open Folder](docs/ui-wireframes/)** | Contains the application's interface wireframes, including dashboards, ticket management, authentication, notifications, reports, and user profiles. |
-| **Workflow Diagrams** | **[Open Folder](docs/workflow-diagrams/)** | Contains system workflow diagrams covering authentication, ticket submission, assignment, resolution, administration, and AI-assisted processes. |
+| **Workflow Diagrams** | **[Open Folder](docs/workflow-diagrams/)** | A collection of workflow diagrams illustrating the main business processes of ResolveHub, including authentication, ticket submission, assignment, AI-assisted analysis, administration, and the complete ticket resolution lifecycle. |
 ---
 
 ## Quality Requirements
