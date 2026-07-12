@@ -27,7 +27,7 @@ A modern full-stack platform for managing internal IT support requests through a
 ---
 
 > [!IMPORTANT]
-> ResolveHub is currently in the **planning and design phase**. The features described in this README represent the approved project scope and will be implemented incrementally.
+> ResolveHub is currently in the **planning and design phase**. The features described in this README represent the project scope and will be implemented incrementally.
 
 ## Table of Contents
 
@@ -116,7 +116,7 @@ ResolveHub aims to:
 
 ### Authentication and User Management
 
-- User registration and login using email and password
+- Users login using email and password
 - Secure password hashing
 - Password-strength validation
 - Forgot-password and reset-password functionality
@@ -189,8 +189,7 @@ ResolveHub aims to:
 - Employee-agent communication
 - Notification center
 - In-app notifications
-- Email notifications
-- Real-time notification updates
+
 
 ### File Attachments
 
@@ -373,7 +372,7 @@ flowchart LR
     AUTH[JWT Authentication and RBAC]
     DB[(SQL Server Express)]
     FILES[Secure File Storage]
-    NOTIFY[Notification and Email Services]
+    NOTIFY[Notification Services]
     REPORTS[Reporting and Analytics]
     AI[AI Assistance]
     CHAT[Real-Time Communication]
