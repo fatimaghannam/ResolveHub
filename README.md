@@ -449,7 +449,7 @@ The following project documentation and design artifacts are available in this r
 - Desktop support
 - Laptop support
 - Tablet support
-- Mobile support
+
 
 ### Security
 
