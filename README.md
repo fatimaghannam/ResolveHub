@@ -421,8 +421,6 @@ ResolveHub uses a relational SQL Server database containing more than 25 connect
 
 ## Documentation
 
-## Documentation
-
 The following project documentation and design artifacts are available in this repository.
 
 | Document | Access | Description |
