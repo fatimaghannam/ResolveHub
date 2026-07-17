@@ -1,8 +1,11 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.OpenApi;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
 using ResolveHub.Api.Data;
 using ResolveHub.Api.Data.Seed;
 using ResolveHub.Api.Entities;
@@ -15,8 +18,12 @@ var builder = WebApplication.CreateBuilder(args);
 // Add controller-based API support.
 builder.Services.AddControllers();
 
-// Generate the OpenAPI document used by Swagger.
-builder.Services.AddOpenApi();
+// Generate the OpenAPI document and add JWT security information.
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer<
+        BearerSecuritySchemeTransformer>();
+});
 
 // Read the SQL Server connection string from configuration/User Secrets.
 var connectionString =
@@ -63,7 +70,8 @@ builder.Services
 
 // Read and validate JWT configuration.
 var jwtSection =
-    builder.Configuration.GetSection(JwtSettings.SectionName);
+    builder.Configuration.GetSection(
+        JwtSettings.SectionName);
 
 var jwtSettings =
     jwtSection.Get<JwtSettings>()
@@ -148,21 +156,26 @@ builder.Services
                 NameClaimType = ClaimTypes.Name,
                 RoleClaimType = ClaimTypes.Role,
 
-                // Prevent the default five-minute expiration allowance.
+                // Do not allow extra time after token expiration.
                 ClockSkew = TimeSpan.Zero
             };
     });
 
-// Register the JWT token-generation service.
-builder.Services.AddSingleton<ITokenService, TokenService>();
-builder.Services.AddScoped<IAuthService, AuthService>();
+// Register application authentication services.
+builder.Services.AddSingleton<
+    ITokenService,
+    TokenService>();
 
-// Register role-based authorization services.
+builder.Services.AddScoped<
+    IAuthService,
+    AuthService>();
+
+// Register role-based authorization.
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-// Development-only database seed and Swagger UI.
+// Development-only database seeding and Swagger UI.
 if (app.Environment.IsDevelopment())
 {
     await DatabaseSeeder.SeedAsync(
@@ -182,7 +195,7 @@ if (app.Environment.IsDevelopment())
 // Redirect HTTP requests to HTTPS.
 app.UseHttpsRedirection();
 
-// Identify the user from the JWT before checking authorization.
+// Authentication must run before authorization.
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -190,3 +203,74 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+internal sealed class BearerSecuritySchemeTransformer(
+    IAuthenticationSchemeProvider authenticationSchemeProvider)
+    : IOpenApiDocumentTransformer
+{
+    public async Task TransformAsync(
+        OpenApiDocument document,
+        OpenApiDocumentTransformerContext context,
+        CancellationToken cancellationToken)
+    {
+        var authenticationSchemes =
+            await authenticationSchemeProvider
+                .GetAllSchemesAsync();
+
+        var bearerSchemeExists =
+            authenticationSchemes.Any(
+                scheme =>
+                    scheme.Name ==
+                    JwtBearerDefaults.AuthenticationScheme);
+
+        if (!bearerSchemeExists)
+        {
+            return;
+        }
+
+        var securitySchemes =
+            new Dictionary<string, IOpenApiSecurityScheme>
+            {
+                [JwtBearerDefaults.AuthenticationScheme] =
+                    new OpenApiSecurityScheme
+                    {
+                        Type = SecuritySchemeType.Http,
+                        Scheme = "bearer",
+                        In = ParameterLocation.Header,
+                        BearerFormat = "JWT",
+                        Description =
+                            "Paste the JWT access token only."
+                    }
+            };
+
+        document.Components ??=
+            new OpenApiComponents();
+
+        document.Components.SecuritySchemes =
+            securitySchemes;
+
+      // Apply the JWT security scheme to API operations.
+foreach (var pathItem in document.Paths.Values)
+{
+    if (pathItem.Operations is null)
+    {
+        continue;
+    }
+
+    foreach (var operation in pathItem.Operations.Values)
+    {
+        operation.Security ??= [];
+
+        operation.Security.Add(
+            new OpenApiSecurityRequirement
+            {
+                [
+                    new OpenApiSecuritySchemeReference(
+                        JwtBearerDefaults.AuthenticationScheme,
+                        document)
+                ] = []
+            });
+    }
+}
+    }
+}
