@@ -112,16 +112,16 @@ This stage of the project establishes the authentication and authorization found
 
 | Objective | Status |
 |---|---:|
-| Set up the ASP.NET Core backend project | ✅ Completed |
-| Configure the SQL Server database connection | ✅ Completed |
-| Implement authentication | ✅ Completed |
-| Implement JWT authentication | ✅ Completed |
-| Implement authorization | ✅ Completed |
-| Implement role-based authorization | ✅ Completed |
-| Configure database migrations | ✅ Completed |
-| Test the APIs through Swagger | ✅ Completed |
-| Set up the React frontend | ⏳ Planned |
-| Create and connect the login/index pages | ⏳ Planned |
+| Set up the ASP.NET Core backend project | Completed |
+| Configure the SQL Server database connection | Completed |
+| Implement authentication | Completed |
+| Implement JWT authentication | Completed |
+| Implement authorization | Completed |
+| Implement role-based authorization | Completed |
+| Configure database migrations | Completed |
+| Test the APIs through Swagger | Completed |
+| Set up the React frontend | Planned |
+| Create and connect the login/index pages | Planned |
 
 ### Security Features Implemented
 
@@ -542,22 +542,21 @@ The repository includes Entity Framework Core migration files and an application
 
 ## API Testing Evidence
 
-Store the screenshots inside:
+The API testing screenshots are stored inside:
 
 ```text
-docs/api-testing/
+docs/api-testing-screenshots/
 ```
 
 | Test | Expected Result | Evidence |
 |---|---:|---|
-| Successful login and JWT generation | `200 OK` | [View Screenshot](docs/api-testing/01_Login_Success_200.png) |
-| Protected endpoint without a token | `401 Unauthorized` | [View Screenshot](docs/api-testing/02_Unauthorized_Access_401.png) |
-| Account lockout after failed attempts | `423 Locked` | [View Screenshot](docs/api-testing/03_Account_Lockout_423.png) |
-| JWT configured successfully in Swagger | Authorized | [View Screenshot](docs/api-testing/04_Swagger_JWT_Authorization.png) |
-| Employee accessing an Administrator endpoint | `403 Forbidden` | [View Screenshot](docs/api-testing/05_Role_Based_Authorization_403.png) |
+| Successful login and JWT generation | `200 OK` | [View Screenshot](docs/api-testing-screenshots/Login_200_OK_JWT.png) |
+| Protected endpoint without a token | `401 Unauthorized` | [View Screenshot](docs/api-testing-screenshots/Unauthorized_Access_401.png) |
+| Account lockout after failed attempts | `423 Locked` | [View Screenshot](docs/api-testing-screenshots/Account_Lockout_423.png) |
+| JWT configured successfully in Swagger | Authorized | [View Screenshot](docs/api-testing-screenshots/Swagger_JWT_Authorization.png) |
+| Employee accessing an Administrator endpoint | `403 Forbidden` | [View Screenshot](docs/api-testing-screenshots/Role_Based_Authorization_403.png) |
 
-> [!NOTE]
-> These links will work after the screenshots are uploaded to the exact folder and filenames shown above.
+The evidence above demonstrates successful authentication, JWT authorization, protected routes, role-based access control, and account lockout.
 
 ---
 
@@ -574,7 +573,7 @@ The following documentation and design artifacts are available in this repositor
 | **Entity Relationship Diagram** | **[View ERD](docs/database/ResolveHub-ERD.png)** | Illustrates the planned entities, relationships, cardinalities, primary keys, and foreign keys. |
 | **UI Wireframes** | **[Open Folder](docs/ui-wireframes/)** | Contains interface wireframes for authentication, dashboards, tickets, notifications, reports, and profiles. |
 | **Workflow Diagrams** | **[Open Folder](docs/workflow-diagrams/)** | Contains workflows for authentication, ticket submission, assignment, communication, administration, and the full ticket lifecycle. |
-| **API Testing Screenshots** | **[Open Folder](docs/api-testing/)** | Contains evidence of successful authentication, authorization, RBAC, and lockout testing. |
+| **API Testing Screenshots** | **[Open Folder](docs/api-testing-screenshots/)** | Contains evidence of successful authentication, authorization, RBAC, and lockout testing. |
 
 ---
 
