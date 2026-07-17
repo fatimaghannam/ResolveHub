@@ -175,22 +175,20 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-// Development-only database seeding and Swagger UI.
-if (app.Environment.IsDevelopment())
+// Seed the database when the application starts.
+await DatabaseSeeder.SeedAsync(
+    app.Services,
+    app.Configuration);
+
+// Enable OpenAPI and Swagger UI for the public demo.
+app.MapOpenApi();
+
+app.UseSwaggerUI(options =>
 {
-    await DatabaseSeeder.SeedAsync(
-        app.Services,
-        app.Configuration);
-
-    app.MapOpenApi();
-
-    app.UseSwaggerUI(options =>
-    {
-        options.SwaggerEndpoint(
-            "/openapi/v1.json",
-            "ResolveHub API v1");
-    });
-}
+    options.SwaggerEndpoint(
+        "/openapi/v1.json",
+        "ResolveHub API v1");
+});
 
 // Redirect HTTP requests to HTTPS.
 app.UseHttpsRedirection();
