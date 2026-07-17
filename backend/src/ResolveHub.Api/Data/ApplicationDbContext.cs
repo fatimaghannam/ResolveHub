@@ -170,10 +170,12 @@ public sealed class ApplicationDbContext
         {
             entity.ToTable("UserAccountRole");
 
-            entity.HasKey(userRole => userRole.ID);
-
-            entity.Property(userRole => userRole.ID)
-                .UseIdentityColumn();
+            // ASP.NET Core Identity requires this composite primary key.
+            entity.HasKey(userRole => new
+            {
+                userRole.UserId,
+                userRole.RoleId
+            });
 
             entity.Property(userRole => userRole.UserId)
                 .HasColumnName("UserAccountID");
@@ -187,13 +189,6 @@ public sealed class ApplicationDbContext
             entity.Property(userRole => userRole.AssignedDate)
                 .HasColumnType("datetime2")
                 .HasDefaultValueSql("SYSUTCDATETIME()");
-
-            entity.HasIndex(userRole => new
-                {
-                    userRole.UserId,
-                    userRole.RoleId
-                })
-                .IsUnique();
 
             entity.HasOne(userRole => userRole.UserAccount)
                 .WithMany(user => user.UserAccountRoles)
@@ -212,7 +207,8 @@ public sealed class ApplicationDbContext
         });
     }
 
-    private static void ConfigureIdentitySupportTables(ModelBuilder builder)
+    private static void ConfigureIdentitySupportTables(
+        ModelBuilder builder)
     {
         builder.Entity<IdentityUserClaim<int>>(entity =>
         {

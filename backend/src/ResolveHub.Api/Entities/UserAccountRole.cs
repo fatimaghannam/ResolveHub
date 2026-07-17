@@ -4,8 +4,6 @@ namespace ResolveHub.Api.Entities;
 
 public sealed class UserAccountRole : IdentityUserRole<int>
 {
-    public int ID { get; set; }
-
     public int? AssignedByUserAccountID { get; set; }
 
     public DateTime AssignedDate { get; set; } = DateTime.UtcNow;

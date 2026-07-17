@@ -1,3 +1,4 @@
+using ResolveHub.Api.Data.Seed;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using ResolveHub.Api.Data;
@@ -58,7 +59,21 @@ builder.Services
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
+if (app.Environment.IsDevelopment())
+{
+    await DatabaseSeeder.SeedAsync(
+        app.Services,
+        app.Configuration);
 
+    app.MapOpenApi();
+
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint(
+            "/openapi/v1.json",
+            "ResolveHub API v1");
+    });
+}
 // Enable OpenAPI and Swagger only during development.
 if (app.Environment.IsDevelopment())
 {
