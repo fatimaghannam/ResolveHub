@@ -8,15 +8,15 @@
 
 <br>
 
-![Project Status](https://img.shields.io/badge/Status-Planning%20%26%20Design-2563EB?style=for-the-badge)
-![React](https://img.shields.io/badge/React.js-Frontend-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+![Project Status](https://img.shields.io/badge/Status-In%20Development-2563EB?style=for-the-badge)
 ![ASP.NET Core](https://img.shields.io/badge/ASP.NET%20Core-Backend-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)
 ![SQL Server](https://img.shields.io/badge/SQL%20Server-Database-CC2927?style=for-the-badge&logo=microsoftsqlserver&logoColor=white)
+![React](https://img.shields.io/badge/React.js-Frontend%20Planned-61DAFB?style=for-the-badge&logo=react&logoColor=black)
 
 ![JWT](https://img.shields.io/badge/JWT-Authentication-000000?style=flat-square&logo=jsonwebtokens)
+![Swagger](https://img.shields.io/badge/Swagger-API%20Testing-85EA2D?style=flat-square&logo=swagger&logoColor=black)
 ![Figma](https://img.shields.io/badge/Figma-UI%2FUX-F24E1E?style=flat-square&logo=figma&logoColor=white)
 ![GitHub](https://img.shields.io/badge/GitHub-Version%20Control-181717?style=flat-square&logo=github)
-![License](https://img.shields.io/badge/License-MIT-22C55E?style=flat-square)
 
 <br>
 
@@ -27,11 +27,15 @@ A modern full-stack platform for managing internal IT support requests through a
 ---
 
 > [!IMPORTANT]
-> ResolveHub is currently in the **planning and design phase**. The features described in this README represent the project scope and will be implemented incrementally.
+> **Current implementation status:** The ASP.NET Core backend authentication module is implemented and tested. It includes SQL Server integration, Entity Framework Core migrations, ASP.NET Core Identity, JWT authentication, protected API endpoints, role-based authorization, account lockout, seeded demo users, and Swagger testing.
+>
+> The React frontend and the remaining ticket-management modules will be implemented incrementally during the next development stages.
 
 ## Table of Contents
 
 - [Overview](#overview)
+- [Current Implementation](#current-implementation)
+- [Assignment 3 — Authentication and Authorization](#assignment-3--authentication-and-authorization)
 - [The Problem](#the-problem)
 - [Project Objectives](#project-objectives)
 - [User Roles](#user-roles)
@@ -40,9 +44,13 @@ A modern full-stack platform for managing internal IT support requests through a
 - [Technology Stack](#technology-stack)
 - [System Architecture](#system-architecture)
 - [Database Overview](#database-overview)
+- [Authentication API Endpoints](#authentication-api-endpoints)
+- [API Testing Evidence](#api-testing-evidence)
 - [Documentation](#documentation)
 - [Quality Requirements](#quality-requirements)
 - [Getting Started](#getting-started)
+- [Demo Accounts](#demo-accounts)
+- [Project Roadmap](#project-roadmap)
 - [License](#license)
 - [Author](#author)
 
@@ -52,11 +60,82 @@ A modern full-stack platform for managing internal IT support requests through a
 
 **ResolveHub** is a web-based IT Help Desk and Ticketing Management System designed to help organizations manage internal technical support requests efficiently.
 
-Employees can submit support tickets, attach supporting files, track progress, communicate with IT support agents, and receive updates until their issues are resolved.
+Employees will be able to submit support tickets, attach supporting files, track progress, communicate with IT support agents, and receive updates until their issues are resolved.
 
-IT support agents can investigate assigned tickets, communicate with employees, update ticket statuses, add internal notes, escalate unresolved issues, and provide final solutions.
+IT support agents will be able to investigate assigned tickets, communicate with employees, update ticket statuses, add internal notes, escalate unresolved issues, and provide final solutions.
 
-Administrators can manage users, roles, ticket categories, assignments, system settings, reports, and activity logs, while managers can monitor departmental support performance through dashboards and analytics.
+Administrators will manage users, roles, ticket categories, assignments, system settings, reports, and activity logs. Managers will monitor departmental support performance through dashboards and analytics.
+
+---
+
+## Current Implementation
+
+The current implementation focuses on the secure backend foundation required before building the complete ticket-management system.
+
+### Completed
+
+- ASP.NET Core Web API project
+- SQL Server database connection
+- Entity Framework Core configuration
+- Entity Framework Core migrations
+- ASP.NET Core Identity integration
+- Secure password hashing
+- Email and password login
+- JWT access-token generation
+- 60-minute access-token lifetime
+- JWT validation
+- Protected API endpoints
+- Role-Based Access Control (RBAC)
+- Employee, IT Support Agent, Administrator, and Manager roles
+- Account lockout after repeated failed login attempts
+- Seeded roles and demo users
+- OpenAPI and Swagger UI
+- JWT authorization through Swagger
+- Authentication and authorization testing
+- Git and GitHub version control
+
+### In Progress / Planned
+
+- React frontend setup
+- Login page connected to the backend API
+- Frontend role-based navigation
+- Complete ticket-management features
+- Notifications, reporting, SLA tracking, assets, and knowledge base modules
+
+---
+
+## Assignment 3 — Authentication and Authorization
+
+This stage of the project establishes the authentication and authorization foundation for ResolveHub.
+
+### Assignment Objectives Covered
+
+| Objective | Status |
+|---|---:|
+| Set up the ASP.NET Core backend project | ✅ Completed |
+| Configure the SQL Server database connection | ✅ Completed |
+| Implement authentication | ✅ Completed |
+| Implement JWT authentication | ✅ Completed |
+| Implement authorization | ✅ Completed |
+| Implement role-based authorization | ✅ Completed |
+| Configure database migrations | ✅ Completed |
+| Test the APIs through Swagger | ✅ Completed |
+| Set up the React frontend | ⏳ Planned |
+| Create and connect the login/index pages | ⏳ Planned |
+
+### Security Features Implemented
+
+- ASP.NET Core Identity
+- Secure password hashing
+- JWT access tokens
+- Token validation
+- Role claims inside the JWT
+- Protected routes using authorization attributes
+- Role-restricted API endpoints
+- `401 Unauthorized` handling
+- `403 Forbidden` handling
+- Account lockout with `423 Locked`
+- Seeded development accounts for testing
 
 ---
 
@@ -105,7 +184,7 @@ ResolveHub aims to:
 
 | Role | Responsibilities |
 |---|---|
-| **Employee** | Creates tickets, uploads attachments, tracks progress, adds comments, receives notifications, reviews solutions, and closes resolved tickets. |
+| **Employee** | Creates tickets, uploads attachments, tracks progress, adds comments, receives notifications, reviews solutions, and confirms issue resolution. |
 | **IT Support Agent** | Handles assigned tickets, investigates issues, communicates with employees, adds internal notes, updates statuses, escalates issues, and provides solutions. |
 | **Administrator** | Manages users, roles, categories, priorities, statuses, assignments, reports, audit logs, settings, and overall system activity. |
 | **Manager** | Monitors department tickets, unresolved issues, performance statistics, priority distribution, and authorized reports. |
@@ -116,18 +195,31 @@ ResolveHub aims to:
 
 ### Authentication and User Management
 
-- Users login using email and password
-- Secure password hashing
-- Password-strength validation
-- Forgot-password and reset-password functionality
-- JWT-based authentication
-- Refresh-token management
-- Role-based access control
-- Protected pages and API routes
-- User profile management
-- Login and account activity tracking
+#### Implemented
 
-### Ticket Management
+- Login using email and password
+- Secure password hashing using ASP.NET Core Identity
+- Password-strength requirements
+- JWT access-token generation
+- JWT validation
+- 60-minute access-token expiration
+- Role-Based Access Control
+- Protected API routes
+- Account lockout after repeated failed attempts
+- Seeded roles and demo users
+- Swagger JWT authorization
+
+#### Planned
+
+- User registration workflow
+- Forgot-password functionality
+- Password reset
+- Refresh tokens
+- User profile management
+- Login and logout activity tracking
+- Frontend login page and protected routes
+
+### Ticket Management — Planned
 
 - Create IT support tickets
 - Generate a unique ticket reference number
@@ -140,7 +232,7 @@ ResolveHub aims to:
 - Track creation and update dates
 - Preserve the complete ticket history
 
-### Ticket Categories
+### Ticket Categories — Planned
 
 - Hardware
 - Software
@@ -150,7 +242,7 @@ ResolveHub aims to:
 - Security
 - Other
 
-### Ticket Priorities
+### Ticket Priorities — Planned
 
 | Priority | Purpose |
 |---|---|
@@ -159,7 +251,7 @@ ResolveHub aims to:
 | **High** | Important issue affecting productivity |
 | **Critical** | Urgent issue with major operational impact |
 
-### Ticket Statuses
+### Ticket Statuses — Planned
 
 - Open
 - Assigned
@@ -169,18 +261,18 @@ ResolveHub aims to:
 - Closed
 - Cancelled
 
-### Assignment and Workflow
+### Assignment and Workflow — Planned
 
 - Manual assignment by administrators
-- Planned automatic ticket assignment
+- Optional automatic ticket assignment
 - Ticket reassignment
 - Assignment history
 - Status updates by support agents
 - Escalation for urgent or unresolved tickets
 - Internal IT-only notes
-- Full audit trail of ticket actions
+- Complete audit trail of ticket actions
 
-### Communication
+### Communication — Planned
 
 - Ticket comments
 - Threaded replies
@@ -188,20 +280,18 @@ ResolveHub aims to:
 - `@username` mentions
 - Employee-agent communication
 - Notification center
-- In-app notifications
+- Real-time in-app notifications
 
-
-### File Attachments
+### File Attachments — Planned
 
 - Upload screenshots, documents, and log files
-- Validate file size
-- Validate supported file types
+- Validate file size and supported file types
 - Store file metadata
 - Secure file downloads
 - Prevent unauthorized attachment access
 - Link attachments to tickets, comments, or chat messages
 
-### Dashboards
+### Dashboards — Planned
 
 #### Employee Dashboard
 
@@ -224,11 +314,8 @@ ResolveHub aims to:
 #### Administrator Dashboard
 
 - Total ticket count
-- Tickets by status
-- Tickets by category
-- Tickets by priority
-- Agent workload
-- Agent performance
+- Tickets by status, category, and priority
+- Agent workload and performance
 - Recent system activity
 - Monthly ticket statistics
 
@@ -242,21 +329,19 @@ ResolveHub aims to:
 - Priority distribution
 - Employee support activity
 
-### Reporting and Analytics
+### Reporting and Analytics — Planned
 
 - Monthly ticket reports
-- Tickets by category
-- Tickets by priority
+- Tickets by category and priority
 - Average resolution time
 - Agent performance
 - Employee activity
 - Pending and delayed tickets
 - SLA violation reports
 - Charts and analytics
-- PDF export
-- Excel export
+- PDF and CSV export
 
-### SLA Management
+### SLA Management — Planned
 
 - SLA policies based on ticket priority
 - First-response deadlines
@@ -267,7 +352,7 @@ ResolveHub aims to:
 - Agent and administrator alerts
 - SLA status reporting
 
-### Audit and Activity Logs
+### Audit and Activity Logs — Planned
 
 - Login and logout tracking
 - Ticket creation tracking
@@ -277,7 +362,7 @@ ResolveHub aims to:
 - Entity and action details
 - User, timestamp, IP address, and browser information
 
-### AI-Assisted Features
+### AI-Assisted Features — Optional
 
 - AI ticket categorization
 - AI priority suggestions
@@ -287,9 +372,9 @@ ResolveHub aims to:
 - Confidence scoring
 - Human review before accepting AI suggestions
 
-### Real-Time Chat
+### Real-Time Communication — Optional
 
-- Employee-agent chat inside tickets
+- Employee-agent communication inside tickets
 - Instant message delivery
 - Typing indicators
 - Online status
@@ -297,7 +382,7 @@ ResolveHub aims to:
 - File sharing
 - Real-time message notifications
 
-### QR Code Asset Management
+### QR Code Asset Management — Optional
 
 - Register IT assets
 - Generate a unique QR code for each asset
@@ -307,7 +392,7 @@ ResolveHub aims to:
 - Track maintenance and repair history
 - Record warranties, locations, and asset status
 
-### User Preferences
+### User Preferences — Planned
 
 - Light and dark theme preferences
 - In-app notification preferences
@@ -347,18 +432,21 @@ A ticket may also be marked as **Cancelled** when the support request is no long
 
 ## Technology Stack
 
-| Area | Technology |
-|---|---|
-| **Frontend** | React.js |
-| **Backend** | ASP.NET Core Web API |
-| **Database** | SQL Server Express |
-| **Authentication** | JWT and Refresh Tokens |
-| **Authorization** | Role-Based Access Control |
-| **UI/UX Design** | Figma |
-| **Database Design** | dbdiagram.io |
-| **API Testing** | Postman |
-| **Version Control** | Git and GitHub |
-| **Documentation** | Markdown, PDF, and Notion |
+| Area | Technology | Status |
+|---|---|---:|
+| **Frontend** | React.js | Planned |
+| **Backend** | ASP.NET Core Web API | Implemented |
+| **Database** | SQL Server Express | Implemented |
+| **ORM** | Entity Framework Core | Implemented |
+| **Identity** | ASP.NET Core Identity | Implemented |
+| **Authentication** | JWT access tokens | Implemented |
+| **Authorization** | Role-Based Access Control | Implemented |
+| **API Documentation** | OpenAPI and Swagger UI | Implemented |
+| **API Testing** | Swagger UI and Postman | Implemented |
+| **UI/UX Design** | Figma | Completed for wireframes |
+| **Database Design** | dbdiagram.io and Draw.io | Completed |
+| **Version Control** | Git and GitHub | Implemented |
+| **Documentation** | Markdown and PDF | Ongoing |
 
 ---
 
@@ -366,16 +454,16 @@ A ticket may also be marked as **Cancelled** when the support request is no long
 
 ```mermaid
 flowchart LR
-    U[Employees, IT Agents, Admins and Managers]
-    F[React.js Frontend]
+    U[Employees, IT Agents, Administrators and Managers]
+    F[React.js Frontend - Planned]
     A[ASP.NET Core Web API]
-    AUTH[JWT Authentication and RBAC]
+    AUTH[ASP.NET Identity, JWT and RBAC]
     DB[(SQL Server Express)]
-    FILES[Secure File Storage]
-    NOTIFY[Notification Services]
-    REPORTS[Reporting and Analytics]
-    AI[AI Assistance]
-    CHAT[Real-Time Communication]
+    FILES[Secure File Storage - Planned]
+    NOTIFY[Notification Services - Planned]
+    REPORTS[Reporting and Analytics - Planned]
+    AI[AI Assistance - Optional]
+    CHAT[Real-Time Communication - Optional]
 
     U --> F
     F --> A
@@ -390,23 +478,34 @@ flowchart LR
 
 The project follows a separated full-stack architecture:
 
-1. The **React.js frontend** provides the user interface.
-2. The **ASP.NET Core Web API** handles business logic and secure API communication.
-3. **JWT and role-based authorization** protect system resources.
+1. The **React.js frontend** will provide the user interface.
+2. The **ASP.NET Core Web API** handles authentication, authorization, business logic, and API communication.
+3. **ASP.NET Core Identity, JWT, and RBAC** protect system resources.
 4. **SQL Server Express** stores relational application data.
-5. Supporting services handle notifications, attachments, reports, AI assistance, and real-time communication.
+5. Future supporting services will handle notifications, attachments, reports, AI assistance, and real-time communication.
 
 ---
 
 ## Database Overview
 
-ResolveHub uses a relational SQL Server database containing more than 25 connected entities.
+ResolveHub uses SQL Server and Entity Framework Core.
 
-### Main Database Areas
+### Currently Implemented Authentication Entities
+
+| Entity | Purpose |
+|---|---|
+| `UserAccount` | Stores user identity, account, profile, and lockout information. |
+| `Role` | Stores system roles. |
+| `UserAccountRole` | Connects users to their assigned roles. |
+| `Department` | Stores the departments associated with users. |
+
+The repository includes Entity Framework Core migration files and an application database context snapshot. These files allow another developer to recreate the authentication database schema.
+
+### Planned Full-System Database Areas
 
 | Area | Main Entities |
 |---|---|
-| **Users and Security** | `UserAccount`, `Role`, `UserAccountRole`, `Department`, `PasswordResetToken`, `RefreshToken` |
+| **Users and Security** | `UserAccount`, `Role`, `UserAccountRole`, `Department` |
 | **Ticket Management** | `Ticket`, `TicketCategory`, `TicketPriority`, `TicketStatus` |
 | **Workflow Tracking** | `TicketAssignment`, `TicketHistory`, `TicketEscalation` |
 | **Communication** | `TicketComment`, `TicketMention`, `TicketChatMessage` |
@@ -419,19 +518,64 @@ ResolveHub uses a relational SQL Server database containing more than 25 connect
 
 ---
 
+## Authentication API Endpoints
+
+| Method | Endpoint | Required Access |
+|---|---|---|
+| `POST` | `/api/auth/login` | Anonymous |
+| `GET` | `/api/authorization-test/authenticated` | Any authenticated user |
+| `GET` | `/api/authorization-test/employee` | Employee |
+| `GET` | `/api/authorization-test/agent` | IT Support Agent |
+| `GET` | `/api/authorization-test/admin` | Administrator |
+| `GET` | `/api/authorization-test/manager` | Manager |
+
+### Important Response Codes
+
+| Code | Meaning |
+|---:|---|
+| `200 OK` | Login or authorized request completed successfully. |
+| `401 Unauthorized` | The endpoint requires a valid JWT access token. |
+| `403 Forbidden` | The authenticated user does not have the required role. |
+| `423 Locked` | The account is temporarily locked after repeated failed login attempts. |
+
+---
+
+## API Testing Evidence
+
+Store the screenshots inside:
+
+```text
+docs/api-testing/
+```
+
+| Test | Expected Result | Evidence |
+|---|---:|---|
+| Successful login and JWT generation | `200 OK` | [View Screenshot](docs/api-testing/01_Login_Success_200.png) |
+| Protected endpoint without a token | `401 Unauthorized` | [View Screenshot](docs/api-testing/02_Unauthorized_Access_401.png) |
+| Account lockout after failed attempts | `423 Locked` | [View Screenshot](docs/api-testing/03_Account_Lockout_423.png) |
+| JWT configured successfully in Swagger | Authorized | [View Screenshot](docs/api-testing/04_Swagger_JWT_Authorization.png) |
+| Employee accessing an Administrator endpoint | `403 Forbidden` | [View Screenshot](docs/api-testing/05_Role_Based_Authorization_403.png) |
+
+> [!NOTE]
+> These links will work after the screenshots are uploaded to the exact folder and filenames shown above.
+
+---
+
 ## Documentation
 
-The following project documentation and design artifacts are available in this repository.
+The following documentation and design artifacts are available in this repository.
 
 | Document | Access | Description |
-|----------|--------|-------------|
+|---|---|---|
 | **Project Overview** | **[View PDF](docs/project-overview/Project%20Overview.pdf)** | Defines the project purpose, scope, objectives, stakeholders, and overall system vision. |
-| **Requirement Analysis** | **[View PDF](docs/requirement-analysis/Requirement%20analysis.pdf)** | Contains the functional requirements and non-functional requirements. |
-| **Database Requirements** | **[View PDF](docs/database/Database%20Information%20of%20the%20project.pdf)** | Describes the database design requirements, entities, constraints, and development standards. |
-| **Database Schema** | **[View PDF](docs/database/ResolveHub.pdf)** | Complete SQL Server database schema containing all tables, attributes, primary keys, foreign keys, and relationships. |
-| **Entity Relationship Diagram (ERD)** | **[View ERD](docs/database/ResolveHub-ERD.png)** | Complete ERD illustrating entities, relationships, cardinalities, primary keys, and foreign keys. |
-| **UI Wireframes** | **[Open Folder](docs/ui-wireframes/)** | Contains the application's interface wireframes, including dashboards, ticket management, authentication, notifications, reports, and user profiles. |
-| **Workflow Diagrams** | **[Open Folder](docs/workflow-diagrams/)** | A collection of workflow diagrams illustrating the main business processes of ResolveHub, including authentication, ticket submission, assignment, AI-assisted analysis, administration, and the complete ticket resolution lifecycle. |
+| **Requirement Analysis** | **[View PDF](docs/requirement-analysis/Requirement%20analysis.pdf)** | Contains the functional and non-functional requirements. |
+| **Database Requirements** | **[View PDF](docs/database/Database%20Information%20of%20the%20project.pdf)** | Describes the database requirements, entities, constraints, and development standards. |
+| **Database Schema** | **[View PDF](docs/database/ResolveHub.pdf)** | Contains the planned SQL Server database schema, tables, attributes, keys, and relationships. |
+| **Entity Relationship Diagram** | **[View ERD](docs/database/ResolveHub-ERD.png)** | Illustrates the planned entities, relationships, cardinalities, primary keys, and foreign keys. |
+| **UI Wireframes** | **[Open Folder](docs/ui-wireframes/)** | Contains interface wireframes for authentication, dashboards, tickets, notifications, reports, and profiles. |
+| **Workflow Diagrams** | **[Open Folder](docs/workflow-diagrams/)** | Contains workflows for authentication, ticket submission, assignment, communication, administration, and the full ticket lifecycle. |
+| **API Testing Screenshots** | **[Open Folder](docs/api-testing/)** | Contains evidence of successful authentication, authorization, RBAC, and lockout testing. |
+
 ---
 
 ## Quality Requirements
@@ -449,15 +593,16 @@ The following project documentation and design artifacts are available in this r
 - Desktop support
 - Laptop support
 - Tablet support
-
+- Mobile responsiveness planned for later refinement
 
 ### Security
 
 - Secure authentication
 - Password hashing
-- JWT session protection
+- JWT access-token protection
 - Role-based authorization
 - Protected API routes
+- Account lockout
 - Input validation
 - Restricted ticket and attachment access
 - Activity and audit logging
@@ -481,8 +626,9 @@ The following project documentation and design artifacts are available in this r
 ### Maintainability
 
 - Separation of frontend, backend, and database logic
-- Reusable UI components
 - Organized API structure
+- Service and interface abstractions
+- Reusable components
 - Meaningful names
 - Clear folder organization
 - Setup and usage documentation
@@ -493,7 +639,7 @@ The system is designed to support future additions such as:
 
 - More departments
 - More roles
-- Additional categories
+- Additional ticket categories
 - External integrations
 - Advanced AI automation
 - Multi-language support
@@ -504,30 +650,181 @@ The system is designed to support future additions such as:
 
 ## Getting Started
 
-> [!NOTE]
-> The frontend and backend applications have not yet been scaffolded. Complete setup instructions will be added after the implementation begins.
+### Prerequisites
 
-### Planned Prerequisites
+Install the following software:
 
-- Node.js
-- npm
-- .NET SDK
+- [.NET SDK](https://dotnet.microsoft.com/download)
 - SQL Server Express
+- SQL Server Management Studio
 - Git
 - Visual Studio Code or Visual Studio
-- Postman
+- Postman — optional
 
-### Planned Local Setup
+### 1. Clone the Repository
 
 ```bash
-# Clone the repository
 git clone https://github.com/fatimaghannam/ResolveHub.git
-
-# Open the project folder
 cd ResolveHub
 ```
 
-Frontend, backend, database configuration, migration, and execution commands will be documented as each application layer is created.
+### 2. Open the Backend Project
+
+```bash
+cd backend/src/ResolveHub.Api
+```
+
+### 3. Restore Dependencies
+
+```bash
+dotnet restore
+```
+
+### 4. Configure the SQL Server Connection
+
+The recommended approach for local development is to use .NET User Secrets.
+
+```powershell
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Server=.\SQLEXPRESS;Database=ResolveHubDB;Trusted_Connection=True;TrustServerCertificate=True;"
+```
+
+Update the server name if your SQL Server instance uses a different name.
+
+### 5. Configure the JWT Signing Key
+
+Run the following PowerShell commands to generate and save a secure JWT key:
+
+```powershell
+$keyBytes = [byte[]]::new(32)
+[System.Security.Cryptography.RandomNumberGenerator]::Fill($keyBytes)
+$jwtKey = [Convert]::ToBase64String($keyBytes)
+
+dotnet user-secrets set "Jwt:Key" "$jwtKey"
+```
+
+### 6. Configure the Demo-Account Password
+
+```powershell
+dotnet user-secrets set "SeedData:DefaultPassword" "ResolveHubDemo@2026!"
+```
+
+> [!WARNING]
+> The demo password is intended only for local development and assignment testing. It must not be used in a production environment.
+
+### 7. Apply the Database Migrations
+
+The API applies pending migrations automatically when it starts. They can also be applied manually:
+
+```bash
+dotnet ef database update
+```
+
+If the Entity Framework CLI is not installed:
+
+```bash
+dotnet tool install --global dotnet-ef
+```
+
+### 8. Run the API
+
+From the `backend/src/ResolveHub.Api` directory:
+
+```bash
+dotnet run
+```
+
+From the repository's `backend` directory, use:
+
+```powershell
+dotnet run --project .\src\ResolveHub.Api\ResolveHub.Api.csproj
+```
+
+The terminal should display local addresses similar to:
+
+```text
+https://localhost:7188
+http://localhost:5275
+```
+
+### 9. Open Swagger
+
+Open either of the following addresses while the API is running:
+
+```text
+https://localhost:7188/swagger
+```
+
+```text
+http://localhost:5275/swagger
+```
+
+The exact ports are defined in `Properties/launchSettings.json`.
+
+### 10. Test JWT Authorization in Swagger
+
+1. Execute `POST /api/auth/login`.
+2. Copy the returned `accessToken`.
+3. Click **Authorize** at the top of Swagger.
+4. Paste the JWT access token.
+5. Click **Authorize**, then **Close**.
+6. Execute the protected authorization-test endpoints.
+
+---
+
+## Demo Accounts
+
+All seeded demo accounts use the following development password:
+
+```text
+ResolveHubDemo@2026!
+```
+
+| Role | Email |
+|---|---|
+| Employee | `employee@resolvehub.test` |
+| IT Support Agent | `agent@resolvehub.test` |
+| Administrator | `admin@resolvehub.test` |
+| Manager | `manager@resolvehub.test` |
+
+> [!NOTE]
+> The demo users and roles are seeded automatically when the application starts.
+
+---
+
+## Project Roadmap
+
+### Completed
+
+- [x] Project overview and requirement analysis
+- [x] UI wireframes
+- [x] Workflow diagrams
+- [x] Database schema and ERD
+- [x] ASP.NET Core Web API setup
+- [x] SQL Server connection
+- [x] Entity Framework Core migrations
+- [x] ASP.NET Core Identity
+- [x] JWT authentication
+- [x] Authorization and RBAC
+- [x] Account lockout
+- [x] Demo-user and role seeding
+- [x] Swagger API testing
+- [x] Authentication testing evidence
+
+### Next Development Stages
+
+- [ ] Set up the React frontend
+- [ ] Create and connect the login page
+- [ ] Add frontend protected routes
+- [ ] Implement user and role administration
+- [ ] Implement ticket creation and management
+- [ ] Implement assignment and status workflows
+- [ ] Implement comments and internal notes
+- [ ] Implement notifications
+- [ ] Implement dashboards and reports
+- [ ] Implement SLA tracking
+- [ ] Implement assets and QR codes
+- [ ] Add optional AI-assisted features
+- [ ] Prepare cloud deployment
 
 ---
 
