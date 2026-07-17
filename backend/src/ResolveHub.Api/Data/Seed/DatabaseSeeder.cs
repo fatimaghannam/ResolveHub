@@ -11,29 +11,29 @@ public static class DatabaseSeeder
     [
         new(
             Email: "employee@resolvehub.test",
-            FirstName: "Test",
-            LastName: "Employee",
+            FirstName: "Ethan",
+            LastName: "Brooks",
             JobTitle: "Employee",
             RoleName: RoleNames.Employee),
 
         new(
             Email: "agent@resolvehub.test",
-            FirstName: "Test",
-            LastName: "Agent",
+            FirstName: "Natalie",
+            LastName: "Hayes",
             JobTitle: "IT Support Agent",
             RoleName: RoleNames.ITAgent),
 
         new(
             Email: "admin@resolvehub.test",
-            FirstName: "Test",
-            LastName: "Administrator",
+            FirstName: "Ryan",
+            LastName: "Whitmore",
             JobTitle: "System Administrator",
             RoleName: RoleNames.Admin),
 
         new(
             Email: "manager@resolvehub.test",
-            FirstName: "Test",
-            LastName: "Manager",
+            FirstName: "Lauren",
+            LastName: "Prescott",
             JobTitle: "Department Manager",
             RoleName: RoleNames.Manager)
     ];
