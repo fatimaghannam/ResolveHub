@@ -219,7 +219,7 @@ ResolveHub aims to:
 - Login and logout activity tracking
 - Frontend login page and protected routes
 
-### Ticket Management — Planned
+### Ticket Management
 
 - Create IT support tickets
 - Generate a unique ticket reference number
@@ -232,7 +232,7 @@ ResolveHub aims to:
 - Track creation and update dates
 - Preserve the complete ticket history
 
-### Ticket Categories — Planned
+### Ticket Categories
 
 - Hardware
 - Software
@@ -242,7 +242,7 @@ ResolveHub aims to:
 - Security
 - Other
 
-### Ticket Priorities — Planned
+### Ticket Priorities 
 
 | Priority | Purpose |
 |---|---|
@@ -251,7 +251,7 @@ ResolveHub aims to:
 | **High** | Important issue affecting productivity |
 | **Critical** | Urgent issue with major operational impact |
 
-### Ticket Statuses — Planned
+### Ticket Statuses 
 
 - Open
 - Assigned
@@ -261,7 +261,7 @@ ResolveHub aims to:
 - Closed
 - Cancelled
 
-### Assignment and Workflow — Planned
+### Assignment and Workflow 
 
 - Manual assignment by administrators
 - Optional automatic ticket assignment
@@ -272,7 +272,7 @@ ResolveHub aims to:
 - Internal IT-only notes
 - Complete audit trail of ticket actions
 
-### Communication — Planned
+### Communication 
 
 - Ticket comments
 - Threaded replies
@@ -282,7 +282,7 @@ ResolveHub aims to:
 - Notification center
 - Real-time in-app notifications
 
-### File Attachments — Planned
+### File Attachments 
 
 - Upload screenshots, documents, and log files
 - Validate file size and supported file types
@@ -291,7 +291,7 @@ ResolveHub aims to:
 - Prevent unauthorized attachment access
 - Link attachments to tickets, comments, or chat messages
 
-### Dashboards — Planned
+### Dashboards 
 
 #### Employee Dashboard
 
@@ -329,7 +329,7 @@ ResolveHub aims to:
 - Priority distribution
 - Employee support activity
 
-### Reporting and Analytics — Planned
+### Reporting and Analytics
 
 - Monthly ticket reports
 - Tickets by category and priority
@@ -341,7 +341,7 @@ ResolveHub aims to:
 - Charts and analytics
 - PDF and CSV export
 
-### SLA Management — Planned
+### SLA Management
 
 - SLA policies based on ticket priority
 - First-response deadlines
@@ -352,7 +352,7 @@ ResolveHub aims to:
 - Agent and administrator alerts
 - SLA status reporting
 
-### Audit and Activity Logs — Planned
+### Audit and Activity Logs 
 
 - Login and logout tracking
 - Ticket creation tracking
@@ -362,7 +362,7 @@ ResolveHub aims to:
 - Entity and action details
 - User, timestamp, IP address, and browser information
 
-### AI-Assisted Features — Optional
+### AI-Assisted Features
 
 - AI ticket categorization
 - AI priority suggestions
@@ -372,7 +372,7 @@ ResolveHub aims to:
 - Confidence scoring
 - Human review before accepting AI suggestions
 
-### Real-Time Communication — Optional
+### Real-Time Communication
 
 - Employee-agent communication inside tickets
 - Instant message delivery
@@ -382,7 +382,7 @@ ResolveHub aims to:
 - File sharing
 - Real-time message notifications
 
-### QR Code Asset Management — Optional
+### QR Code Asset Management
 
 - Register IT assets
 - Generate a unique QR code for each asset
@@ -392,7 +392,7 @@ ResolveHub aims to:
 - Track maintenance and repair history
 - Record warranties, locations, and asset status
 
-### User Preferences — Planned
+### User Preferences 
 
 - Light and dark theme preferences
 - In-app notification preferences
