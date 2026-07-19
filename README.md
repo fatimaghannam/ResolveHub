@@ -48,9 +48,6 @@ A modern full-stack platform for managing internal IT support requests through a
 - [API Testing Evidence](#api-testing-evidence)
 - [Documentation](#documentation)
 - [Quality Requirements](#quality-requirements)
-- [Getting Started](#getting-started)
-- [Demo Accounts](#demo-accounts)
-- [Project Roadmap](#project-roadmap)
 - [License](#license)
 - [Author](#author)
 
