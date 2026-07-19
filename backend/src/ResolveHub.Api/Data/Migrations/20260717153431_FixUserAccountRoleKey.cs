@@ -4,10 +4,10 @@
 
 namespace ResolveHub.Api.Data.Migrations
 {
-    /// <inheritdoc />
+    
     public partial class FixUserAccountRoleKey : Migration
     {
-        /// <inheritdoc />
+    
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropPrimaryKey(
@@ -28,7 +28,7 @@ namespace ResolveHub.Api.Data.Migrations
                 columns: new[] { "UserAccountID", "RoleID" });
         }
 
-        /// <inheritdoc />
+    
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropPrimaryKey(

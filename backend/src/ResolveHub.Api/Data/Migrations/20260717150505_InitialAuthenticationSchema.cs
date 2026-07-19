@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace ResolveHub.Api.Data.Migrations
 {
-    /// <inheritdoc />
+
     public partial class InitialAuthenticationSchema : Migration
     {
         /// <inheritdoc />
@@ -263,7 +263,7 @@ namespace ResolveHub.Api.Data.Migrations
                 unique: true);
         }
 
-        /// <inheritdoc />
+    
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
