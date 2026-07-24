@@ -41,7 +41,7 @@ public sealed class AuthFlowTests
         Assert.NotNull(body);
         Assert.Equal("Bearer", body.TokenType);
         Assert.False(string.IsNullOrWhiteSpace(body.AccessToken));
-        Assert.InRange(body.ExpiresInSeconds, 3590, 3600);
+        Assert.InRange(body.ExpiresInSeconds, 86_390, 86_400);
         Assert.Equal(user.Id, body.User.ID);
         Assert.Equal(user.Email, body.User.Email);
         Assert.Equal("Test", body.User.FirstName);
@@ -101,8 +101,22 @@ public sealed class AuthFlowTests
         var lifetime = token.ValidTo - token.ValidFrom;
         Assert.InRange(
             lifetime,
-            TimeSpan.FromMinutes(59.9),
-            TimeSpan.FromMinutes(60.1));
+            TimeSpan.FromHours(23.99),
+            TimeSpan.FromHours(24.01));
+
+        var responseExpirationDifference =
+            (body.ExpiresAtUtc.UtcDateTime - token.ValidTo)
+                .Duration();
+
+        Assert.InRange(
+            responseExpirationDifference,
+            TimeSpan.Zero,
+            TimeSpan.FromSeconds(1));
+
+        Assert.InRange(
+            body.ExpiresAtUtc - DateTimeOffset.UtcNow,
+            TimeSpan.FromHours(23.99),
+            TimeSpan.FromHours(24.01));
     }
 
     [Fact]

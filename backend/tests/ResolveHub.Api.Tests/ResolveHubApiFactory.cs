@@ -53,7 +53,7 @@ public sealed class ResolveHubApiFactory
         builder.UseSetting("Jwt:Key", JwtKey);
         builder.UseSetting(
             "Jwt:AccessTokenExpirationMinutes",
-            "60");
+            "1440");
         builder.UseSetting(
             "Cors:AllowedOrigins:0",
             "https://localhost:5173");

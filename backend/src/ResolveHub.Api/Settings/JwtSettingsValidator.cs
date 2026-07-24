@@ -6,7 +6,7 @@ public sealed class JwtSettingsValidator
     : IValidateOptions<JwtSettings>
 {
     private const int MinimumSigningKeyBytes = 32;
-    private const int RequiredAccessTokenMinutes = 60;
+    private const int RequiredAccessTokenMinutes = 1440;
 
     public ValidateOptionsResult Validate(
         string? name,

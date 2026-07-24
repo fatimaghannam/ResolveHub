@@ -10,5 +10,5 @@ public sealed class JwtSettings
 
     public string Key { get; init; } = string.Empty;
 
-    public int AccessTokenExpirationMinutes { get; init; } = 60;
+    public int AccessTokenExpirationMinutes { get; init; } = 1440;
 }

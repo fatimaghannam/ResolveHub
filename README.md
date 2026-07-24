@@ -79,7 +79,7 @@ The current implementation focuses on the secure backend foundation required bef
 - Secure password hashing
 - Email and password login
 - JWT access-token generation
-- 60-minute access-token lifetime
+- 24-hour access-token lifetime
 - JWT validation
 - Protected API endpoints
 - Role-Based Access Control (RBAC)
@@ -199,7 +199,7 @@ ResolveHub aims to:
 - Password-strength requirements
 - JWT access-token generation
 - JWT validation
-- 60-minute access-token expiration
+- 24-hour access-token expiration
 - Role-Based Access Control
 - Protected API routes
 - Account lockout after repeated failed attempts
