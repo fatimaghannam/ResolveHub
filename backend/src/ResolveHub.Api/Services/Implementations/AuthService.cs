@@ -11,15 +11,18 @@ public sealed class AuthService : IAuthService
     private readonly UserManager<UserAccount> _userManager;
     private readonly SignInManager<UserAccount> _signInManager;
     private readonly ITokenService _tokenService;
+    private readonly ILogger<AuthService> _logger;
 
     public AuthService(
         UserManager<UserAccount> userManager,
         SignInManager<UserAccount> signInManager,
-        ITokenService tokenService)
+        ITokenService tokenService,
+        ILogger<AuthService> logger)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _tokenService = tokenService;
+        _logger = logger;
     }
 
     public async Task<LoginServiceResult> LoginAsync(
@@ -34,12 +37,19 @@ public sealed class AuthService : IAuthService
 
         if (user is null)
         {
+            _logger.LogWarning(
+                "Login rejected because the credentials were invalid.");
+
             return new LoginServiceResult(
                 LoginStatus.InvalidCredentials);
         }
 
         if (!user.IsActive)
         {
+            _logger.LogWarning(
+                "Login rejected because user {UserId} is inactive.",
+                user.Id);
+
             return new LoginServiceResult(
                 LoginStatus.Inactive);
         }
@@ -55,6 +65,11 @@ public sealed class AuthService : IAuthService
             var lockoutEndUtc =
                 await _userManager.GetLockoutEndDateAsync(user);
 
+            _logger.LogWarning(
+                "Login rejected because user {UserId} is locked until {LockoutEndUtc}.",
+                user.Id,
+                lockoutEndUtc);
+
             return new LoginServiceResult(
                 LoginStatus.LockedOut,
                 LockoutEndUtc: lockoutEndUtc);
@@ -62,6 +77,10 @@ public sealed class AuthService : IAuthService
 
         if (!signInResult.Succeeded)
         {
+            _logger.LogWarning(
+                "Login rejected because the credentials for user {UserId} were invalid.",
+                user.Id);
+
             return new LoginServiceResult(
                 LoginStatus.InvalidCredentials);
         }
@@ -71,6 +90,10 @@ public sealed class AuthService : IAuthService
 
         if (roles.Count == 0)
         {
+            _logger.LogError(
+                "Authentication configuration error: user {UserId} has no assigned role.",
+                user.Id);
+
             return new LoginServiceResult(
                 LoginStatus.MissingRole);
         }
@@ -102,6 +125,10 @@ public sealed class AuthService : IAuthService
                 FirstName: user.FirstName,
                 LastName: user.LastName,
                 Roles: roleCollection));
+
+        _logger.LogInformation(
+            "User {UserId} logged in successfully.",
+            user.Id);
 
         return new LoginServiceResult(
             LoginStatus.Success,

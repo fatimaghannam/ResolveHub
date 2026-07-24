@@ -127,6 +127,14 @@ public static class DatabaseSeeder
                     creationResult,
                     $"creating user '{seedUser.Email}'");
             }
+            else if (!user.LockoutEnabled)
+            {
+                user.LockoutEnabled = true;
+
+                EnsureSucceeded(
+                    await userManager.UpdateAsync(user),
+                    $"enabling lockout for '{seedUser.Email}'");
+            }
 
             if (!await userManager.IsInRoleAsync(
                     user,

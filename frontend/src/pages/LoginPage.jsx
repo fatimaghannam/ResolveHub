@@ -6,6 +6,10 @@ import '../styles/login.css'
 const AUTH_STORAGE_KEY = 'resolveHubAuth'
 
 function getLoginError(error) {
+  if (error.status === 400) {
+    return 'Please check your email address and password and try again.'
+  }
+
   if (error.status === 401) {
     return 'The email address or password is incorrect.'
   }
@@ -16,6 +20,10 @@ function getLoginError(error) {
 
   if (error.status === 423) {
     return 'Your account is temporarily locked after repeated failed attempts.'
+  }
+
+  if (error.status === 429) {
+    return 'Too many login attempts. Please wait and try again.'
   }
 
   if (error.message === 'CONNECTION_ERROR') {
@@ -45,13 +53,13 @@ function LoginPage() {
     try {
       setIsLoading(true)
 
-      const authData = await loginUser({
-        email: email.trim(),
-        password,
-      })
+      const authData = await loginUser(email.trim(), password)
 
       const storage = rememberMe ? localStorage : sessionStorage
+      const otherStorage = rememberMe ? sessionStorage : localStorage
+
       storage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authData))
+      otherStorage.removeItem(AUTH_STORAGE_KEY)
 
       setMessage('Sign in successful.')
     } catch (error) {

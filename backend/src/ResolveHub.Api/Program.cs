@@ -1,66 +1,62 @@
-using System.Security.Claims;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.OpenApi;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using ResolveHub.Api.Constants;
 using ResolveHub.Api.Data;
 using ResolveHub.Api.Data.Seed;
 using ResolveHub.Api.Entities;
+using ResolveHub.Api.Infrastructure;
 using ResolveHub.Api.Services.Implementations;
 using ResolveHub.Api.Services.Interfaces;
 using ResolveHub.Api.Settings;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add controller-based API support.
 builder.Services.AddControllers();
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
-// Generate the OpenAPI document and add JWT security information.
 builder.Services.AddOpenApi(options =>
 {
     options.AddDocumentTransformer<
         BearerSecuritySchemeTransformer>();
 });
 
-// Read the SQL Server connection string from configuration/User Secrets.
 var connectionString =
     builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException(
         "Connection string 'DefaultConnection' was not found.");
 
-// Register Entity Framework Core and SQL Server.
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
     options.UseSqlServer(connectionString);
 });
 
-// Required by Identity's default token providers.
 builder.Services.AddDataProtection();
 
-// Register ASP.NET Core Identity.
 builder.Services
     .AddIdentityCore<UserAccount>(options =>
     {
-        // User configuration.
         options.User.RequireUniqueEmail = true;
 
-        // Password requirements.
         options.Password.RequiredLength = 8;
         options.Password.RequireUppercase = true;
         options.Password.RequireLowercase = true;
         options.Password.RequireDigit = true;
         options.Password.RequireNonAlphanumeric = true;
 
-        // Account lockout configuration.
         options.Lockout.AllowedForNewUsers = true;
         options.Lockout.MaxFailedAccessAttempts = 5;
         options.Lockout.DefaultLockoutTimeSpan =
             TimeSpan.FromMinutes(15);
 
-        // Email confirmation is not required for this assignment.
         options.SignIn.RequireConfirmedEmail = false;
     })
     .AddRoles<Role>()
@@ -68,64 +64,18 @@ builder.Services
     .AddSignInManager()
     .AddDefaultTokenProviders();
 
-// Read and validate JWT configuration.
 var jwtSection =
-    builder.Configuration.GetSection(
-        JwtSettings.SectionName);
+    builder.Configuration.GetSection(JwtSettings.SectionName);
 
-var jwtSettings =
-    jwtSection.Get<JwtSettings>()
-    ?? throw new InvalidOperationException(
-        "JWT configuration could not be loaded.");
+builder.Services
+    .AddOptions<JwtSettings>()
+    .Bind(jwtSection)
+    .ValidateOnStart();
 
-if (string.IsNullOrWhiteSpace(jwtSettings.Issuer))
-{
-    throw new InvalidOperationException(
-        "JWT issuer is missing.");
-}
+builder.Services.AddSingleton<
+    IValidateOptions<JwtSettings>,
+    JwtSettingsValidator>();
 
-if (string.IsNullOrWhiteSpace(jwtSettings.Audience))
-{
-    throw new InvalidOperationException(
-        "JWT audience is missing.");
-}
-
-if (string.IsNullOrWhiteSpace(jwtSettings.Key))
-{
-    throw new InvalidOperationException(
-        "JWT signing key is missing.");
-}
-
-if (jwtSettings.AccessTokenExpirationMinutes <= 0)
-{
-    throw new InvalidOperationException(
-        "JWT expiration must be greater than zero minutes.");
-}
-
-byte[] jwtSigningKey;
-
-try
-{
-    jwtSigningKey =
-        Convert.FromBase64String(jwtSettings.Key);
-}
-catch (FormatException exception)
-{
-    throw new InvalidOperationException(
-        "JWT signing key must be a valid Base64 value.",
-        exception);
-}
-
-if (jwtSigningKey.Length < 32)
-{
-    throw new InvalidOperationException(
-        "JWT signing key must contain at least 32 bytes.");
-}
-
-// Make JwtSettings available through IOptions<JwtSettings>.
-builder.Services.Configure<JwtSettings>(jwtSection);
-
-// Register JWT bearer authentication.
 builder.Services
     .AddAuthentication(options =>
     {
@@ -135,72 +85,154 @@ builder.Services
         options.DefaultChallengeScheme =
             JwtBearerDefaults.AuthenticationScheme;
     })
-    .AddJwtBearer(options =>
+    .AddJwtBearer();
+
+builder.Services
+    .AddOptions<JwtBearerOptions>(
+        JwtBearerDefaults.AuthenticationScheme)
+    .Configure<IOptions<JwtSettings>>(
+        (options, jwtOptions) =>
+        {
+            var jwtSettings = jwtOptions.Value;
+            var signingKey = new SymmetricSecurityKey(
+                Convert.FromBase64String(jwtSettings.Key));
+
+            options.MapInboundClaims = false;
+            options.TokenValidationParameters =
+                new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidIssuer = jwtSettings.Issuer,
+                    ValidateAudience = true,
+                    ValidAudience = jwtSettings.Audience,
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = signingKey,
+                    ValidateLifetime = true,
+                    RequireExpirationTime = true,
+                    RequireSignedTokens = true,
+                    NameClaimType = "name",
+                    RoleClaimType = "role",
+                    ClockSkew = TimeSpan.Zero
+                };
+        });
+
+var allowedOrigins =
+    builder.Configuration
+        .GetSection("Cors:AllowedOrigins")
+        .Get<string[]>()
+    ?? [];
+
+if (allowedOrigins.Length == 0 ||
+    allowedOrigins.Any(string.IsNullOrWhiteSpace))
+{
+    throw new InvalidOperationException(
+        "At least one valid CORS allowed origin must be configured.");
+}
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(
+        SecurityPolicyNames.FrontendCors,
+        policy =>
+        {
+            policy
+                .WithOrigins(allowedOrigins)
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        });
+});
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode =
+        StatusCodes.Status429TooManyRequests;
+
+    options.OnRejected = async (context, cancellationToken) =>
     {
-        options.TokenValidationParameters =
-            new TokenValidationParameters
+        TimeSpan? retryAfter = null;
+
+        if (context.Lease.TryGetMetadata(
+                MetadataName.RetryAfter,
+                out var retryAfterValue))
+        {
+            retryAfter = retryAfterValue;
+            context.HttpContext.Response.Headers.RetryAfter =
+                Math.Max(
+                    1,
+                    (int)Math.Ceiling(
+                        retryAfterValue.TotalSeconds))
+                .ToString(
+                    System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        await context.HttpContext.Response.WriteAsJsonAsync(
+            new
             {
-                ValidateIssuer = true,
-                ValidIssuer = jwtSettings.Issuer,
+                message =
+                    "Too many login attempts. Please try again later.",
+                retryAfterSeconds = retryAfter is null
+                    ? (int?)null
+                    : Math.Max(
+                        1,
+                        (int)Math.Ceiling(
+                            retryAfter.Value.TotalSeconds))
+            },
+            cancellationToken);
+    };
 
-                ValidateAudience = true,
-                ValidAudience = jwtSettings.Audience,
+    options.AddPolicy(
+        SecurityPolicyNames.LoginRateLimit,
+        httpContext =>
+        {
+            var clientIdentifier =
+                httpContext.Connection.RemoteIpAddress?.ToString()
+                ?? "unknown-client";
 
-                ValidateIssuerSigningKey = true,
-                IssuerSigningKey =
-                    new SymmetricSecurityKey(jwtSigningKey),
+            return RateLimitPartition.GetFixedWindowLimiter(
+                clientIdentifier,
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 10,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                    AutoReplenishment = true
+                });
+        });
+});
 
-                ValidateLifetime = true,
-                RequireExpirationTime = true,
-
-                NameClaimType = ClaimTypes.Name,
-                RoleClaimType = ClaimTypes.Role,
-
-                // Do not allow extra time after token expiration.
-                ClockSkew = TimeSpan.Zero
-            };
-    });
-
-// Register application authentication services.
-builder.Services.AddSingleton<
-    ITokenService,
-    TokenService>();
-
-builder.Services.AddScoped<
-    IAuthService,
-    AuthService>();
-
-// Register role-based authorization.
+builder.Services.AddSingleton<ITokenService, TokenService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-// Seed the database when the application starts.
-await DatabaseSeeder.SeedAsync(
-    app.Services,
-    app.Configuration);
-
-// Enable OpenAPI and Swagger UI for the public demo.
-app.MapOpenApi();
-
-app.UseSwaggerUI(options =>
+if (app.Environment.IsDevelopment())
 {
-    options.SwaggerEndpoint(
-        "/openapi/v1.json",
-        "ResolveHub API v1");
-});
+    await DatabaseSeeder.SeedAsync(
+        app.Services,
+        app.Configuration);
 
-// Redirect HTTP requests to HTTPS.
+    app.MapOpenApi();
+
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint(
+            "/openapi/v1.json",
+            "ResolveHub API v1");
+    });
+}
+
+app.UseExceptionHandler();
 app.UseHttpsRedirection();
-
-// Authentication must run before authorization.
+app.UseCors(SecurityPolicyNames.FrontendCors);
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
-
-// Map controller routes.
 app.MapControllers();
 
 app.Run();
+
+public partial class Program;
 
 internal sealed class BearerSecuritySchemeTransformer(
     IAuthenticationSchemeProvider authenticationSchemeProvider)
@@ -226,7 +258,8 @@ internal sealed class BearerSecuritySchemeTransformer(
             return;
         }
 
-        var securitySchemes =
+        document.Components ??= new OpenApiComponents();
+        document.Components.SecuritySchemes =
             new Dictionary<string, IOpenApiSecurityScheme>
             {
                 [JwtBearerDefaults.AuthenticationScheme] =
@@ -241,34 +274,26 @@ internal sealed class BearerSecuritySchemeTransformer(
                     }
             };
 
-        document.Components ??=
-            new OpenApiComponents();
-
-        document.Components.SecuritySchemes =
-            securitySchemes;
-
-      // Apply the JWT security scheme to API operations.
-foreach (var pathItem in document.Paths.Values)
-{
-    if (pathItem.Operations is null)
-    {
-        continue;
-    }
-
-    foreach (var operation in pathItem.Operations.Values)
-    {
-        operation.Security ??= [];
-
-        operation.Security.Add(
-            new OpenApiSecurityRequirement
+        foreach (var pathItem in document.Paths.Values)
+        {
+            if (pathItem.Operations is null)
             {
-                [
-                    new OpenApiSecuritySchemeReference(
-                        JwtBearerDefaults.AuthenticationScheme,
-                        document)
-                ] = []
-            });
-    }
-}
+                continue;
+            }
+
+            foreach (var operation in pathItem.Operations.Values)
+            {
+                operation.Security ??= [];
+                operation.Security.Add(
+                    new OpenApiSecurityRequirement
+                    {
+                        [
+                            new OpenApiSecuritySchemeReference(
+                                JwtBearerDefaults.AuthenticationScheme,
+                                document)
+                        ] = []
+                    });
+            }
+        }
     }
 }

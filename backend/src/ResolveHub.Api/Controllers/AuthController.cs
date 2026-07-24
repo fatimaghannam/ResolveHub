@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using ResolveHub.Api.Constants;
 using ResolveHub.Api.DTOs.Auth;
 using ResolveHub.Api.Services.Interfaces;
 using ResolveHub.Api.Services.Models;
@@ -19,15 +21,21 @@ public sealed class AuthController : ControllerBase
 
     [AllowAnonymous]
     [HttpPost("login")]
+    [EnableRateLimiting(SecurityPolicyNames.LoginRateLimit)]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status423Locked)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<LoginResponse>> LoginAsync(
         [FromBody] LoginRequest request)
     {
+        Response.Headers.CacheControl = "no-store, no-cache";
+        Response.Headers.Pragma = "no-cache";
+        Response.Headers.Expires = "0";
+
         var result = await _authService.LoginAsync(request);
 
         return result.Status switch
@@ -56,7 +64,8 @@ public sealed class AuthController : ControllerBase
                     StatusCodes.Status403Forbidden,
                     new
                     {
-                        message = "This account is inactive."
+                        message =
+                            "This account is inactive. Please contact IT Support."
                     }),
 
             LoginStatus.MissingRole =>
@@ -64,8 +73,7 @@ public sealed class AuthController : ControllerBase
                     StatusCodes.Status500InternalServerError,
                     new
                     {
-                        message =
-                            "The account does not have an assigned role."
+                        message = "Unable to complete authentication."
                     }),
 
             _ =>
@@ -73,8 +81,7 @@ public sealed class AuthController : ControllerBase
                     StatusCodes.Status500InternalServerError,
                     new
                     {
-                        message =
-                            "An unexpected authentication error occurred."
+                        message = "Unable to complete authentication."
                     })
         };
     }

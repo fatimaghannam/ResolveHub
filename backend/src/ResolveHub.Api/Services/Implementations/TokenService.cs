@@ -88,23 +88,25 @@ public sealed class TokenService : ITokenService
                 email),
 
             new(
-                ClaimTypes.NameIdentifier,
-                user.Id.ToString(CultureInfo.InvariantCulture)),
+                JwtRegisteredClaimNames.GivenName,
+                user.FirstName),
 
             new(
-                ClaimTypes.Name,
-                fullName),
+                JwtRegisteredClaimNames.FamilyName,
+                user.LastName),
 
             new(
-                ClaimTypes.Email,
-                email)
+                JwtRegisteredClaimNames.Name,
+                fullName)
         };
 
         claims.AddRange(
             roles
                 .Distinct(StringComparer.Ordinal)
                 .Select(role =>
-                    new Claim(ClaimTypes.Role, role)));
+                    new Claim(
+                        "role",
+                        role)));
 
         var token = new JwtSecurityToken(
             issuer: _jwtSettings.Issuer,
