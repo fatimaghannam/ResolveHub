@@ -63,7 +63,15 @@ public sealed class ResolveHubApiFactory
         builder.UseSetting(
             "PasswordReset:TokenLifetimeMinutes",
             "30");
-        builder.UseSetting("Email:Enabled", "false");
+        builder.UseSetting(
+            "Resend:ApiToken",
+            "re_test_placeholder");
+        builder.UseSetting(
+            "Resend:FromEmail",
+            "onboarding@resend.dev");
+        builder.UseSetting(
+            "Resend:FromName",
+            "ResolveHub");
         builder.ConfigureLogging(logging =>
         {
             logging.ClearProviders();
@@ -255,6 +263,8 @@ public sealed class FakePasswordResetEmailSender
     private readonly List<SentPasswordResetEmail> _messages = [];
     private readonly object _sync = new();
 
+    public Exception? ExceptionToThrow { get; set; }
+
     public IReadOnlyList<SentPasswordResetEmail> Messages
     {
         get
@@ -273,6 +283,11 @@ public sealed class FakePasswordResetEmailSender
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+
+        if (ExceptionToThrow is not null)
+        {
+            throw ExceptionToThrow;
+        }
 
         lock (_sync)
         {

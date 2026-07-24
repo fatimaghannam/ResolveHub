@@ -40,7 +40,8 @@ public static class DatabaseSeeder
 
     public static async Task SeedAsync(
         IServiceProvider services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IWebHostEnvironment environment)
     {
         await using var scope = services.CreateAsyncScope();
 
@@ -65,7 +66,35 @@ public static class DatabaseSeeder
             ?? throw new InvalidOperationException(
                 "SeedData:DefaultPassword was not found in User Secrets.");
 
-        await SeedUsersAsync(userManager, defaultPassword);
+        await SeedUsersAsync(
+            userManager,
+            defaultPassword,
+            TestUsers,
+            includeEmailInErrors: true);
+
+        var passwordResetTestEmail =
+            configuration["SeedData:PasswordResetTestEmail"]
+                ?.Trim();
+
+        if (environment.IsDevelopment() &&
+            !string.IsNullOrWhiteSpace(passwordResetTestEmail))
+        {
+            SeedUser[] passwordResetTestUsers =
+            [
+                new(
+                    Email: passwordResetTestEmail,
+                    FirstName: "Password",
+                    LastName: "Tester",
+                    JobTitle: "Employee",
+                    RoleName: RoleNames.Employee)
+            ];
+
+            await SeedUsersAsync(
+                userManager,
+                defaultPassword,
+                passwordResetTestUsers,
+                includeEmailInErrors: false);
+        }
     }
 
     private static async Task SeedRolesAsync(
@@ -96,10 +125,16 @@ public static class DatabaseSeeder
 
     private static async Task SeedUsersAsync(
         UserManager<UserAccount> userManager,
-        string defaultPassword)
+        string defaultPassword,
+        IEnumerable<SeedUser> seedUsers,
+        bool includeEmailInErrors)
     {
-        foreach (var seedUser in TestUsers)
+        foreach (var seedUser in seedUsers)
         {
+            var userDescription = includeEmailInErrors
+                ? $"user '{seedUser.Email}'"
+                : "password-reset test user";
+
             var user =
                 await userManager.FindByEmailAsync(seedUser.Email);
 
@@ -125,7 +160,7 @@ public static class DatabaseSeeder
 
                 EnsureSucceeded(
                     creationResult,
-                    $"creating user '{seedUser.Email}'");
+                    $"creating {userDescription}");
             }
             else if (!user.LockoutEnabled)
             {
@@ -133,7 +168,7 @@ public static class DatabaseSeeder
 
                 EnsureSucceeded(
                     await userManager.UpdateAsync(user),
-                    $"enabling lockout for '{seedUser.Email}'");
+                    $"enabling lockout for {userDescription}");
             }
 
             if (!await userManager.IsInRoleAsync(
@@ -148,7 +183,7 @@ public static class DatabaseSeeder
                 EnsureSucceeded(
                     roleResult,
                     $"assigning role '{seedUser.RoleName}' " +
-                    $"to '{seedUser.Email}'");
+                    $"to {userDescription}");
             }
         }
     }

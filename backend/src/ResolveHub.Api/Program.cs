@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using Resend;
 using ResolveHub.Api.Constants;
 using ResolveHub.Api.Data;
 using ResolveHub.Api.Data.Seed;
@@ -93,25 +94,30 @@ builder.Services
         "PasswordReset:TokenLifetimeMinutes must be between 5 and 1440.")
     .ValidateOnStart();
 
+var resendSection =
+    builder.Configuration.GetSection(
+        ResendSettings.SectionName);
+
+var resendSettings =
+    resendSection.Get<ResendSettings>()
+    ?? new ResendSettings();
+
 builder.Services
-    .AddOptions<EmailSettings>()
+    .AddOptions<ResendSettings>()
     .Bind(
-        builder.Configuration.GetSection(
-            EmailSettings.SectionName))
+        resendSection)
     .Validate(
         settings =>
-            !settings.Enabled ||
-            (!string.IsNullOrWhiteSpace(settings.Host) &&
-             settings.Port is > 0 and <= 65535 &&
-             !string.IsNullOrWhiteSpace(settings.FromAddress) &&
-             !string.IsNullOrWhiteSpace(settings.FromName)),
-        "Enabled email delivery requires a host, valid port, from address, and from name.")
-    .Validate(
-        settings =>
-            !builder.Environment.IsProduction() ||
-            settings.Enabled,
-        "Email delivery must be enabled in production.")
+            !string.IsNullOrWhiteSpace(settings.ApiToken) &&
+            !string.IsNullOrWhiteSpace(settings.FromEmail) &&
+            !string.IsNullOrWhiteSpace(settings.FromName),
+        "Resend requires an API token, sender email, and sender name.")
     .ValidateOnStart();
+
+builder.Services.AddResend(options =>
+{
+    options.ApiToken = resendSettings.ApiToken;
+});
 
 builder.Services.Configure<DataProtectionTokenProviderOptions>(
     options =>
@@ -302,7 +308,7 @@ builder.Services.AddSingleton<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<
     IPasswordResetEmailSender,
-    SmtpPasswordResetEmailSender>();
+    ResendPasswordResetEmailSender>();
 builder.Services.AddScoped<
     IPasswordResetService,
     PasswordResetService>();
@@ -314,7 +320,8 @@ if (app.Environment.IsDevelopment())
 {
     await DatabaseSeeder.SeedAsync(
         app.Services,
-        app.Configuration);
+        app.Configuration,
+        app.Environment);
 
     app.MapOpenApi();
 

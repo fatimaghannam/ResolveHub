@@ -125,6 +125,34 @@ public sealed class PasswordResetFlowTests
     }
 
     [Fact]
+    public async Task ForgotPassword_EmailProviderFailure_ReturnsGenericAcceptedResponse()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        const string email = "provider-failure@resolvehub.test";
+        await factory.CreateUserAsync(email, OriginalPassword);
+        factory.EmailSender.ExceptionToThrow =
+            new InvalidOperationException(
+                "Resend provider sensitive failure detail.");
+        using var client = factory.CreateHttpsClient();
+
+        var response = await ForgotAsync(client, email);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        Assert.Equal(GenericForgotMessage, await ReadMessageAsync(response));
+        AssertNoCache(response);
+        Assert.DoesNotContain(
+            "Resend provider sensitive failure detail.",
+            body,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "token",
+            body,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(factory.EmailSender.Messages);
+    }
+
+    [Fact]
     public async Task ResetPassword_ValidLink_ChangesPasswordAndCannotBeReused()
     {
         await using var factory = new ResolveHubApiFactory();
