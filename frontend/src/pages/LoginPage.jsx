@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { loginUser } from '../services/authService.js'
 import '../styles/login.css'
 
@@ -34,12 +35,16 @@ function getLoginError(error) {
 }
 
 function LoginPage() {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [message, setMessage] = useState('')
+  const [message, setMessage] = useState(
+    location.state?.passwordResetMessage ?? '',
+  )
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -70,7 +75,7 @@ function LoginPage() {
   }
 
   function handleForgotPassword() {
-    setMessage('Please contact IT Support to reset your password.')
+    navigate('/forgot-password')
   }
 
   return (

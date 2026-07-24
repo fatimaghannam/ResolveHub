@@ -64,6 +64,66 @@ builder.Services
     .AddSignInManager()
     .AddDefaultTokenProviders();
 
+builder.Services
+    .AddOptions<FrontendSettings>()
+    .Bind(
+        builder.Configuration.GetSection(
+            FrontendSettings.SectionName))
+    .Validate(
+        settings =>
+            Uri.TryCreate(
+                settings.BaseUrl,
+                UriKind.Absolute,
+                out var uri) &&
+            (uri.Scheme == Uri.UriSchemeHttp ||
+             uri.Scheme == Uri.UriSchemeHttps) &&
+            string.IsNullOrEmpty(uri.Query) &&
+            string.IsNullOrEmpty(uri.Fragment),
+        "Frontend:BaseUrl must be an absolute HTTP or HTTPS URL without a query string or fragment.")
+    .ValidateOnStart();
+
+builder.Services
+    .AddOptions<PasswordResetSettings>()
+    .Bind(
+        builder.Configuration.GetSection(
+            PasswordResetSettings.SectionName))
+    .Validate(
+        settings =>
+            settings.TokenLifetimeMinutes is >= 5 and <= 1440,
+        "PasswordReset:TokenLifetimeMinutes must be between 5 and 1440.")
+    .ValidateOnStart();
+
+builder.Services
+    .AddOptions<EmailSettings>()
+    .Bind(
+        builder.Configuration.GetSection(
+            EmailSettings.SectionName))
+    .Validate(
+        settings =>
+            !settings.Enabled ||
+            (!string.IsNullOrWhiteSpace(settings.Host) &&
+             settings.Port is > 0 and <= 65535 &&
+             !string.IsNullOrWhiteSpace(settings.FromAddress) &&
+             !string.IsNullOrWhiteSpace(settings.FromName)),
+        "Enabled email delivery requires a host, valid port, from address, and from name.")
+    .Validate(
+        settings =>
+            !builder.Environment.IsProduction() ||
+            settings.Enabled,
+        "Email delivery must be enabled in production.")
+    .ValidateOnStart();
+
+builder.Services.Configure<DataProtectionTokenProviderOptions>(
+    options =>
+    {
+        var tokenLifetimeMinutes =
+            builder.Configuration.GetValue<int>(
+                "PasswordReset:TokenLifetimeMinutes");
+
+        options.TokenLifespan =
+            TimeSpan.FromMinutes(tokenLifetimeMinutes);
+    });
+
 var jwtSection =
     builder.Configuration.GetSection(JwtSettings.SectionName);
 
@@ -169,7 +229,7 @@ builder.Services.AddRateLimiter(options =>
             new
             {
                 message =
-                    "Too many login attempts. Please try again later.",
+                    "Too many requests. Please try again later.",
                 retryAfterSeconds = retryAfter is null
                     ? (int?)null
                     : Math.Max(
@@ -198,10 +258,54 @@ builder.Services.AddRateLimiter(options =>
                     AutoReplenishment = true
                 });
         });
+
+    options.AddPolicy(
+        SecurityPolicyNames.ForgotPasswordRateLimit,
+        httpContext =>
+        {
+            var clientIdentifier =
+                httpContext.Connection.RemoteIpAddress?.ToString()
+                ?? "unknown-client";
+
+            return RateLimitPartition.GetFixedWindowLimiter(
+                clientIdentifier,
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 5,
+                    Window = TimeSpan.FromMinutes(15),
+                    QueueLimit = 0,
+                    AutoReplenishment = true
+                });
+        });
+
+    options.AddPolicy(
+        SecurityPolicyNames.ResetPasswordRateLimit,
+        httpContext =>
+        {
+            var clientIdentifier =
+                httpContext.Connection.RemoteIpAddress?.ToString()
+                ?? "unknown-client";
+
+            return RateLimitPartition.GetFixedWindowLimiter(
+                clientIdentifier,
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 10,
+                    Window = TimeSpan.FromMinutes(15),
+                    QueueLimit = 0,
+                    AutoReplenishment = true
+                });
+        });
 });
 
 builder.Services.AddSingleton<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<
+    IPasswordResetEmailSender,
+    SmtpPasswordResetEmailSender>();
+builder.Services.AddScoped<
+    IPasswordResetService,
+    PasswordResetService>();
 builder.Services.AddAuthorization();
 
 var app = builder.Build();

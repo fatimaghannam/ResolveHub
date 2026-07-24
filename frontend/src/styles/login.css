@@ -527,3 +527,34 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+.form-message--success {
+  color: #137333;
+}
+
+.password-guidance {
+  color: #68768a;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.auth-card__footer {
+  white-space: normal;
+}
+
+.auth-link {
+  color: #1769c2;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.auth-link:hover {
+  color: #0d4f96;
+  text-decoration: underline;
+}
+
+.auth-link:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid #2478ce;
+  outline-offset: 3px;
+}

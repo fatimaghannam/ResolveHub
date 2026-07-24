@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -6,9 +7,13 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using ResolveHub.Api.Constants;
 using ResolveHub.Api.Data;
 using ResolveHub.Api.Entities;
+using ResolveHub.Api.DTOs.Auth;
+using ResolveHub.Api.Services.Interfaces;
+using ResolveHub.Api.Services.Models;
 
 namespace ResolveHub.Api.Tests;
 
@@ -22,6 +27,19 @@ public sealed class ResolveHubApiFactory
 
     private readonly string _databaseName =
         $"ResolveHubTests-{Guid.NewGuid():N}";
+    private readonly TimeSpan? _tokenLifespan;
+    private readonly bool _throwPasswordResetRequests;
+
+    public ResolveHubApiFactory(
+        TimeSpan? tokenLifespan = null,
+        bool throwPasswordResetRequests = false)
+    {
+        _tokenLifespan = tokenLifespan;
+        _throwPasswordResetRequests =
+            throwPasswordResetRequests;
+    }
+
+    public FakePasswordResetEmailSender EmailSender { get; } = new();
 
     protected override void ConfigureWebHost(
         IWebHostBuilder builder)
@@ -39,6 +57,13 @@ public sealed class ResolveHubApiFactory
         builder.UseSetting(
             "Cors:AllowedOrigins:0",
             "https://localhost:5173");
+        builder.UseSetting(
+            "Frontend:BaseUrl",
+            "https://frontend.resolvehub.test");
+        builder.UseSetting(
+            "PasswordReset:TokenLifetimeMinutes",
+            "30");
+        builder.UseSetting("Email:Enabled", "false");
         builder.ConfigureLogging(logging =>
         {
             logging.ClearProviders();
@@ -57,6 +82,37 @@ public sealed class ResolveHubApiFactory
                 {
                     options.UseInMemoryDatabase(_databaseName);
                 });
+
+            services.AddDataProtection()
+                .UseEphemeralDataProtectionProvider();
+            services.Configure<PasswordHasherOptions>(
+                options =>
+                {
+                    options.IterationCount = 1_000;
+                });
+
+            services.RemoveAll<IPasswordResetEmailSender>();
+            services.AddSingleton<IPasswordResetEmailSender>(
+                EmailSender);
+
+            if (_throwPasswordResetRequests)
+            {
+                services.RemoveAll<IPasswordResetService>();
+                services.AddScoped<
+                    IPasswordResetService,
+                    ThrowingPasswordResetService>();
+            }
+
+            if (_tokenLifespan is not null)
+            {
+                services.PostConfigure<
+                    DataProtectionTokenProviderOptions>(
+                    options =>
+                    {
+                        options.TokenLifespan =
+                            _tokenLifespan.Value;
+                    });
+            }
         });
     }
 
@@ -74,7 +130,8 @@ public sealed class ResolveHubApiFactory
         string email,
         string password,
         string? roleName = RoleNames.Employee,
-        bool isActive = true)
+        bool isActive = true,
+        bool emailConfirmed = true)
     {
         using var scope = Services.CreateScope();
 
@@ -103,7 +160,7 @@ public sealed class ResolveHubApiFactory
         {
             UserName = email,
             Email = email,
-            EmailConfirmed = true,
+            EmailConfirmed = emailConfirmed,
             FirstName = "Test",
             LastName = "User",
             IsActive = isActive,
@@ -135,6 +192,24 @@ public sealed class ResolveHubApiFactory
                 $"Test user '{email}' was not found.");
     }
 
+    public async Task SetLockoutAsync(
+        string email,
+        int failedCount,
+        DateTimeOffset lockoutEnd)
+    {
+        using var scope = Services.CreateScope();
+        var userManager =
+            scope.ServiceProvider
+                .GetRequiredService<UserManager<UserAccount>>();
+        var user = await userManager.FindByEmailAsync(email)
+            ?? throw new InvalidOperationException(
+                $"Test user '{email}' was not found.");
+
+        user.AccessFailedCount = failedCount;
+        user.LockoutEnd = lockoutEnd;
+        EnsureSucceeded(await userManager.UpdateAsync(user));
+    }
+
     private static void EnsureSucceeded(IdentityResult result)
     {
         if (result.Succeeded)
@@ -146,5 +221,68 @@ public sealed class ResolveHubApiFactory
             string.Join(
                 "; ",
                 result.Errors.Select(error => error.Description)));
+    }
+}
+
+public sealed class ThrowingPasswordResetService
+    : IPasswordResetService
+{
+    public Task RequestPasswordResetAsync(
+        ForgotPasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        throw new InvalidOperationException(
+            "Sensitive internal test detail.");
+    }
+
+    public Task<PasswordResetServiceResult> ResetPasswordAsync(
+        ResetPasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        throw new InvalidOperationException(
+            "Sensitive internal test detail.");
+    }
+}
+
+public sealed record SentPasswordResetEmail(
+    string RecipientEmail,
+    string RecipientName,
+    string ResetUrl);
+
+public sealed class FakePasswordResetEmailSender
+    : IPasswordResetEmailSender
+{
+    private readonly List<SentPasswordResetEmail> _messages = [];
+    private readonly object _sync = new();
+
+    public IReadOnlyList<SentPasswordResetEmail> Messages
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _messages.ToArray();
+            }
+        }
+    }
+
+    public Task SendPasswordResetEmailAsync(
+        string recipientEmail,
+        string recipientName,
+        string resetUrl,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        lock (_sync)
+        {
+            _messages.Add(
+                new SentPasswordResetEmail(
+                    recipientEmail,
+                    recipientName,
+                    resetUrl));
+        }
+
+        return Task.CompletedTask;
     }
 }

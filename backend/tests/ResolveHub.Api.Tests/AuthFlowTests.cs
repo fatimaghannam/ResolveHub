@@ -488,7 +488,7 @@ public sealed class AuthFlowTests
             response.StatusCode);
         Assert.True(response.Headers.RetryAfter is not null);
         Assert.Equal(
-            "Too many login attempts. Please try again later.",
+            "Too many requests. Please try again later.",
             await ReadMessageAsync(response));
     }
 
