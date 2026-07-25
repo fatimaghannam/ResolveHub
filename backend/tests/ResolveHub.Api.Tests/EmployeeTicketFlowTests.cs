@@ -70,7 +70,8 @@ public sealed class EmployeeTicketFlowTests
         var page = await client.GetFromJsonAsync<PagedResultDto<TicketListItemDto>>(
             $"/api/tickets?search={Uri.EscapeDataString(first.TicketReferenceNumber)}" +
             $"&categoryId={lookups.CategoryId}&priorityId={lookups.PriorityId}" +
-            "&fromDate=2026-07-20&toDate=2026-07-20&page=1&pageSize=1" +
+            "&fromUtc=2026-07-20T00%3A00%3A00Z" +
+            "&toUtcExclusive=2026-07-21T00%3A00%3A00Z&page=1&pageSize=1" +
             "&sortBy=title&sortDirection=asc");
 
         Assert.NotNull(page);
@@ -78,6 +79,63 @@ public sealed class EmployeeTicketFlowTests
         Assert.Equal(first.Id, page.Items.Single().Id);
         Assert.Equal(1, page.TotalItems);
         Assert.Equal(1, page.TotalPages);
+    }
+
+    [Fact]
+    public async Task TicketList_UsesInclusiveExclusiveUtcBoundaries()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        await factory.SeedTicketLookupsAsync();
+        var employee = await factory.CreateUserAsync(
+            "utc-boundaries@resolvehub.test", Password);
+        using var client = await CreateEmployeeClientAsync(factory, employee.Email!);
+
+        var exactStart = await CreateTicketAsync(factory, client, "Exact UTC range start");
+        var localToday = await CreateTicketAsync(factory, client, "Local today ticket");
+        var beforeEnd = await CreateTicketAsync(factory, client, "Before UTC range end");
+        var beforeStart = await CreateTicketAsync(factory, client, "Before UTC range start");
+        var exactEnd = await CreateTicketAsync(factory, client, "Exact UTC range end");
+
+        var fromUtc = new DateTime(2026, 7, 25, 21, 0, 0, DateTimeKind.Utc);
+        var toUtcExclusive = new DateTime(2026, 7, 26, 21, 0, 0, DateTimeKind.Utc);
+        await factory.SetTicketCreatedDateAsync(exactStart.Id, fromUtc);
+        await factory.SetTicketCreatedDateAsync(
+            localToday.Id,
+            new DateTime(2026, 7, 25, 21, 30, 0, DateTimeKind.Utc));
+        await factory.SetTicketCreatedDateAsync(beforeEnd.Id, toUtcExclusive.AddTicks(-1));
+        await factory.SetTicketCreatedDateAsync(beforeStart.Id, fromUtc.AddTicks(-1));
+        await factory.SetTicketCreatedDateAsync(exactEnd.Id, toUtcExclusive);
+
+        var page = await client.GetFromJsonAsync<PagedResultDto<TicketListItemDto>>(
+            "/api/tickets?fromUtc=2026-07-25T21%3A00%3A00Z" +
+            "&toUtcExclusive=2026-07-26T21%3A00%3A00Z");
+
+        Assert.NotNull(page);
+        Assert.Equal(3, page.TotalItems);
+        Assert.Contains(page.Items, ticket => ticket.Id == exactStart.Id);
+        Assert.Contains(page.Items, ticket => ticket.Id == localToday.Id);
+        Assert.Contains(page.Items, ticket => ticket.Id == beforeEnd.Id);
+        Assert.DoesNotContain(page.Items, ticket => ticket.Id == beforeStart.Id);
+        Assert.DoesNotContain(page.Items, ticket => ticket.Id == exactEnd.Id);
+    }
+
+    [Theory]
+    [InlineData("?fromUtc=2026-07-25T21%3A00%3A00Z")]
+    [InlineData("?toUtcExclusive=2026-07-26T21%3A00%3A00Z")]
+    [InlineData(
+        "?fromUtc=2026-07-26T21%3A00%3A00Z" +
+        "&toUtcExclusive=2026-07-25T21%3A00%3A00Z")]
+    public async Task TicketList_RejectsIncompleteOrInvalidUtcRanges(string query)
+    {
+        await using var factory = new ResolveHubApiFactory();
+        await factory.SeedTicketLookupsAsync();
+        var employee = await factory.CreateUserAsync(
+            $"invalid-range-{Guid.NewGuid():N}@resolvehub.test", Password);
+        using var client = await CreateEmployeeClientAsync(factory, employee.Email!);
+
+        var response = await client.GetAsync($"/api/tickets{query}");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]

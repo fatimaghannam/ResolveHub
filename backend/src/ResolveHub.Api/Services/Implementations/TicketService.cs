@@ -75,18 +75,16 @@ public sealed class TicketService(ApplicationDbContext dbContext)
         if (filter.PriorityId.HasValue)
             query = query.Where(ticket => ticket.TicketPriorityID == filter.PriorityId);
 
-        if (filter.FromDate.HasValue)
+        if (filter.FromUtc.HasValue)
         {
-            var from = filter.FromDate.Value.ToDateTime(TimeOnly.MinValue);
-            query = query.Where(ticket => ticket.CreatedDate >= from);
+            var fromUtc = filter.FromUtc.Value.UtcDateTime;
+            query = query.Where(ticket => ticket.CreatedDate >= fromUtc);
         }
 
-        if (filter.ToDate.HasValue)
+        if (filter.ToUtcExclusive.HasValue)
         {
-            var toExclusive = filter.ToDate.Value
-                .AddDays(1)
-                .ToDateTime(TimeOnly.MinValue);
-            query = query.Where(ticket => ticket.CreatedDate < toExclusive);
+            var toUtcExclusive = filter.ToUtcExclusive.Value.UtcDateTime;
+            query = query.Where(ticket => ticket.CreatedDate < toUtcExclusive);
         }
 
         var totalItems = await query.CountAsync(cancellationToken);
