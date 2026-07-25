@@ -25,7 +25,7 @@ public sealed class TicketDraftService(
     public async Task<TicketServiceResult<TicketDraftDto>> CreateAsync(
         int userId, SaveTicketDraftRequestDto request, CancellationToken token)
     {
-        var validation = await ValidateAsync(userId, request, token);
+        var validation = await ValidateAsync(request, token);
         if (validation is not null)
             return new(TicketOperationStatus.Invalid, Message: validation);
         var now = DateTime.UtcNow;
@@ -42,7 +42,7 @@ public sealed class TicketDraftService(
         var draft = await dbContext.TicketDrafts.SingleOrDefaultAsync(
             item => item.ID == id && item.UserAccountID == userId, token);
         if (draft is null) return new(TicketOperationStatus.NotFound);
-        var validation = await ValidateAsync(userId, request, token);
+        var validation = await ValidateAsync(request, token);
         if (validation is not null)
             return new(TicketOperationStatus.Invalid, Message: validation);
         Apply(draft, request);
@@ -72,8 +72,7 @@ public sealed class TicketDraftService(
             Title = draft.Title ?? string.Empty,
             Description = draft.Description ?? string.Empty,
             TicketCategoryId = draft.TicketCategoryID ?? 0,
-            TicketPriorityId = draft.TicketPriorityID ?? 0,
-            AssetId = draft.AssetID
+            TicketPriorityId = draft.TicketPriorityID ?? 0
         };
         await using var transaction = dbContext.Database.IsRelational()
             ? await dbContext.Database.BeginTransactionAsync(token)
@@ -88,13 +87,12 @@ public sealed class TicketDraftService(
     }
 
     private async Task<string?> ValidateAsync(
-        int userId, SaveTicketDraftRequestDto request, CancellationToken token)
+        SaveTicketDraftRequestDto request, CancellationToken token)
     {
         if (string.IsNullOrWhiteSpace(request.Title) &&
             string.IsNullOrWhiteSpace(request.Description) &&
             request.TicketCategoryId is null &&
-            request.TicketPriorityId is null &&
-            request.AssetId is null)
+            request.TicketPriorityId is null)
             return "Enter at least one value before saving a draft.";
         if (request.TicketCategoryId is int categoryId &&
             !await dbContext.TicketCategories.AnyAsync(
@@ -104,16 +102,6 @@ public sealed class TicketDraftService(
             !await dbContext.TicketPriorities.AnyAsync(
                 item => item.ID == priorityId && item.IsActive, token))
             return "Select a valid active priority.";
-        if (request.AssetId is int assetId)
-        {
-            var department = await dbContext.Users.Where(user => user.Id == userId)
-                .Select(user => user.DepartmentID).SingleAsync(token);
-            if (!await dbContext.Assets.AnyAsync(asset => asset.ID == assetId &&
-                asset.IsActive && (asset.AssignedToUserAccountID == userId ||
-                    (department != null && asset.AssignedToUserAccountID == null &&
-                     asset.DepartmentID == department)), token))
-                return "Select an active asset available to your account.";
-        }
         return null;
     }
 
@@ -123,16 +111,15 @@ public sealed class TicketDraftService(
         draft.Description = NullIfWhiteSpace(request.Description);
         draft.TicketCategoryID = request.TicketCategoryId;
         draft.TicketPriorityID = request.TicketPriorityId;
-        draft.AssetID = request.AssetId;
     }
 
     private static string? NullIfWhiteSpace(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     private static TicketDraftDto ToDto(TicketDraft draft) =>
         new(draft.ID, draft.Title, draft.Description, draft.TicketCategoryID,
-            draft.TicketPriorityID, draft.AssetID, draft.CreatedDate, draft.UpdatedDate);
+            draft.TicketPriorityID, draft.CreatedDate, draft.UpdatedDate);
     private static IQueryable<TicketDraftDto> Project(IQueryable<TicketDraft> query) =>
         query.Select(draft => new TicketDraftDto(draft.ID, draft.Title,
             draft.Description, draft.TicketCategoryID, draft.TicketPriorityID,
-            draft.AssetID, draft.CreatedDate, draft.UpdatedDate));
+            draft.CreatedDate, draft.UpdatedDate));
 }

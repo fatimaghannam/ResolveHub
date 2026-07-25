@@ -10,7 +10,6 @@ public sealed class SaveTicketDraftRequestDto
     public string? Description { get; init; }
     public int? TicketCategoryId { get; init; }
     public int? TicketPriorityId { get; init; }
-    public int? AssetId { get; init; }
 }
 
 public sealed record TicketDraftDto(
@@ -19,6 +18,5 @@ public sealed record TicketDraftDto(
     string? Description,
     int? TicketCategoryId,
     int? TicketPriorityId,
-    int? AssetId,
     DateTime CreatedDate,
     DateTime UpdatedDate);

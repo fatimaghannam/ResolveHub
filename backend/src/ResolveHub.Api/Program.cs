@@ -323,7 +323,6 @@ builder.Services.AddScoped<
     IPasswordResetService,
     PasswordResetService>();
 builder.Services.AddScoped<ITicketService, TicketService>();
-builder.Services.AddScoped<IAssetService, AssetService>();
 builder.Services.AddScoped<ITicketAttachmentService, TicketAttachmentService>();
 builder.Services.AddScoped<ITicketDraftService, TicketDraftService>();
 builder.Services.AddAuthorization();

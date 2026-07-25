@@ -27,8 +27,6 @@ export const getPriorities = (signal) =>
   apiRequest('/api/ticket-priorities', { signal })
 export const getStatuses = (signal) =>
   apiRequest('/api/ticket-statuses', { signal })
-export const getMyAssets = (search = '', signal) =>
-  apiRequest(`/api/assets/mine${toQueryString({ search })}`, { signal })
 export const uploadAttachment = (ticketId, file) => {
   const form = new FormData()
   form.append('file', file)

@@ -4,6 +4,7 @@ import Pagination from '../components/common/Pagination.jsx'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
 import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
 import { cancelTicket, getCategories, getPriorities, getStatuses, getTickets } from '../services/ticketService.js'
+import { formatLocalDate } from '../utils/dateTime.js'
 
 const emptyFilters = { search: '', statusId: '', categoryId: '', priorityId: '', fromDate: '', toDate: '', page: 1, pageSize: 10 }
 
@@ -108,7 +109,7 @@ function EmployeeTicketsPage() {
             <tbody>{data.items.map((ticket) => <tr key={ticket.id}>
               <td><strong>{ticket.ticketReferenceNumber}</strong></td><td>{ticket.title}</td><td>{ticket.categoryName}</td>
               <td><TicketPriorityBadge value={ticket.priorityName} /></td><td><TicketStatusBadge value={ticket.statusName} /></td>
-              <td>{ticket.assignedToName ?? 'Unassigned'}</td><td>{new Date(ticket.createdDate).toLocaleDateString()}</td>
+              <td>{ticket.assignedToName ?? 'Unassigned'}</td><td>{formatLocalDate(ticket.createdDate)}</td>
               <td><div className="row-actions"><Link to={`/employee/tickets/${ticket.id}`}>View</Link>{ticket.canEdit && <Link to={`/employee/tickets/${ticket.id}/edit`}>Edit</Link>}{ticket.canDelete && <button onClick={() => setCancelTarget(ticket)}>Delete</button>}</div></td>
             </tr>)}</tbody>
           </table></div>

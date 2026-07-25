@@ -1,10 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Paperclip, Save, Send, Upload } from 'lucide-react'
-import {
-  getCategories,
-  getMyAssets,
-  getPriorities,
-} from '../../services/ticketService.js'
+import { getCategories, getPriorities } from '../../services/ticketService.js'
 import { ErrorState, LoadingState } from '../common/States.jsx'
 
 const emptyValues = {
@@ -12,7 +8,6 @@ const emptyValues = {
   description: '',
   ticketCategoryId: '',
   ticketPriorityId: '',
-  assetId: '',
 }
 const allowedExtensions = ['png', 'jpg', 'jpeg', 'pdf', 'docx', 'txt', 'log', 'zip']
 const maxFileSize = 10 * 1024 * 1024
@@ -35,8 +30,6 @@ function TicketForm({
 }) {
   const [values, setValues] = useState({ ...emptyValues, ...initialValues })
   const [lookups, setLookups] = useState(null)
-  const [assets, setAssets] = useState([])
-  const [assetSearch, setAssetSearch] = useState('')
   const [files, setFiles] = useState([])
   const [fileErrors, setFileErrors] = useState([])
   const [errors, setErrors] = useState({})
@@ -51,15 +44,10 @@ function TicketForm({
     const controller = new AbortController()
     setLoadingError('')
     setLookups(null)
-    Promise.all([
-      getCategories(controller.signal),
-      getPriorities(controller.signal),
-      getMyAssets('', controller.signal),
-    ])
-      .then(([categories, priorities, assetOptions]) => {
+    Promise.all([getCategories(controller.signal), getPriorities(controller.signal)])
+      .then(([categories, priorities]) => {
         if (!controller.signal.aborted) {
           setLookups({ categories, priorities })
-          setAssets(assetOptions)
         }
       })
       .catch((error) => {
@@ -69,29 +57,6 @@ function TicketForm({
       })
     return () => controller.abort()
   }, [lookupRequest])
-
-  useEffect(() => {
-    if (!lookups) return undefined
-    const controller = new AbortController()
-    const timer = setTimeout(() => {
-      getMyAssets(assetSearch, controller.signal)
-        .then((result) => {
-          if (!controller.signal.aborted) setAssets(result)
-        })
-        .catch((error) => {
-          if (error.name !== 'AbortError' && !controller.signal.aborted) {
-            setErrors((current) => ({
-              ...current,
-              asset: 'Assets could not be searched.',
-            }))
-          }
-        })
-    }, 300)
-    return () => {
-      clearTimeout(timer)
-      controller.abort()
-    }
-  }, [assetSearch, lookups])
 
   function validate() {
     const next = {}
@@ -113,7 +78,6 @@ function TicketForm({
       ticketPriorityId: values.ticketPriorityId
         ? Number(values.ticketPriorityId)
         : null,
-      assetId: values.assetId ? Number(values.assetId) : null,
     }
   }
 
@@ -218,23 +182,6 @@ function TicketForm({
           <em>{errors.ticketPriorityId}</em>
         </label>
       </div>
-
-      <label>
-        <span>Related Asset <small>(optional)</small></span>
-        <input
-          value={assetSearch}
-          onChange={(event) => setAssetSearch(event.target.value)}
-          placeholder="Search by asset name, tag, serial number, or location…"
-        />
-        <select value={values.assetId} onChange={(event) => setValues({ ...values, assetId: event.target.value })}>
-          <option value="">No related asset</option>
-          {assets.map((asset) => (
-            <option key={asset.id} value={asset.id}>{asset.assetTag} — {asset.assetName}</option>
-          ))}
-        </select>
-        {assets.length === 0 && <small>No active assets are assigned or available to your department.</small>}
-        <em>{errors.asset}</em>
-      </label>
 
       <section className="attachment-field" aria-labelledby="attachment-title">
         <div><strong id="attachment-title">Attachments <small>(optional)</small></strong><p>PNG, JPG, PDF, DOCX, TXT, LOG or ZIP. Maximum 10 MB each — up to 5 files.</p></div>

@@ -1,12 +1,10 @@
 import { useEffect, useState } from 'react'
+import { ArrowLeft } from 'lucide-react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ErrorState, LoadingState } from '../components/common/States.jsx'
 import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
 import { cancelTicket, downloadAttachment, getTicket } from '../services/ticketService.js'
-
-function formatDate(value) {
-  return value ? new Date(value).toLocaleString() : '—'
-}
+import { formatLocalDateTime } from '../utils/dateTime.js'
 
 function TicketDetailsPage() {
   const { id } = useParams()
@@ -68,26 +66,33 @@ function TicketDetailsPage() {
     }
   }
 
+  function goBackToTickets() {
+    navigate('/employee/tickets')
+  }
+
   if (error) return <ErrorState message={error} />
   if (!ticket) return <LoadingState message="Loading ticket details…" />
 
   return (
     <>
       {location.state?.notice && <div className="inline-alert inline-alert--success" role="status">{location.state.notice}</div>}
-      <section className="page-heading page-heading--action"><div><span className="eyebrow">{ticket.ticketReferenceNumber}</span><h2>{ticket.title}</h2><p>Created {formatDate(ticket.createdDate)}</p></div><div className="heading-actions">{ticket.canEdit && <Link className="button button--secondary" to={`/employee/tickets/${id}/edit`}>Edit</Link>}{ticket.canDelete && <button className="button button--danger-outline" onClick={() => setDialogOpen(true)}>Cancel Ticket</button>}</div></section>
+      <button type="button" className="back-link back-link--top" onClick={goBackToTickets} aria-label="Back to My Tickets">
+        <ArrowLeft size={17} aria-hidden="true" />
+        <span>Back to My Tickets</span>
+      </button>
+      <section className="page-heading page-heading--action"><div><span className="eyebrow">{ticket.ticketReferenceNumber}</span><h2>{ticket.title}</h2><p>Created <time dateTime={ticket.createdDate} title="Displayed in your local time">{formatLocalDateTime(ticket.createdDate)}</time></p></div><div className="heading-actions">{ticket.canEdit && <Link className="button button--secondary" to={`/employee/tickets/${id}/edit`}>Edit</Link>}{ticket.canDelete && <button className="button button--danger-outline" onClick={() => setDialogOpen(true)}>Cancel Ticket</button>}</div></section>
       {!ticket.canEdit && <div className="inline-alert">This ticket can no longer be edited because work has already started.</div>}
       <div className="details-grid">
         <section className="panel details-main"><h2>Issue Description</h2><p className="ticket-description">{ticket.description}</p>
           <h2>Attachments</h2>
           {ticket.attachments.length === 0 ? <p>No attachments.</p> : ticket.attachments.map((file) => (
-            <div className="attachment-row" key={file.id}><span>{file.fileName}</span><small>{Math.ceil(file.fileSizeBytes / 1024)} KB</small><button type="button" onClick={() => download(file)}>Download</button></div>
+            <div className="attachment-row" key={file.id}><span>{file.fileName}</span><small>{Math.ceil(file.fileSizeBytes / 1024)} KB · <time dateTime={file.uploadedDate}>{formatLocalDateTime(file.uploadedDate)}</time></small><button type="button" onClick={() => download(file)}>Download</button></div>
           ))}
         </section>
         <aside className="panel details-side"><h2>Ticket Information</h2>
-          <dl><div><dt>Status</dt><dd><TicketStatusBadge value={ticket.statusName} /></dd></div><div><dt>Priority</dt><dd><TicketPriorityBadge value={ticket.priorityName} /></dd></div><div><dt>Category</dt><dd>{ticket.categoryName}</dd></div><div><dt>Asset</dt><dd>{ticket.relatedAsset ? `${ticket.relatedAsset.assetTag} — ${ticket.relatedAsset.assetName}` : 'None'}</dd></div><div><dt>Created by</dt><dd>{ticket.createdByName}</dd></div><div><dt>Assigned to</dt><dd>{ticket.assignedToName ?? 'Unassigned'}</dd></div><div><dt>Last updated</dt><dd>{formatDate(ticket.updatedDate)}</dd></div></dl>
+          <dl><div><dt>Status</dt><dd><TicketStatusBadge value={ticket.statusName} /></dd></div><div><dt>Priority</dt><dd><TicketPriorityBadge value={ticket.priorityName} /></dd></div><div><dt>Category</dt><dd>{ticket.categoryName}</dd></div><div><dt>Created by</dt><dd>{ticket.createdByName}</dd></div><div><dt>Assigned to</dt><dd>{ticket.assignedToName ?? 'Unassigned'}</dd></div><div><dt>Last updated</dt><dd><time dateTime={ticket.updatedDate} title="Displayed in your local time">{formatLocalDateTime(ticket.updatedDate)}</time></dd></div></dl>
         </aside>
       </div>
-      <Link className="back-link" to="/employee/tickets">← Back to My Tickets</Link>
       {dialogOpen && <div className="dialog-backdrop"><div className="dialog" role="dialog" aria-modal="true" aria-labelledby="details-cancel-title" aria-describedby="details-cancel-description"><h2 id="details-cancel-title">Cancel {ticket.ticketReferenceNumber}?</h2><p id="details-cancel-description">The ticket will be removed from your active list.</p><label><span>Reason (optional)</span><textarea maxLength="500" value={reason} onChange={(e) => setReason(e.target.value)} /></label><div className="dialog__actions"><button autoFocus type="button" className="button button--secondary" onClick={() => setDialogOpen(false)} disabled={saving}>Keep Ticket</button><button type="button" className="button button--danger" onClick={confirmCancel} disabled={saving}>{saving ? 'Cancelling…' : 'Confirm Cancellation'}</button></div></div></div>}
     </>
   )

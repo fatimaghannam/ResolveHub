@@ -13,39 +13,6 @@ public sealed class TicketAssetsAttachmentsAndDraftsTests
     private const string Password = "ValidPassword1!";
 
     [Fact]
-    public async Task AssignedAsset_IsAccepted_WhileAnotherUsersAssetIsRejected()
-    {
-        await using var factory = new ResolveHubApiFactory();
-        await factory.SeedTicketLookupsAsync();
-        var owner = await factory.CreateUserAsync("asset-owner@resolvehub.test", Password);
-        var other = await factory.CreateUserAsync("asset-other@resolvehub.test", Password);
-        var allowed = await factory.CreateAssetAsync(owner.Id);
-        var forbidden = await factory.CreateAssetAsync(other.Id);
-        using var client = await LoginAsync(factory, owner.Email!);
-        var lookups = await factory.GetTicketLookupIdsAsync();
-
-        var accepted = await client.PostAsJsonAsync("/api/tickets", new
-        {
-            title = "Ticket with assigned asset",
-            description = "This ticket references an allowed assigned device.",
-            ticketCategoryId = lookups.CategoryId,
-            ticketPriorityId = lookups.PriorityId,
-            assetId = allowed.ID
-        });
-        var rejected = await client.PostAsJsonAsync("/api/tickets", new
-        {
-            title = "Ticket with forbidden asset",
-            description = "This ticket attempts to reference another user's device.",
-            ticketCategoryId = lookups.CategoryId,
-            ticketPriorityId = lookups.PriorityId,
-            assetId = forbidden.ID
-        });
-
-        Assert.Equal(HttpStatusCode.Created, accepted.StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
-    }
-
-    [Fact]
     public async Task AttachmentUploadDownloadAndOwnership_AreEnforced()
     {
         await using var factory = new ResolveHubApiFactory();
