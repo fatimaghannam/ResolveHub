@@ -23,6 +23,10 @@ public sealed class ApplicationDbContext
     }
 
     public DbSet<Department> Departments => Set<Department>();
+    public DbSet<Ticket> Tickets => Set<Ticket>();
+    public DbSet<TicketCategory> TicketCategories => Set<TicketCategory>();
+    public DbSet<TicketPriority> TicketPriorities => Set<TicketPriority>();
+    public DbSet<TicketStatus> TicketStatuses => Set<TicketStatus>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -32,7 +36,110 @@ public sealed class ApplicationDbContext
         ConfigureUserAccount(builder);
         ConfigureRole(builder);
         ConfigureUserAccountRole(builder);
+        ConfigureTicketCategory(builder);
+        ConfigureTicketPriority(builder);
+        ConfigureTicketStatus(builder);
+        ConfigureTicket(builder);
         ConfigureIdentitySupportTables(builder);
+    }
+
+    private static void ConfigureTicketCategory(ModelBuilder builder)
+    {
+        builder.Entity<TicketCategory>(entity =>
+        {
+            entity.ToTable("TicketCategory");
+            entity.HasKey(item => item.ID);
+            entity.Property(item => item.ID).UseIdentityColumn();
+            entity.Property(item => item.Name).HasMaxLength(100).IsRequired();
+            entity.Property(item => item.Description).HasMaxLength(500);
+            entity.Property(item => item.IsActive).HasDefaultValue(true);
+            entity.HasIndex(item => item.Name).IsUnique();
+        });
+    }
+
+    private static void ConfigureTicketPriority(ModelBuilder builder)
+    {
+        builder.Entity<TicketPriority>(entity =>
+        {
+            entity.ToTable("TicketPriority");
+            entity.HasKey(item => item.ID);
+            entity.Property(item => item.ID).UseIdentityColumn();
+            entity.Property(item => item.Name).HasMaxLength(50).IsRequired();
+            entity.Property(item => item.Description).HasMaxLength(500);
+            entity.Property(item => item.IsActive).HasDefaultValue(true);
+            entity.HasIndex(item => item.Name).IsUnique();
+        });
+    }
+
+    private static void ConfigureTicketStatus(ModelBuilder builder)
+    {
+        builder.Entity<TicketStatus>(entity =>
+        {
+            entity.ToTable("TicketStatus");
+            entity.HasKey(item => item.ID);
+            entity.Property(item => item.ID).UseIdentityColumn();
+            entity.Property(item => item.Name).HasMaxLength(50).IsRequired();
+            entity.Property(item => item.Description).HasMaxLength(500);
+            entity.Property(item => item.IsActive).HasDefaultValue(true);
+            entity.HasIndex(item => item.Name).IsUnique();
+        });
+    }
+
+    private static void ConfigureTicket(ModelBuilder builder)
+    {
+        builder.Entity<Ticket>(entity =>
+        {
+            entity.ToTable("Ticket");
+            entity.HasKey(ticket => ticket.ID);
+            entity.Property(ticket => ticket.ID).UseIdentityColumn();
+            entity.Property(ticket => ticket.TicketReferenceNumber)
+                .HasMaxLength(32).IsRequired();
+            entity.HasIndex(ticket => ticket.TicketReferenceNumber).IsUnique();
+            entity.Property(ticket => ticket.Title).HasMaxLength(200).IsRequired();
+            entity.Property(ticket => ticket.Description)
+                .HasMaxLength(5000).IsRequired();
+            entity.Property(ticket => ticket.CancelledReason).HasMaxLength(500);
+            entity.Property(ticket => ticket.CreatedDate).HasColumnType("datetime2");
+            entity.Property(ticket => ticket.UpdatedDate).HasColumnType("datetime2");
+            entity.Property(ticket => ticket.AssignedDate).HasColumnType("datetime2");
+            entity.Property(ticket => ticket.ResolvedDate).HasColumnType("datetime2");
+            entity.Property(ticket => ticket.ClosedDate).HasColumnType("datetime2");
+            entity.Property(ticket => ticket.CancelledDate).HasColumnType("datetime2");
+            entity.Property(ticket => ticket.IsDeleted).HasDefaultValue(false);
+
+            entity.HasIndex(ticket => ticket.CreatedByUserAccountID);
+            entity.HasIndex(ticket => ticket.TicketStatusID);
+            entity.HasIndex(ticket => ticket.TicketCategoryID);
+            entity.HasIndex(ticket => ticket.TicketPriorityID);
+            entity.HasIndex(ticket => ticket.CreatedDate);
+            entity.HasIndex(ticket => new
+            {
+                ticket.CreatedByUserAccountID,
+                ticket.IsDeleted,
+                ticket.CreatedDate
+            });
+
+            entity.HasOne(ticket => ticket.CreatedByUserAccount)
+                .WithMany(user => user.CreatedTickets)
+                .HasForeignKey(ticket => ticket.CreatedByUserAccountID)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(ticket => ticket.AssignedToUserAccount)
+                .WithMany(user => user.AssignedTickets)
+                .HasForeignKey(ticket => ticket.AssignedToUserAccountID)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(ticket => ticket.TicketCategory)
+                .WithMany(category => category.Tickets)
+                .HasForeignKey(ticket => ticket.TicketCategoryID)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(ticket => ticket.TicketPriority)
+                .WithMany(priority => priority.Tickets)
+                .HasForeignKey(ticket => ticket.TicketPriorityID)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(ticket => ticket.TicketStatus)
+                .WithMany(status => status.Tickets)
+                .HasForeignKey(ticket => ticket.TicketStatusID)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
     }
 
     private static void ConfigureDepartment(ModelBuilder builder)

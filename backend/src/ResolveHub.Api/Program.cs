@@ -312,6 +312,7 @@ builder.Services.AddScoped<
 builder.Services.AddScoped<
     IPasswordResetService,
     PasswordResetService>();
+builder.Services.AddScoped<ITicketService, TicketService>();
 builder.Services.AddAuthorization();
 
 var app = builder.Build();

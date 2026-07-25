@@ -218,6 +218,88 @@ public sealed class ResolveHubApiFactory
         EnsureSucceeded(await userManager.UpdateAsync(user));
     }
 
+    public async Task SeedTicketLookupsAsync()
+    {
+        using var scope = Services.CreateScope();
+        var context = scope.ServiceProvider
+            .GetRequiredService<ApplicationDbContext>();
+        if (await context.TicketCategories.AnyAsync())
+            return;
+
+        context.TicketCategories.AddRange(
+            new TicketCategory { Name = "Hardware", SortOrder = 1 },
+            new TicketCategory { Name = "Software", SortOrder = 2 });
+        context.TicketPriorities.AddRange(
+            new TicketPriority { Name = "Low", SortOrder = 1 },
+            new TicketPriority { Name = "High", SortOrder = 2 });
+        context.TicketStatuses.AddRange(
+            new TicketStatus { Name = TicketStatusNames.Open, SortOrder = 1 },
+            new TicketStatus { Name = TicketStatusNames.Assigned, SortOrder = 2 },
+            new TicketStatus { Name = TicketStatusNames.InProgress, SortOrder = 3 },
+            new TicketStatus { Name = TicketStatusNames.Resolved, SortOrder = 4 });
+        await context.SaveChangesAsync();
+    }
+
+    public async Task<(int CategoryId, int PriorityId)> GetTicketLookupIdsAsync()
+    {
+        using var scope = Services.CreateScope();
+        var context = scope.ServiceProvider
+            .GetRequiredService<ApplicationDbContext>();
+        return (
+            await context.TicketCategories.Select(item => item.ID).FirstAsync(),
+            await context.TicketPriorities.Select(item => item.ID).FirstAsync());
+    }
+
+    public async Task SetTicketStateAsync(
+        int ticketId,
+        string statusName,
+        int? assignedUserId = null)
+    {
+        using var scope = Services.CreateScope();
+        var context = scope.ServiceProvider
+            .GetRequiredService<ApplicationDbContext>();
+        var ticket = await context.Tickets.FindAsync(ticketId)
+            ?? throw new InvalidOperationException("Ticket not found.");
+        ticket.TicketStatusID = await context.TicketStatuses
+            .Where(status => status.Name == statusName)
+            .Select(status => status.ID)
+            .SingleAsync();
+        ticket.AssignedToUserAccountID = assignedUserId;
+        await context.SaveChangesAsync();
+    }
+
+    public async Task SetTicketCreatedDateAsync(
+        int ticketId,
+        DateTime createdDate)
+    {
+        using var scope = Services.CreateScope();
+        var context = scope.ServiceProvider
+            .GetRequiredService<ApplicationDbContext>();
+        var ticket = await context.Tickets.FindAsync(ticketId)
+            ?? throw new InvalidOperationException("Ticket not found.");
+        ticket.CreatedDate = createdDate;
+        ticket.UpdatedDate = createdDate;
+        await context.SaveChangesAsync();
+    }
+
+    public async Task<TicketTestSnapshot> GetTicketSnapshotAsync(int ticketId)
+    {
+        using var scope = Services.CreateScope();
+        var context = scope.ServiceProvider
+            .GetRequiredService<ApplicationDbContext>();
+        return await context.Tickets
+            .Where(ticket => ticket.ID == ticketId)
+            .Select(ticket => new TicketTestSnapshot(
+                ticket.ID,
+                ticket.CreatedByUserAccountID,
+                ticket.TicketStatus.Name,
+                ticket.AssignedToUserAccountID,
+                ticket.IsDeleted,
+                ticket.CancelledDate,
+                ticket.CancelledReason))
+            .SingleAsync();
+    }
+
     private static void EnsureSucceeded(IdentityResult result)
     {
         if (result.Succeeded)
@@ -231,6 +313,15 @@ public sealed class ResolveHubApiFactory
                 result.Errors.Select(error => error.Description)));
     }
 }
+
+public sealed record TicketTestSnapshot(
+    int ID,
+    int CreatedByUserAccountID,
+    string StatusName,
+    int? AssignedToUserAccountID,
+    bool IsDeleted,
+    DateTime? CancelledDate,
+    string? CancelledReason);
 
 public sealed class ThrowingPasswordResetService
     : IPasswordResetService

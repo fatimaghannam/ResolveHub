@@ -60,6 +60,7 @@ public static class DatabaseSeeder
         await dbContext.Database.MigrateAsync();
 
         await SeedRolesAsync(roleManager);
+        await SeedTicketLookupsAsync(dbContext);
 
         var defaultPassword =
             configuration["SeedData:DefaultPassword"]
@@ -94,6 +95,95 @@ public static class DatabaseSeeder
                 defaultPassword,
                 passwordResetTestUsers,
                 includeEmailInErrors: false);
+        }
+    }
+
+    private static async Task SeedTicketLookupsAsync(
+        ApplicationDbContext dbContext)
+    {
+        await SeedCategoriesAsync(dbContext);
+        await SeedPrioritiesAsync(dbContext);
+        await SeedStatusesAsync(dbContext);
+        await dbContext.SaveChangesAsync();
+    }
+
+    private static async Task SeedCategoriesAsync(
+        ApplicationDbContext dbContext)
+    {
+        string[] names =
+        [
+            "Hardware", "Software", "Network", "Email",
+            "Access Request", "Security", "Other"
+        ];
+
+        var existing = await dbContext.TicketCategories
+            .Select(item => item.Name)
+            .ToListAsync();
+
+        for (var index = 0; index < names.Length; index++)
+        {
+            if (existing.Contains(names[index], StringComparer.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            dbContext.TicketCategories.Add(new TicketCategory
+            {
+                Name = names[index],
+                SortOrder = index + 1,
+                IsActive = true
+            });
+        }
+    }
+
+    private static async Task SeedPrioritiesAsync(
+        ApplicationDbContext dbContext)
+    {
+        string[] names = ["Low", "Medium", "High", "Critical"];
+        var existing = await dbContext.TicketPriorities
+            .Select(item => item.Name)
+            .ToListAsync();
+
+        for (var index = 0; index < names.Length; index++)
+        {
+            if (existing.Contains(names[index], StringComparer.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            dbContext.TicketPriorities.Add(new TicketPriority
+            {
+                Name = names[index],
+                SortOrder = index + 1,
+                IsActive = true
+            });
+        }
+    }
+
+    private static async Task SeedStatusesAsync(
+        ApplicationDbContext dbContext)
+    {
+        var existing = await dbContext.TicketStatuses
+            .Select(item => item.Name)
+            .ToListAsync();
+
+        for (var index = 0; index < TicketStatusNames.All.Length; index++)
+        {
+            var name = TicketStatusNames.All[index];
+            if (existing.Contains(name, StringComparer.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            dbContext.TicketStatuses.Add(new TicketStatus
+            {
+                Name = name,
+                SortOrder = index + 1,
+                IsFinalStatus =
+                    name is TicketStatusNames.Closed or
+                        TicketStatusNames.Cancelled,
+                IsActive = true
+            });
         }
     }
 

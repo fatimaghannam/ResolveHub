@@ -2,9 +2,8 @@ import { useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { loginUser } from '../services/authService.js'
+import { AUTH_STORAGE_KEY, EMPLOYEE_ROLE } from '../services/authStorage.js'
 import '../styles/login.css'
-
-const AUTH_STORAGE_KEY = 'resolveHubAuth'
 
 function getLoginError(error) {
   if (error.status === 400) {
@@ -67,6 +66,9 @@ function LoginPage() {
       otherStorage.removeItem(AUTH_STORAGE_KEY)
 
       setMessage('Sign in successful.')
+      if (authData.user?.roles?.includes(EMPLOYEE_ROLE)) {
+        navigate('/employee/dashboard', { replace: true })
+      }
     } catch (error) {
       setMessage(getLoginError(error))
     } finally {

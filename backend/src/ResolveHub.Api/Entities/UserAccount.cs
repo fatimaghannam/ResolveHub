@@ -29,4 +29,8 @@ public sealed class UserAccount : IdentityUser<int>
 
     public ICollection<UserAccountRole> RoleAssignmentsMade { get; set; }
         = new List<UserAccountRole>();
+
+    public ICollection<Ticket> CreatedTickets { get; set; } = [];
+
+    public ICollection<Ticket> AssignedTickets { get; set; } = [];
 }
