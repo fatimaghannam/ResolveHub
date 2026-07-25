@@ -27,6 +27,9 @@ public sealed class ApplicationDbContext
     public DbSet<TicketCategory> TicketCategories => Set<TicketCategory>();
     public DbSet<TicketPriority> TicketPriorities => Set<TicketPriority>();
     public DbSet<TicketStatus> TicketStatuses => Set<TicketStatus>();
+    public DbSet<Asset> Assets => Set<Asset>();
+    public DbSet<TicketAttachment> TicketAttachments => Set<TicketAttachment>();
+    public DbSet<TicketDraft> TicketDrafts => Set<TicketDraft>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -40,6 +43,9 @@ public sealed class ApplicationDbContext
         ConfigureTicketPriority(builder);
         ConfigureTicketStatus(builder);
         ConfigureTicket(builder);
+        ConfigureAsset(builder);
+        ConfigureTicketAttachment(builder);
+        ConfigureTicketDraft(builder);
         ConfigureIdentitySupportTables(builder);
     }
 
@@ -112,6 +118,7 @@ public sealed class ApplicationDbContext
             entity.HasIndex(ticket => ticket.TicketCategoryID);
             entity.HasIndex(ticket => ticket.TicketPriorityID);
             entity.HasIndex(ticket => ticket.CreatedDate);
+            entity.HasIndex(ticket => ticket.AssetID);
             entity.HasIndex(ticket => new
             {
                 ticket.CreatedByUserAccountID,
@@ -139,6 +146,97 @@ public sealed class ApplicationDbContext
                 .WithMany(status => status.Tickets)
                 .HasForeignKey(ticket => ticket.TicketStatusID)
                 .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(ticket => ticket.Asset)
+                .WithMany(asset => asset.Tickets)
+                .HasForeignKey(ticket => ticket.AssetID)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+    }
+
+    private static void ConfigureAsset(ModelBuilder builder)
+    {
+        builder.Entity<Asset>(entity =>
+        {
+            entity.ToTable("Asset");
+            entity.HasKey(asset => asset.ID);
+            entity.Property(asset => asset.ID).UseIdentityColumn();
+            entity.Property(asset => asset.AssetTag).HasMaxLength(50).IsRequired();
+            entity.Property(asset => asset.AssetName).HasMaxLength(150).IsRequired();
+            entity.Property(asset => asset.AssetType).HasMaxLength(100).IsRequired();
+            entity.Property(asset => asset.SerialNumber).HasMaxLength(100);
+            entity.Property(asset => asset.Location).HasMaxLength(150);
+            entity.Property(asset => asset.AssetStatus).HasMaxLength(50).IsRequired();
+            entity.Property(asset => asset.IsActive).HasDefaultValue(true);
+            entity.Property(asset => asset.CreatedDate).HasColumnType("datetime2");
+            entity.Property(asset => asset.UpdatedDate).HasColumnType("datetime2");
+            entity.HasIndex(asset => asset.AssetTag).IsUnique();
+            entity.HasIndex(asset => asset.AssignedToUserAccountID);
+            entity.HasIndex(asset => asset.DepartmentID);
+            entity.HasOne(asset => asset.Department)
+                .WithMany(department => department.Assets)
+                .HasForeignKey(asset => asset.DepartmentID)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(asset => asset.AssignedToUserAccount)
+                .WithMany(user => user.AssignedAssets)
+                .HasForeignKey(asset => asset.AssignedToUserAccountID)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+    }
+
+    private static void ConfigureTicketAttachment(ModelBuilder builder)
+    {
+        builder.Entity<TicketAttachment>(entity =>
+        {
+            entity.ToTable("TicketAttachment");
+            entity.HasKey(attachment => attachment.ID);
+            entity.Property(attachment => attachment.ID).UseIdentityColumn();
+            entity.Property(attachment => attachment.FileName).HasMaxLength(255).IsRequired();
+            entity.Property(attachment => attachment.StoredFileName).HasMaxLength(100).IsRequired();
+            entity.Property(attachment => attachment.FilePath).HasMaxLength(500).IsRequired();
+            entity.Property(attachment => attachment.ContentType).HasMaxLength(150).IsRequired();
+            entity.Property(attachment => attachment.IsPrivate).HasDefaultValue(true);
+            entity.Property(attachment => attachment.IsDeleted).HasDefaultValue(false);
+            entity.Property(attachment => attachment.UploadedDate).HasColumnType("datetime2");
+            entity.HasIndex(attachment => new { attachment.TicketID, attachment.IsDeleted });
+            entity.HasOne(attachment => attachment.Ticket)
+                .WithMany(ticket => ticket.Attachments)
+                .HasForeignKey(attachment => attachment.TicketID)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(attachment => attachment.UploadedByUserAccount)
+                .WithMany(user => user.UploadedTicketAttachments)
+                .HasForeignKey(attachment => attachment.UploadedByUserAccountID)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureTicketDraft(ModelBuilder builder)
+    {
+        builder.Entity<TicketDraft>(entity =>
+        {
+            entity.ToTable("TicketDraft");
+            entity.HasKey(draft => draft.ID);
+            entity.Property(draft => draft.ID).UseIdentityColumn();
+            entity.Property(draft => draft.Title).HasMaxLength(200);
+            entity.Property(draft => draft.Description).HasMaxLength(5000);
+            entity.Property(draft => draft.CreatedDate).HasColumnType("datetime2");
+            entity.Property(draft => draft.UpdatedDate).HasColumnType("datetime2");
+            entity.HasIndex(draft => new { draft.UserAccountID, draft.UpdatedDate });
+            entity.HasOne(draft => draft.UserAccount)
+                .WithMany(user => user.TicketDrafts)
+                .HasForeignKey(draft => draft.UserAccountID)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(draft => draft.TicketCategory)
+                .WithMany(category => category.TicketDrafts)
+                .HasForeignKey(draft => draft.TicketCategoryID)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(draft => draft.TicketPriority)
+                .WithMany(priority => priority.TicketDrafts)
+                .HasForeignKey(draft => draft.TicketPriorityID)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(draft => draft.Asset)
+                .WithMany(asset => asset.TicketDrafts)
+                .HasForeignKey(draft => draft.AssetID)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 

@@ -32,6 +32,8 @@ public sealed record TicketDetailsDto(
     DateTime? ClosedDate,
     DateTime? CancelledDate,
     string? CancelledReason,
+    AssetLookupDto? RelatedAsset,
+    IReadOnlyCollection<TicketAttachmentDto> Attachments,
     bool CanEdit,
     bool CanDelete);
 
@@ -43,3 +45,19 @@ public sealed record TicketDashboardSummaryDto(
     IReadOnlyCollection<TicketListItemDto> RecentTickets);
 
 public sealed record TicketLookupDto(int Id, string Name);
+
+public sealed record AssetLookupDto(
+    int Id,
+    string AssetTag,
+    string AssetName,
+    string AssetType,
+    string? SerialNumber,
+    string? Location);
+
+public sealed record TicketAttachmentDto(
+    int Id,
+    string FileName,
+    string ContentType,
+    long FileSizeBytes,
+    DateTime UploadedDate,
+    bool CanDelete);

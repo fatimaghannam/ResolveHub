@@ -8,4 +8,5 @@ public sealed class TicketCategory
     public int SortOrder { get; set; }
     public bool IsActive { get; set; } = true;
     public ICollection<Ticket> Tickets { get; set; } = [];
+    public ICollection<TicketDraft> TicketDrafts { get; set; } = [];
 }

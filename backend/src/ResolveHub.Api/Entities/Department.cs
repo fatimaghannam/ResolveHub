@@ -14,4 +14,6 @@ public sealed class Department
 
     public ICollection<UserAccount> UserAccounts { get; set; }
         = new List<UserAccount>();
+
+    public ICollection<Asset> Assets { get; set; } = [];
 }

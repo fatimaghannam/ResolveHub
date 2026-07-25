@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ErrorState, LoadingState } from '../components/common/States.jsx'
 import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
-import { cancelTicket, getTicket } from '../services/ticketService.js'
+import { cancelTicket, downloadAttachment, getTicket } from '../services/ticketService.js'
 
 function formatDate(value) {
   return value ? new Date(value).toLocaleString() : '—'
@@ -20,9 +20,17 @@ function TicketDetailsPage() {
 
   useEffect(() => {
     const controller = new AbortController()
-    getTicket(id, controller.signal).then(setTicket).catch((requestError) => {
-      if (requestError.name !== 'AbortError') setError(requestError.status === 404 ? 'This ticket is unavailable.' : requestError.message)
-    })
+    setError('')
+    setTicket(null)
+    getTicket(id, controller.signal)
+      .then((result) => {
+        if (!controller.signal.aborted) setTicket(result)
+      })
+      .catch((requestError) => {
+        if (requestError.name !== 'AbortError' && !controller.signal.aborted) {
+          setError(requestError.status === 404 ? 'This ticket is unavailable.' : requestError.message)
+        }
+      })
     return () => controller.abort()
   }, [id])
 
@@ -46,6 +54,20 @@ function TicketDetailsPage() {
     } finally { setSaving(false) }
   }
 
+  async function download(file) {
+    try {
+      const blob = await downloadAttachment(id, file.id)
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = file.fileName
+      anchor.click()
+      URL.revokeObjectURL(url)
+    } catch (requestError) {
+      setError(requestError.message)
+    }
+  }
+
   if (error) return <ErrorState message={error} />
   if (!ticket) return <LoadingState message="Loading ticket details…" />
 
@@ -55,9 +77,14 @@ function TicketDetailsPage() {
       <section className="page-heading page-heading--action"><div><span className="eyebrow">{ticket.ticketReferenceNumber}</span><h2>{ticket.title}</h2><p>Created {formatDate(ticket.createdDate)}</p></div><div className="heading-actions">{ticket.canEdit && <Link className="button button--secondary" to={`/employee/tickets/${id}/edit`}>Edit</Link>}{ticket.canDelete && <button className="button button--danger-outline" onClick={() => setDialogOpen(true)}>Cancel Ticket</button>}</div></section>
       {!ticket.canEdit && <div className="inline-alert">This ticket can no longer be edited because work has already started.</div>}
       <div className="details-grid">
-        <section className="panel details-main"><h2>Issue Description</h2><p className="ticket-description">{ticket.description}</p></section>
+        <section className="panel details-main"><h2>Issue Description</h2><p className="ticket-description">{ticket.description}</p>
+          <h2>Attachments</h2>
+          {ticket.attachments.length === 0 ? <p>No attachments.</p> : ticket.attachments.map((file) => (
+            <div className="attachment-row" key={file.id}><span>{file.fileName}</span><small>{Math.ceil(file.fileSizeBytes / 1024)} KB</small><button type="button" onClick={() => download(file)}>Download</button></div>
+          ))}
+        </section>
         <aside className="panel details-side"><h2>Ticket Information</h2>
-          <dl><div><dt>Status</dt><dd><TicketStatusBadge value={ticket.statusName} /></dd></div><div><dt>Priority</dt><dd><TicketPriorityBadge value={ticket.priorityName} /></dd></div><div><dt>Category</dt><dd>{ticket.categoryName}</dd></div><div><dt>Created by</dt><dd>{ticket.createdByName}</dd></div><div><dt>Assigned to</dt><dd>{ticket.assignedToName ?? 'Unassigned'}</dd></div><div><dt>Last updated</dt><dd>{formatDate(ticket.updatedDate)}</dd></div></dl>
+          <dl><div><dt>Status</dt><dd><TicketStatusBadge value={ticket.statusName} /></dd></div><div><dt>Priority</dt><dd><TicketPriorityBadge value={ticket.priorityName} /></dd></div><div><dt>Category</dt><dd>{ticket.categoryName}</dd></div><div><dt>Asset</dt><dd>{ticket.relatedAsset ? `${ticket.relatedAsset.assetTag} — ${ticket.relatedAsset.assetName}` : 'None'}</dd></div><div><dt>Created by</dt><dd>{ticket.createdByName}</dd></div><div><dt>Assigned to</dt><dd>{ticket.assignedToName ?? 'Unassigned'}</dd></div><div><dt>Last updated</dt><dd>{formatDate(ticket.updatedDate)}</dd></div></dl>
         </aside>
       </div>
       <Link className="back-link" to="/employee/tickets">← Back to My Tickets</Link>

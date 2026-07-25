@@ -33,4 +33,10 @@ public sealed class UserAccount : IdentityUser<int>
     public ICollection<Ticket> CreatedTickets { get; set; } = [];
 
     public ICollection<Ticket> AssignedTickets { get; set; } = [];
+
+    public ICollection<Asset> AssignedAssets { get; set; } = [];
+
+    public ICollection<TicketAttachment> UploadedTicketAttachments { get; set; } = [];
+
+    public ICollection<TicketDraft> TicketDrafts { get; set; } = [];
 }

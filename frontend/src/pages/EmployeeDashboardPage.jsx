@@ -15,9 +15,11 @@ function EmployeeDashboardPage() {
     const controller = new AbortController()
     setError('')
     getDashboard(controller.signal)
-      .then(setData)
+      .then((result) => {
+        if (!controller.signal.aborted) setData(result)
+      })
       .catch((requestError) => {
-        if (requestError.name !== 'AbortError') setError(requestError.message)
+        if (requestError.name !== 'AbortError' && !controller.signal.aborted) setError(requestError.message)
       })
     return () => controller.abort()
   }, [reload])

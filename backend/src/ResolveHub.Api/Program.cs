@@ -94,6 +94,16 @@ builder.Services
         "PasswordReset:TokenLifetimeMinutes must be between 5 and 1440.")
     .ValidateOnStart();
 
+builder.Services
+    .AddOptions<FileStorageSettings>()
+    .Bind(builder.Configuration.GetSection(FileStorageSettings.SectionName))
+    .Validate(settings =>
+        !string.IsNullOrWhiteSpace(settings.UploadRoot) &&
+        settings.MaxFileSizeBytes > 0 &&
+        settings.MaxFilesPerTicket is > 0 and <= 20,
+        "FileStorage settings are invalid.")
+    .ValidateOnStart();
+
 var resendSection =
     builder.Configuration.GetSection(
         ResendSettings.SectionName);
@@ -313,6 +323,9 @@ builder.Services.AddScoped<
     IPasswordResetService,
     PasswordResetService>();
 builder.Services.AddScoped<ITicketService, TicketService>();
+builder.Services.AddScoped<IAssetService, AssetService>();
+builder.Services.AddScoped<ITicketAttachmentService, TicketAttachmentService>();
+builder.Services.AddScoped<ITicketDraftService, TicketDraftService>();
 builder.Services.AddAuthorization();
 
 var app = builder.Build();

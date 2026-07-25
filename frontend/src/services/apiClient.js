@@ -9,9 +9,10 @@ export class ApiError extends Error {
 }
 
 export async function apiRequest(path, options = {}) {
+  const { responseType, ...fetchOptions } = options
   const auth = getStoredAuth()
   const headers = new Headers(options.headers)
-  if (options.body && !headers.has('Content-Type')) {
+  if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
   }
   if (auth?.accessToken) {
@@ -20,7 +21,7 @@ export async function apiRequest(path, options = {}) {
 
   let response
   try {
-    response = await fetch(path, { ...options, headers })
+    response = await fetch(path, { ...fetchOptions, headers })
   } catch (error) {
     if (error.name === 'AbortError') {
       throw error
@@ -28,6 +29,10 @@ export async function apiRequest(path, options = {}) {
     throw new ApiError(
       'The server could not be reached. Make sure the backend is running.',
     )
+  }
+
+  if (response.ok && responseType === 'blob') {
+    return response.blob()
   }
 
   let body = null

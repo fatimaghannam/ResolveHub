@@ -29,6 +29,7 @@ function isNavigationActive(id, pathname) {
   if (id === 'tickets') {
     return (
       pathname === '/employee/tickets' ||
+      pathname.startsWith('/employee/tickets/drafts') ||
       /^\/employee\/tickets\/\d+(\/edit)?$/.test(pathname)
     )
   }
@@ -64,7 +65,9 @@ function DashboardLayout() {
     navigate('/login', { replace: true })
   }
 
-  const pageTitle = location.pathname.includes('/tickets/create')
+  const pageTitle = location.pathname.includes('/tickets/drafts')
+    ? 'Ticket Drafts'
+    : location.pathname.includes('/tickets/create')
     ? 'Create Ticket'
     : location.pathname.includes('/edit')
       ? 'Edit Ticket'

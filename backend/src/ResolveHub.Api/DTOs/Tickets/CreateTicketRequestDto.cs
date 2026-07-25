@@ -15,4 +15,6 @@ public sealed class CreateTicketRequestDto
 
     [Range(1, int.MaxValue)]
     public int TicketPriorityId { get; init; }
+
+    public int? AssetId { get; init; }
 }

@@ -23,9 +23,11 @@ function EmployeeTicketsPage() {
   useEffect(() => {
     const controller = new AbortController()
     Promise.all([getStatuses(controller.signal), getCategories(controller.signal), getPriorities(controller.signal)])
-      .then(([statuses, categories, priorities]) => setLookups({ statuses, categories, priorities }))
+      .then(([statuses, categories, priorities]) => {
+        if (!controller.signal.aborted) setLookups({ statuses, categories, priorities })
+      })
       .catch((requestError) => {
-        if (requestError.name !== 'AbortError') setError(requestError.message)
+        if (requestError.name !== 'AbortError' && !controller.signal.aborted) setError(requestError.message)
       })
     return () => controller.abort()
   }, [])
@@ -34,9 +36,11 @@ function EmployeeTicketsPage() {
     const controller = new AbortController()
     setData(null); setError('')
     getTickets({ ...filters, sortBy: 'createdDate', sortDirection: 'desc' }, controller.signal)
-      .then(setData)
+      .then((result) => {
+        if (!controller.signal.aborted) setData(result)
+      })
       .catch((requestError) => {
-        if (requestError.name !== 'AbortError') setError(requestError.message)
+        if (requestError.name !== 'AbortError' && !controller.signal.aborted) setError(requestError.message)
       })
     return () => controller.abort()
   }, [filters, reload])
@@ -80,7 +84,7 @@ function EmployeeTicketsPage() {
 
   return (
     <>
-      <section className="page-heading page-heading--action"><div><h2>My Tickets</h2><p>Search, filter, and manage your support requests.</p></div><Link className="button button--primary" to="/employee/tickets/create">Create Ticket</Link></section>
+      <section className="page-heading page-heading--action"><div><h2>My Tickets</h2><p>Search, filter, and manage your support requests.</p></div><div className="heading-actions"><Link className="button button--secondary" to="/employee/tickets/drafts">Drafts</Link><Link className="button button--primary" to="/employee/tickets/create">Create Ticket</Link></div></section>
       <form className="filter-panel" onSubmit={applyFilters}>
         <label className="filter-search"><span>Search</span><input value={draft.search} onChange={(e) => setDraft({ ...draft, search: e.target.value })} placeholder="Ticket number or title" /></label>
         {['statusId', 'categoryId', 'priorityId'].map((key) => (

@@ -1,14 +1,51 @@
-import { useEffect, useState } from 'react'
-import { getCategories, getPriorities } from '../../services/ticketService.js'
+import { useEffect, useRef, useState } from 'react'
+import { Paperclip, Save, Send, Upload } from 'lucide-react'
+import {
+  getCategories,
+  getMyAssets,
+  getPriorities,
+} from '../../services/ticketService.js'
 import { ErrorState, LoadingState } from '../common/States.jsx'
 
-function TicketForm({ initialValues, submitLabel, onSubmit, onCancel }) {
-  const [values, setValues] = useState(initialValues ?? { title: '', description: '', ticketCategoryId: '', ticketPriorityId: '' })
+const emptyValues = {
+  title: '',
+  description: '',
+  ticketCategoryId: '',
+  ticketPriorityId: '',
+  assetId: '',
+}
+const allowedExtensions = ['png', 'jpg', 'jpeg', 'pdf', 'docx', 'txt', 'log', 'zip']
+const maxFileSize = 10 * 1024 * 1024
+
+function formatBytes(value) {
+  return value < 1024 * 1024
+    ? `${Math.ceil(value / 1024)} KB`
+    : `${(value / 1024 / 1024).toFixed(1)} MB`
+}
+
+function TicketForm({
+  mode = 'create',
+  initialValues,
+  existingAttachments = [],
+  submitLabel,
+  onSubmit,
+  onSaveDraft,
+  onDeleteAttachment,
+  onCancel,
+}) {
+  const [values, setValues] = useState({ ...emptyValues, ...initialValues })
   const [lookups, setLookups] = useState(null)
+  const [assets, setAssets] = useState([])
+  const [assetSearch, setAssetSearch] = useState('')
+  const [files, setFiles] = useState([])
+  const [fileErrors, setFileErrors] = useState([])
   const [errors, setErrors] = useState({})
   const [loadingError, setLoadingError] = useState('')
   const [lookupRequest, setLookupRequest] = useState(0)
   const [saving, setSaving] = useState(false)
+  const [savingDraft, setSavingDraft] = useState(false)
+  const [draftNotice, setDraftNotice] = useState('')
+  const fileInput = useRef(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -17,15 +54,44 @@ function TicketForm({ initialValues, submitLabel, onSubmit, onCancel }) {
     Promise.all([
       getCategories(controller.signal),
       getPriorities(controller.signal),
+      getMyAssets('', controller.signal),
     ])
-      .then(([categories, priorities]) => setLookups({ categories, priorities }))
+      .then(([categories, priorities, assetOptions]) => {
+        if (!controller.signal.aborted) {
+          setLookups({ categories, priorities })
+          setAssets(assetOptions)
+        }
+      })
       .catch((error) => {
-        if (error.name !== 'AbortError') {
-          setLoadingError(error.message)
+        if (error.name !== 'AbortError' && !controller.signal.aborted) {
+          setLoadingError('Ticket options could not be loaded.')
         }
       })
     return () => controller.abort()
   }, [lookupRequest])
+
+  useEffect(() => {
+    if (!lookups) return undefined
+    const controller = new AbortController()
+    const timer = setTimeout(() => {
+      getMyAssets(assetSearch, controller.signal)
+        .then((result) => {
+          if (!controller.signal.aborted) setAssets(result)
+        })
+        .catch((error) => {
+          if (error.name !== 'AbortError' && !controller.signal.aborted) {
+            setErrors((current) => ({
+              ...current,
+              asset: 'Assets could not be searched.',
+            }))
+          }
+        })
+    }, 300)
+    return () => {
+      clearTimeout(timer)
+      controller.abort()
+    }
+  }, [assetSearch, lookups])
 
   function validate() {
     const next = {}
@@ -37,48 +103,200 @@ function TicketForm({ initialValues, submitLabel, onSubmit, onCancel }) {
     return Object.keys(next).length === 0
   }
 
+  function payload() {
+    return {
+      title: values.title.trim(),
+      description: values.description.trim(),
+      ticketCategoryId: values.ticketCategoryId
+        ? Number(values.ticketCategoryId)
+        : null,
+      ticketPriorityId: values.ticketPriorityId
+        ? Number(values.ticketPriorityId)
+        : null,
+      assetId: values.assetId ? Number(values.assetId) : null,
+    }
+  }
+
+  function addFiles(incoming) {
+    const accepted = []
+    const nextErrors = []
+    const remaining = 5 - existingAttachments.length - files.length
+    Array.from(incoming).forEach((file) => {
+      const extension = file.name.split('.').pop()?.toLowerCase()
+      if (!allowedExtensions.includes(extension)) {
+        nextErrors.push(`${file.name}: file type is not allowed.`)
+      } else if (file.size > maxFileSize) {
+        nextErrors.push(`${file.name}: exceeds the 10 MB limit.`)
+      } else if (accepted.length >= remaining) {
+        nextErrors.push(`${file.name}: a ticket may have at most 5 files.`)
+      } else {
+        accepted.push(file)
+      }
+    })
+    setFiles((current) => [...current, ...accepted])
+    setFileErrors(nextErrors)
+  }
+
   async function submit(event) {
     event.preventDefault()
     if (!validate() || saving) return
     try {
-      setSaving(true); setErrors({})
-      await onSubmit({
-        title: values.title.trim(),
-        description: values.description.trim(),
-        ticketCategoryId: Number(values.ticketCategoryId),
-        ticketPriorityId: Number(values.ticketPriorityId),
-      })
+      setSaving(true)
+      setErrors({})
+      await onSubmit(payload(), files)
     } catch (error) {
       setErrors({ form: error.message })
-    } finally { setSaving(false) }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function saveDraft() {
+    if (!onSaveDraft || savingDraft) return
+    try {
+      setSavingDraft(true)
+      setErrors({})
+      setDraftNotice('')
+      await onSaveDraft(payload())
+      setDraftNotice('Draft saved. Attachments will be uploaded when the draft is submitted.')
+    } catch (error) {
+      setErrors({ form: error.message })
+    } finally {
+      setSavingDraft(false)
+    }
   }
 
   if (loadingError) {
-    return (
-      <ErrorState
-        message={loadingError}
-        onRetry={() => setLookupRequest((current) => current + 1)}
-      />
-    )
+    return <ErrorState message={loadingError} onRetry={() => setLookupRequest((value) => value + 1)} />
   }
   if (!lookups) return <LoadingState message="Loading ticket options…" />
 
   return (
     <form className="ticket-form panel" onSubmit={submit} noValidate>
       {errors.form && <div className="inline-alert inline-alert--error" role="alert">{errors.form}</div>}
-      <label><span>Title <b aria-hidden="true">*</b></span><small>Briefly summarize the issue.</small>
-        <input maxLength="200" value={values.title} onChange={(e) => setValues({ ...values, title: e.target.value })} aria-describedby="title-error title-count" />
-        <span className="field-meta"><em id="title-error">{errors.title}</em><small id="title-count">{values.title.length}/200</small></span>
+      {draftNotice && <div className="inline-alert inline-alert--success" role="status">{draftNotice}</div>}
+
+      <label>
+        <span>Title <b aria-hidden="true">*</b></span>
+        <input
+          maxLength="200"
+          placeholder="Brief description of your issue…"
+          value={values.title}
+          onChange={(event) => setValues({ ...values, title: event.target.value })}
+          aria-describedby="title-error title-count"
+        />
+        <span className="field-meta"><em id="title-error">{errors.title}</em><small id="title-count">{values.title.length} / 200</small></span>
       </label>
-      <label><span>Description <b aria-hidden="true">*</b></span><small>Include what happened, when it started, and any troubleshooting attempted.</small>
-        <textarea rows="8" maxLength="5000" value={values.description} onChange={(e) => setValues({ ...values, description: e.target.value })} />
-        <span className="field-meta"><em>{errors.description}</em><small>{values.description.length}/5000</small></span>
+
+      <label>
+        <span>Description <b aria-hidden="true">*</b></span>
+        <textarea
+          rows="6"
+          maxLength="5000"
+          placeholder="Please describe what happened, when it started, any error messages you saw, and any troubleshooting you already tried…"
+          value={values.description}
+          onChange={(event) => setValues({ ...values, description: event.target.value })}
+        />
+        <span className="field-meta"><em>{errors.description}</em><small>{values.description.length} / 5000</small></span>
       </label>
+
       <div className="form-grid">
-        <label><span>Category <b>*</b></span><select value={values.ticketCategoryId} onChange={(e) => setValues({ ...values, ticketCategoryId: e.target.value })}><option value="">Select category</option>{lookups.categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><em>{errors.ticketCategoryId}</em></label>
-        <label><span>Priority <b>*</b></span><select value={values.ticketPriorityId} onChange={(e) => setValues({ ...values, ticketPriorityId: e.target.value })}><option value="">Select priority</option>{lookups.priorities.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><em>{errors.ticketPriorityId}</em></label>
+        <label>
+          <span>Category <b aria-hidden="true">*</b></span>
+          <select value={values.ticketCategoryId} onChange={(event) => setValues({ ...values, ticketCategoryId: event.target.value })}>
+            <option value="">Select category…</option>
+            {lookups.categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </select>
+          <em>{errors.ticketCategoryId}</em>
+        </label>
+        <label>
+          <span>Priority <b aria-hidden="true">*</b></span>
+          <select value={values.ticketPriorityId} onChange={(event) => setValues({ ...values, ticketPriorityId: event.target.value })}>
+            <option value="">Select priority…</option>
+            {lookups.priorities.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </select>
+          <em>{errors.ticketPriorityId}</em>
+        </label>
       </div>
-      <div className="form-actions"><button type="button" className="button button--secondary" onClick={onCancel} disabled={saving}>Cancel</button><button className="button button--primary" disabled={saving}>{saving ? 'Saving…' : submitLabel}</button></div>
+
+      <label>
+        <span>Related Asset <small>(optional)</small></span>
+        <input
+          value={assetSearch}
+          onChange={(event) => setAssetSearch(event.target.value)}
+          placeholder="Search by asset name, tag, serial number, or location…"
+        />
+        <select value={values.assetId} onChange={(event) => setValues({ ...values, assetId: event.target.value })}>
+          <option value="">No related asset</option>
+          {assets.map((asset) => (
+            <option key={asset.id} value={asset.id}>{asset.assetTag} — {asset.assetName}</option>
+          ))}
+        </select>
+        {assets.length === 0 && <small>No active assets are assigned or available to your department.</small>}
+        <em>{errors.asset}</em>
+      </label>
+
+      <section className="attachment-field" aria-labelledby="attachment-title">
+        <div><strong id="attachment-title">Attachments <small>(optional)</small></strong><p>PNG, JPG, PDF, DOCX, TXT, LOG or ZIP. Maximum 10 MB each — up to 5 files.</p></div>
+        <button
+          type="button"
+          className="attachment-dropzone"
+          onClick={() => fileInput.current?.click()}
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => {
+            event.preventDefault()
+            addFiles(event.dataTransfer.files)
+          }}
+        >
+          <Upload size={20} aria-hidden="true" />
+          <span>Drop files here or click to browse</span>
+        </button>
+        <input
+          ref={fileInput}
+          className="visually-hidden"
+          type="file"
+          multiple
+          accept=".png,.jpg,.jpeg,.pdf,.docx,.txt,.log,.zip"
+          onChange={(event) => {
+            addFiles(event.target.files)
+            event.target.value = ''
+          }}
+        />
+        {existingAttachments.map((file) => (
+          <div className="attachment-row" key={file.id}>
+            <Paperclip size={16} /><span>{file.fileName}</span><small>{formatBytes(file.fileSizeBytes)}</small>
+            {onDeleteAttachment && <button type="button" onClick={async () => {
+              try {
+                await onDeleteAttachment(file.id)
+              } catch (error) {
+                setErrors({ form: error.message || 'The attachment could not be removed.' })
+              }
+            }}>Remove</button>}
+          </div>
+        ))}
+        {files.map((file, index) => (
+          <div className="attachment-row" key={`${file.name}-${file.lastModified}`}>
+            <Paperclip size={16} /><span>{file.name}</span><small>{formatBytes(file.size)}</small>
+            <button type="button" onClick={() => setFiles(files.filter((_, itemIndex) => itemIndex !== index))}>Remove</button>
+          </div>
+        ))}
+        {fileErrors.map((message) => <em key={message}>{message}</em>)}
+      </section>
+
+      <div className="form-actions form-actions--split">
+        <div>
+          <button type="button" className="button button--secondary" onClick={onCancel} disabled={saving || savingDraft}>Cancel</button>
+          {onSaveDraft && (
+            <button type="button" className="button button--secondary" onClick={saveDraft} disabled={saving || savingDraft}>
+              <Save size={17} />{savingDraft ? 'Saving…' : 'Save Draft'}
+            </button>
+          )}
+        </div>
+        <button className="button button--primary" disabled={saving || savingDraft}>
+          <Send size={17} />{saving ? 'Saving…' : submitLabel}
+        </button>
+      </div>
+      {mode === 'draft' && <small className="draft-note">Files are uploaded when this draft is submitted as a ticket.</small>}
     </form>
   )
 }

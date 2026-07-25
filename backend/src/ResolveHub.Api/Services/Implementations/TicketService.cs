@@ -131,6 +131,8 @@ public sealed class TicketService(ApplicationDbContext dbContext)
             request.Description,
             request.TicketCategoryId,
             request.TicketPriorityId,
+            request.AssetId,
+            userId,
             cancellationToken);
         if (validation is not null)
             return new(TicketOperationStatus.Invalid, Message: validation);
@@ -154,6 +156,7 @@ public sealed class TicketService(ApplicationDbContext dbContext)
             TicketCategoryID = request.TicketCategoryId,
             TicketPriorityID = request.TicketPriorityId,
             TicketStatusID = openStatusId,
+            AssetID = request.AssetId,
             Title = request.Title.Trim(),
             Description = request.Description.Trim(),
             CreatedDate = now,
@@ -195,6 +198,8 @@ public sealed class TicketService(ApplicationDbContext dbContext)
             request.Description,
             request.TicketCategoryId,
             request.TicketPriorityId,
+            request.AssetId,
+            userId,
             cancellationToken);
         if (validation is not null)
             return new(TicketOperationStatus.Invalid, Message: validation);
@@ -203,6 +208,7 @@ public sealed class TicketService(ApplicationDbContext dbContext)
         ticket.Description = request.Description.Trim();
         ticket.TicketCategoryID = request.TicketCategoryId;
         ticket.TicketPriorityID = request.TicketPriorityId;
+        ticket.AssetID = request.AssetId;
         ticket.UpdatedDate = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -274,6 +280,8 @@ public sealed class TicketService(ApplicationDbContext dbContext)
         string description,
         int categoryId,
         int priorityId,
+        int? assetId,
+        int userId,
         CancellationToken cancellationToken)
     {
         var trimmedTitle = title.Trim();
@@ -289,7 +297,28 @@ public sealed class TicketService(ApplicationDbContext dbContext)
             return "Select a valid active category.";
         var priorityExists = await dbContext.TicketPriorities
             .AnyAsync(item => item.ID == priorityId && item.IsActive, cancellationToken);
-        return priorityExists ? null : "Select a valid active priority.";
+        if (!priorityExists)
+            return "Select a valid active priority.";
+
+        if (assetId.HasValue)
+        {
+            var userDepartmentId = await dbContext.Users
+                .Where(user => user.Id == userId)
+                .Select(user => user.DepartmentID)
+                .SingleAsync(cancellationToken);
+            var assetAllowed = await dbContext.Assets.AnyAsync(
+                asset => asset.ID == assetId &&
+                    asset.IsActive &&
+                    (asset.AssignedToUserAccountID == userId ||
+                     (userDepartmentId != null &&
+                      asset.AssignedToUserAccountID == null &&
+                      asset.DepartmentID == userDepartmentId)),
+                cancellationToken);
+            if (!assetAllowed)
+                return "Select an active asset available to your account.";
+        }
+
+        return null;
     }
 
     private static bool CanModify(Ticket ticket) =>
@@ -365,6 +394,27 @@ public sealed class TicketService(ApplicationDbContext dbContext)
             ticket.ClosedDate,
             ticket.CancelledDate,
             ticket.CancelledReason,
+            ticket.Asset == null
+                ? null
+                : new AssetLookupDto(
+                    ticket.Asset.ID,
+                    ticket.Asset.AssetTag,
+                    ticket.Asset.AssetName,
+                    ticket.Asset.AssetType,
+                    ticket.Asset.SerialNumber,
+                    ticket.Asset.Location),
+            ticket.Attachments
+                .Where(attachment => !attachment.IsDeleted)
+                .OrderByDescending(attachment => attachment.UploadedDate)
+                .Select(attachment => new TicketAttachmentDto(
+                    attachment.ID,
+                    attachment.FileName,
+                    attachment.ContentType,
+                    attachment.FileSizeBytes,
+                    attachment.UploadedDate,
+                    ticket.TicketStatus.Name == TicketStatusNames.Open &&
+                        ticket.AssignedToUserAccountID == null))
+                .ToList(),
             ticket.TicketStatus.Name == TicketStatusNames.Open &&
                 ticket.AssignedToUserAccountID == null,
             ticket.TicketStatus.Name == TicketStatusNames.Open &&

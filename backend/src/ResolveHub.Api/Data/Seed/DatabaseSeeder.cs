@@ -72,6 +72,7 @@ public static class DatabaseSeeder
             defaultPassword,
             TestUsers,
             includeEmailInErrors: true);
+        await SeedDevelopmentAssetsAsync(dbContext, userManager, environment);
 
         var passwordResetTestEmail =
             configuration["SeedData:PasswordResetTestEmail"]
@@ -104,6 +105,46 @@ public static class DatabaseSeeder
         await SeedCategoriesAsync(dbContext);
         await SeedPrioritiesAsync(dbContext);
         await SeedStatusesAsync(dbContext);
+        await dbContext.SaveChangesAsync();
+    }
+
+    private static async Task SeedDevelopmentAssetsAsync(
+        ApplicationDbContext dbContext,
+        UserManager<UserAccount> userManager,
+        IWebHostEnvironment environment)
+    {
+        if (!environment.IsDevelopment())
+            return;
+        var employee = await userManager.FindByEmailAsync(
+            "employee@resolvehub.test");
+        if (employee is null)
+            return;
+
+        var assets = new[]
+        {
+            new Asset
+            {
+                AssetTag = "LAP-001",
+                AssetName = "Dell Latitude Laptop",
+                AssetType = "Laptop",
+                SerialNumber = "DL-5440-001",
+                Location = "Beirut Office",
+                AssignedToUserAccountID = employee.Id
+            },
+            new Asset
+            {
+                AssetTag = "MON-001",
+                AssetName = "Dell Monitor",
+                AssetType = "Monitor",
+                SerialNumber = "DM-2422-001",
+                Location = "Beirut Office",
+                AssignedToUserAccountID = employee.Id
+            }
+        };
+        var existing = await dbContext.Assets
+            .Select(asset => asset.AssetTag).ToListAsync();
+        dbContext.Assets.AddRange(assets.Where(asset =>
+            !existing.Contains(asset.AssetTag, StringComparer.OrdinalIgnoreCase)));
         await dbContext.SaveChangesAsync();
     }
 

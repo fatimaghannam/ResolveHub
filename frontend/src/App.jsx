@@ -10,6 +10,8 @@ import CreateTicketPage from './pages/CreateTicketPage.jsx'
 import EditTicketPage from './pages/EditTicketPage.jsx'
 import TicketDetailsPage from './pages/TicketDetailsPage.jsx'
 import ComingSoonPage from './pages/ComingSoonPage.jsx'
+import TicketDraftsPage from './pages/TicketDraftsPage.jsx'
+import EditTicketDraftPage from './pages/EditTicketDraftPage.jsx'
 
 function App() {
   return (
@@ -31,6 +33,8 @@ function App() {
           <Route path="dashboard" element={<EmployeeDashboardPage />} />
           <Route path="tickets" element={<EmployeeTicketsPage />} />
           <Route path="tickets/create" element={<CreateTicketPage />} />
+          <Route path="tickets/drafts" element={<TicketDraftsPage />} />
+          <Route path="tickets/drafts/:id" element={<EditTicketDraftPage />} />
           <Route path="tickets/:id" element={<TicketDetailsPage />} />
           <Route path="tickets/:id/edit" element={<EditTicketPage />} />
           <Route path="coming-soon" element={<ComingSoonPage />} />

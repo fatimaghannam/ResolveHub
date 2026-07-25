@@ -72,6 +72,13 @@ public sealed class ResolveHubApiFactory
         builder.UseSetting(
             "Resend:FromName",
             "ResolveHub");
+        builder.UseSetting(
+            "FileStorage:UploadRoot",
+            Path.Combine(
+                Path.GetTempPath(),
+                $"ResolveHubAttachmentTests-{_databaseName}"));
+        builder.UseSetting("FileStorage:MaxFileSizeBytes", "10485760");
+        builder.UseSetting("FileStorage:MaxFilesPerTicket", "5");
         builder.ConfigureLogging(logging =>
         {
             logging.ClearProviders();
@@ -280,6 +287,30 @@ public sealed class ResolveHubApiFactory
         ticket.CreatedDate = createdDate;
         ticket.UpdatedDate = createdDate;
         await context.SaveChangesAsync();
+    }
+
+    public async Task<Asset> CreateAssetAsync(
+        int? assignedUserId = null,
+        int? departmentId = null,
+        bool isActive = true)
+    {
+        using var scope = Services.CreateScope();
+        var context = scope.ServiceProvider
+            .GetRequiredService<ApplicationDbContext>();
+        var asset = new Asset
+        {
+            AssetTag = $"TEST-{Guid.NewGuid():N}"[..18],
+            AssetName = "Integration Test Laptop",
+            AssetType = "Laptop",
+            SerialNumber = Guid.NewGuid().ToString("N"),
+            Location = "Test Office",
+            AssignedToUserAccountID = assignedUserId,
+            DepartmentID = departmentId,
+            IsActive = isActive
+        };
+        context.Assets.Add(asset);
+        await context.SaveChangesAsync();
+        return asset;
     }
 
     public async Task<TicketTestSnapshot> GetTicketSnapshotAsync(int ticketId)

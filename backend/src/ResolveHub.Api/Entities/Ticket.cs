@@ -9,6 +9,7 @@ public sealed class Ticket
     public int TicketCategoryID { get; set; }
     public int TicketPriorityID { get; set; }
     public int TicketStatusID { get; set; }
+    public int? AssetID { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public DateTime CreatedDate { get; set; }
@@ -25,4 +26,6 @@ public sealed class Ticket
     public TicketCategory TicketCategory { get; set; } = null!;
     public TicketPriority TicketPriority { get; set; } = null!;
     public TicketStatus TicketStatus { get; set; } = null!;
+    public Asset? Asset { get; set; }
+    public ICollection<TicketAttachment> Attachments { get; set; } = [];
 }

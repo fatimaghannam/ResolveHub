@@ -27,3 +27,38 @@ export const getPriorities = (signal) =>
   apiRequest('/api/ticket-priorities', { signal })
 export const getStatuses = (signal) =>
   apiRequest('/api/ticket-statuses', { signal })
+export const getMyAssets = (search = '', signal) =>
+  apiRequest(`/api/assets/mine${toQueryString({ search })}`, { signal })
+export const uploadAttachment = (ticketId, file) => {
+  const form = new FormData()
+  form.append('file', file)
+  return apiRequest(`/api/tickets/${ticketId}/attachments`, {
+    method: 'POST',
+    body: form,
+  })
+}
+export const deleteAttachment = (ticketId, attachmentId) =>
+  apiRequest(`/api/tickets/${ticketId}/attachments/${attachmentId}`, {
+    method: 'DELETE',
+  })
+export const downloadAttachment = (ticketId, attachmentId) =>
+  apiRequest(`/api/tickets/${ticketId}/attachments/${attachmentId}/download`, {
+    responseType: 'blob',
+  })
+export const getDrafts = () => apiRequest('/api/ticket-drafts')
+export const getDraft = (id, signal) =>
+  apiRequest(`/api/ticket-drafts/${id}`, { signal })
+export const createDraft = (values) =>
+  apiRequest('/api/ticket-drafts', {
+    method: 'POST',
+    body: JSON.stringify(values),
+  })
+export const updateDraft = (id, values) =>
+  apiRequest(`/api/ticket-drafts/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(values),
+  })
+export const deleteDraft = (id) =>
+  apiRequest(`/api/ticket-drafts/${id}`, { method: 'DELETE' })
+export const submitDraft = (id) =>
+  apiRequest(`/api/ticket-drafts/${id}/submit`, { method: 'POST' })

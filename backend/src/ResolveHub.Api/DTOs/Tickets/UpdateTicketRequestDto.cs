@@ -15,4 +15,6 @@ public sealed class UpdateTicketRequestDto
 
     [Range(1, int.MaxValue)]
     public int TicketPriorityId { get; init; }
+
+    public int? AssetId { get; init; }
 }
