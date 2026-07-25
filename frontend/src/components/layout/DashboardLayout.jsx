@@ -11,17 +11,29 @@ import {
   Ticket,
   X,
 } from 'lucide-react'
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { clearStoredAuth, getStoredAuth } from '../../services/authStorage.js'
 import '../../styles/dashboard.css'
 
 const navigation = [
-  { to: '/employee/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/employee/tickets', label: 'My Tickets', icon: Ticket },
-  { to: '/employee/tickets/create', label: 'Create Ticket', icon: PlusCircle },
+  { id: 'dashboard', to: '/employee/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'tickets', to: '/employee/tickets', label: 'My Tickets', icon: Ticket },
+  { id: 'create', to: '/employee/tickets/create', label: 'Create Ticket', icon: PlusCircle },
   { to: '/employee/coming-soon', label: 'Notifications', icon: Bell, soon: true },
   { to: '/employee/coming-soon', label: 'Profile', icon: CircleUserRound, soon: true },
 ]
+
+function isNavigationActive(id, pathname) {
+  if (id === 'dashboard') return pathname === '/employee/dashboard'
+  if (id === 'create') return pathname === '/employee/tickets/create'
+  if (id === 'tickets') {
+    return (
+      pathname === '/employee/tickets' ||
+      /^\/employee\/tickets\/\d+(\/edit)?$/.test(pathname)
+    )
+  }
+  return false
+}
 
 function DashboardLayout() {
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false)
@@ -77,8 +89,13 @@ function DashboardLayout() {
         className={`sidebar ${isMobileSidebarOpen ? 'sidebar--open' : ''}`}
       >
         <div className="sidebar__brand">
-          <span className="brand-mark">R</span>
-          <span className="sidebar-text">ResolveHub</span>
+          <img
+            className="sidebar__logo"
+            src="/favicon.png"
+            alt="ResolveHub"
+            draggable="false"
+          />
+          <span className="sidebar__wordmark sidebar-text">ResolveHub</span>
           <button
             type="button"
             className="icon-button sidebar__desktop-toggle"
@@ -91,7 +108,7 @@ function DashboardLayout() {
           </button>
           <button
             type="button"
-            className="icon-button sidebar__close"
+            className="icon-button sidebar__mobile-close"
             onClick={() => setIsMobileSidebarOpen(false)}
             aria-label="Close navigation"
             aria-controls="employee-sidebar"
@@ -100,22 +117,24 @@ function DashboardLayout() {
           </button>
         </div>
         <nav aria-label="Employee navigation">
-          {navigation.map(({ to, label, icon: Icon, soon }, index) => (
-            <NavLink
-              key={`${label}-${index}`}
-              to={to}
-              onClick={() => setIsMobileSidebarOpen(false)}
-              aria-label={label}
-              title={isDesktopCollapsed ? label : undefined}
-              className={({ isActive }) =>
-                `sidebar-link ${isActive && !soon ? 'sidebar-link--active' : ''}`
-              }
-            >
-              <Icon size={19} aria-hidden="true" />
-              <span className="sidebar-text">{label}</span>
-              {soon && <small className="sidebar-text">Soon</small>}
-            </NavLink>
-          ))}
+          {navigation.map(({ id, to, label, icon: Icon, soon }, index) => {
+            const active = isNavigationActive(id, location.pathname)
+            return (
+              <Link
+                key={`${label}-${index}`}
+                to={to}
+                onClick={() => setIsMobileSidebarOpen(false)}
+                aria-label={label}
+                aria-current={active ? 'page' : undefined}
+                title={isDesktopCollapsed ? label : undefined}
+                className={`sidebar-link ${active ? 'sidebar-link--active' : ''}`}
+              >
+                <Icon size={19} aria-hidden="true" />
+                <span className="sidebar-text">{label}</span>
+                {soon && <small className="sidebar-text">Soon</small>}
+              </Link>
+            )
+          })}
         </nav>
         <button
           type="button"

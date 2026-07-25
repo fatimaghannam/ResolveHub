@@ -7,15 +7,25 @@ function TicketForm({ initialValues, submitLabel, onSubmit, onCancel }) {
   const [lookups, setLookups] = useState(null)
   const [errors, setErrors] = useState({})
   const [loadingError, setLoadingError] = useState('')
+  const [lookupRequest, setLookupRequest] = useState(0)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     const controller = new AbortController()
-    Promise.all([getCategories(controller.signal), getPriorities(controller.signal)])
+    setLoadingError('')
+    setLookups(null)
+    Promise.all([
+      getCategories(controller.signal),
+      getPriorities(controller.signal),
+    ])
       .then(([categories, priorities]) => setLookups({ categories, priorities }))
-      .catch((error) => setLoadingError(error.message))
+      .catch((error) => {
+        if (error.name !== 'AbortError') {
+          setLoadingError(error.message)
+        }
+      })
     return () => controller.abort()
-  }, [])
+  }, [lookupRequest])
 
   function validate() {
     const next = {}
@@ -43,7 +53,14 @@ function TicketForm({ initialValues, submitLabel, onSubmit, onCancel }) {
     } finally { setSaving(false) }
   }
 
-  if (loadingError) return <ErrorState message={loadingError} />
+  if (loadingError) {
+    return (
+      <ErrorState
+        message={loadingError}
+        onRetry={() => setLookupRequest((current) => current + 1)}
+      />
+    )
+  }
   if (!lookups) return <LoadingState message="Loading ticket options…" />
 
   return (
