@@ -12,6 +12,12 @@ import TicketDetailsPage from './pages/TicketDetailsPage.jsx'
 import ComingSoonPage from './pages/ComingSoonPage.jsx'
 import TicketDraftsPage from './pages/TicketDraftsPage.jsx'
 import EditTicketDraftPage from './pages/EditTicketDraftPage.jsx'
+import AgentDashboardPage from './pages/AgentDashboardPage.jsx'
+import AgentTicketsPage from './pages/AgentTicketsPage.jsx'
+import AgentTicketDetailsPage from './pages/AgentTicketDetailsPage.jsx'
+import AgentNotificationsPage from './pages/AgentNotificationsPage.jsx'
+import AgentProfilePage from './pages/AgentProfilePage.jsx'
+import { EMPLOYEE_ROLE, IT_AGENT_ROLE } from './services/authStorage.js'
 
 function App() {
   return (
@@ -24,7 +30,7 @@ function App() {
         <Route
           path="/employee"
           element={
-            <ProtectedRoute employeeOnly>
+            <ProtectedRoute allowedRoles={[EMPLOYEE_ROLE]}>
               <DashboardLayout />
             </ProtectedRoute>
           }
@@ -38,6 +44,21 @@ function App() {
           <Route path="tickets/:id" element={<TicketDetailsPage />} />
           <Route path="tickets/:id/edit" element={<EditTicketPage />} />
           <Route path="coming-soon" element={<ComingSoonPage />} />
+        </Route>
+        <Route
+          path="/agent"
+          element={
+            <ProtectedRoute allowedRoles={[IT_AGENT_ROLE]}>
+              <DashboardLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<AgentDashboardPage />} />
+          <Route path="tickets" element={<AgentTicketsPage />} />
+          <Route path="tickets/:id" element={<AgentTicketDetailsPage />} />
+          <Route path="notifications" element={<AgentNotificationsPage />} />
+          <Route path="profile" element={<AgentProfilePage />} />
         </Route>
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>

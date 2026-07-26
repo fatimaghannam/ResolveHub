@@ -8,6 +8,7 @@ import {
   updateTicket,
   uploadAttachment,
 } from '../services/ticketService.js'
+import { formatTicketReference } from '../utils/ticketReference.js'
 
 function EditTicketPage() {
   const { id } = useParams()
@@ -39,7 +40,7 @@ function EditTicketPage() {
 
   return (
     <>
-      <section className="page-heading"><h2>Edit {ticket.ticketReferenceNumber}</h2><p>Update the issue information while the ticket is still open and unassigned.</p></section>
+      <section className="page-heading"><h2>Edit {formatTicketReference(ticket)}</h2><p>Update the issue information while the ticket is still open and unassigned.</p></section>
       <TicketForm
         mode="edit"
         initialValues={{ title: ticket.title, description: ticket.description, ticketCategoryId: ticket.ticketCategoryId, ticketPriorityId: ticket.ticketPriorityId }}

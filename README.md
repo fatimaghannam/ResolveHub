@@ -219,7 +219,10 @@ ResolveHub aims to:
 ### Ticket Management
 
 - Create IT support tickets
-- Generate a unique ticket reference number
+- Display ticket references consistently as `RH-YYYY-NNNN`
+- Future backend generation must use `RH-{CurrentYear}-{SequentialNumber}`;
+  the year is determined at creation time and the numeric sequence is assigned
+  by database/business logic
 - Add a title and detailed issue description
 - Select ticket category and priority
 - Upload screenshots, documents, and log files

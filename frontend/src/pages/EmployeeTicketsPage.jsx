@@ -6,6 +6,7 @@ import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/Ti
 import { cancelTicket, getCategories, getPriorities, getStatuses, getTickets } from '../services/ticketService.js'
 import { formatLocalDate } from '../utils/dateTime.js'
 import { getLocalQuickDateRange, getUtcDateRange } from '../utils/dateRange.js'
+import { formatTicketReference } from '../utils/ticketReference.js'
 
 const dateRangeOptions = [
   ['all', 'All Dates'],
@@ -205,7 +206,7 @@ function EmployeeTicketsPage() {
           <div className="table-scroll"><table className="ticket-table">
             <thead><tr><th>Ticket Number</th><th>Title</th><th>Category</th><th>Priority</th><th>Status</th><th>Assigned To</th><th>Created</th><th>Actions</th></tr></thead>
             <tbody>{data.items.map((ticket) => <tr key={ticket.id}>
-              <td><strong>{ticket.ticketReferenceNumber}</strong></td><td>{ticket.title}</td><td>{ticket.categoryName}</td>
+              <td><strong>{formatTicketReference(ticket)}</strong></td><td>{ticket.title}</td><td>{ticket.categoryName}</td>
               <td><TicketPriorityBadge value={ticket.priorityName} /></td><td><TicketStatusBadge value={ticket.statusName} /></td>
               <td>{ticket.assignedToName ?? 'Unassigned'}</td><td>{formatLocalDate(ticket.createdDate)}</td>
               <td><div className="row-actions"><Link to={`/employee/tickets/${ticket.id}`}>View</Link>{ticket.canEdit && <Link to={`/employee/tickets/${ticket.id}/edit`}>Edit</Link>}{ticket.canDelete && <button onClick={() => setCancelTarget(ticket)}>Delete</button>}</div></td>
@@ -215,7 +216,7 @@ function EmployeeTicketsPage() {
         <Pagination page={data.page} totalPages={data.totalPages} onChange={changePage} />
       </section>}
       {cancelTarget && <div className="dialog-backdrop" role="presentation"><div className="dialog" role="dialog" aria-modal="true" aria-labelledby="cancel-title" aria-describedby="cancel-description">
-        <h2 id="cancel-title">Cancel {cancelTarget.ticketReferenceNumber}?</h2><p id="cancel-description">This removes the ticket from your active list. This action cannot be undone.</p>
+        <h2 id="cancel-title">Cancel {formatTicketReference(cancelTarget)}?</h2><p id="cancel-description">This removes the ticket from your active list. This action cannot be undone.</p>
         <label><span>Reason (optional)</span><select value={reason} onChange={(e) => setReason(e.target.value)}><option value="">Select a reason</option><option>Created by mistake</option><option>Duplicate ticket</option><option>Issue no longer exists</option><option>Other</option></select></label>
         <div className="dialog__actions"><button autoFocus type="button" className="button button--secondary" onClick={() => setCancelTarget(null)} disabled={cancelling}>Keep Ticket</button><button type="button" className="button button--danger" onClick={confirmCancel} disabled={cancelling}>{cancelling ? 'Cancelling…' : 'Cancel Ticket'}</button></div>
       </div></div>}

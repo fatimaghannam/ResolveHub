@@ -2,7 +2,12 @@ import { useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { loginUser } from '../services/authService.js'
-import { AUTH_STORAGE_KEY, EMPLOYEE_ROLE } from '../services/authStorage.js'
+import {
+  AUTH_STORAGE_KEY,
+  clearStoredAuth,
+  isEmployee,
+  isItAgent,
+} from '../services/authStorage.js'
 import '../styles/login.css'
 
 function getLoginError(error) {
@@ -42,7 +47,10 @@ function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState(
-    location.state?.passwordResetMessage ?? '',
+    location.state?.passwordResetMessage ??
+      (location.state?.accessDenied
+        ? 'Your account does not have permission to access that page.'
+        : ''),
   )
 
   async function handleSubmit(event) {
@@ -65,9 +73,13 @@ function LoginPage() {
       storage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authData))
       otherStorage.removeItem(AUTH_STORAGE_KEY)
 
-      setMessage('Sign in successful.')
-      if (authData.user?.roles?.includes(EMPLOYEE_ROLE)) {
+      if (isEmployee(authData)) {
         navigate('/employee/dashboard', { replace: true })
+      } else if (isItAgent(authData)) {
+        navigate('/agent/dashboard', { replace: true })
+      } else {
+        clearStoredAuth()
+        setMessage('This account role is not supported in the dashboard yet.')
       }
     } catch (error) {
       setMessage(getLoginError(error))

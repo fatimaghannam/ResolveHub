@@ -5,6 +5,7 @@ import { getDashboard } from '../services/ticketService.js'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
 import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
 import { formatLocalDate } from '../utils/dateTime.js'
+import { formatTicketReference } from '../utils/ticketReference.js'
 
 function EmployeeDashboardPage() {
   const { user } = useOutletContext()
@@ -59,7 +60,7 @@ function EmployeeDashboardPage() {
               <thead><tr><th>Ticket</th><th>Title</th><th>Priority</th><th>Status</th><th>Created</th><th /></tr></thead>
               <tbody>{data.recentTickets.map((ticket) => (
                 <tr key={ticket.id}>
-                  <td><strong>{ticket.ticketReferenceNumber}</strong></td><td>{ticket.title}</td>
+                  <td><strong>{formatTicketReference(ticket)}</strong></td><td>{ticket.title}</td>
                   <td><TicketPriorityBadge value={ticket.priorityName} /></td>
                   <td><TicketStatusBadge value={ticket.statusName} /></td>
                   <td>{formatLocalDate(ticket.createdDate)}</td>

@@ -12,10 +12,14 @@ import {
   X,
 } from 'lucide-react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { clearStoredAuth, getStoredAuth } from '../../services/authStorage.js'
+import {
+  clearStoredAuth,
+  getStoredAuth,
+  isItAgent,
+} from '../../services/authStorage.js'
 import '../../styles/dashboard.css'
 
-const navigation = [
+const employeeNavigation = [
   { id: 'dashboard', to: '/employee/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'tickets', to: '/employee/tickets', label: 'My Tickets', icon: Ticket },
   { id: 'create', to: '/employee/tickets/create', label: 'Create Ticket', icon: PlusCircle },
@@ -23,9 +27,18 @@ const navigation = [
   { to: '/employee/coming-soon', label: 'Profile', icon: CircleUserRound, soon: true },
 ]
 
-function isNavigationActive(id, pathname) {
-  if (id === 'dashboard') return pathname === '/employee/dashboard'
-  if (id === 'create') return pathname === '/employee/tickets/create'
+const agentNavigation = [
+  { id: 'dashboard', to: '/agent/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'tickets', to: '/agent/tickets', label: 'Assigned Tickets', icon: Ticket },
+  { id: 'notifications', to: '/agent/notifications', label: 'Notifications', icon: Bell },
+  { id: 'profile', to: '/agent/profile', label: 'Profile', icon: CircleUserRound },
+]
+
+function isNavigationActive(id, pathname, agent) {
+  const base = agent ? '/agent' : '/employee'
+  if (id === 'dashboard') return pathname === `${base}/dashboard`
+  if (id === 'create') return pathname === `${base}/tickets/create`
+  if (id === 'tickets' && agent) return pathname.startsWith('/agent/tickets')
   if (id === 'tickets') {
     return (
       pathname === '/employee/tickets' ||
@@ -33,7 +46,24 @@ function isNavigationActive(id, pathname) {
       /^\/employee\/tickets\/\d+(\/edit)?$/.test(pathname)
     )
   }
-  return false
+  return pathname === `${base}/${id}`
+}
+
+function getPageTitle(pathname, agent) {
+  if (agent) {
+    if (/\/agent\/tickets\/[^/]+$/.test(pathname)) return 'Ticket Details'
+    if (pathname.endsWith('/tickets')) return 'Assigned Tickets'
+    if (pathname.endsWith('/notifications')) return 'Notifications'
+    if (pathname.endsWith('/profile')) return 'Profile'
+    return 'Dashboard'
+  }
+  if (pathname.includes('/tickets/drafts')) return 'Ticket Drafts'
+  if (pathname.includes('/tickets/create')) return 'Create Ticket'
+  if (pathname.includes('/edit')) return 'Edit Ticket'
+  if (pathname.match(/\/tickets\/\d+$/)) return 'Ticket Details'
+  if (pathname.endsWith('/tickets')) return 'My Tickets'
+  if (pathname.endsWith('/dashboard')) return 'Dashboard'
+  return 'Coming Soon'
 }
 
 function DashboardLayout() {
@@ -43,6 +73,11 @@ function DashboardLayout() {
   const location = useLocation()
   const auth = getStoredAuth()
   const user = auth?.user
+  const agent = isItAgent(auth)
+  const navigation = agent ? agentNavigation : employeeNavigation
+  const roleLabel = agent ? 'IT Support Agent' : 'Employee'
+  const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ')
+  const sidebarId = 'dashboard-sidebar'
 
   useEffect(() => {
     if (!isMobileSidebarOpen) return undefined
@@ -65,19 +100,7 @@ function DashboardLayout() {
     navigate('/login', { replace: true })
   }
 
-  const pageTitle = location.pathname.includes('/tickets/drafts')
-    ? 'Ticket Drafts'
-    : location.pathname.includes('/tickets/create')
-    ? 'Create Ticket'
-    : location.pathname.includes('/edit')
-      ? 'Edit Ticket'
-      : location.pathname.match(/\/tickets\/\d+$/)
-        ? 'Ticket Details'
-        : location.pathname.endsWith('/tickets')
-          ? 'My Tickets'
-          : location.pathname.endsWith('/dashboard')
-            ? 'Dashboard'
-            : 'Coming Soon'
+  const pageTitle = getPageTitle(location.pathname, agent)
 
   return (
     <div className={`dashboard-shell ${isDesktopCollapsed ? 'dashboard-shell--collapsed' : ''}`}>
@@ -88,7 +111,7 @@ function DashboardLayout() {
         hidden={!isMobileSidebarOpen}
       />
       <aside
-        id="employee-sidebar"
+        id={sidebarId}
         className={`sidebar ${isMobileSidebarOpen ? 'sidebar--open' : ''}`}
       >
         <div className="sidebar__brand">
@@ -105,7 +128,7 @@ function DashboardLayout() {
             onClick={() => setIsDesktopCollapsed((current) => !current)}
             aria-label={isDesktopCollapsed ? 'Expand navigation' : 'Collapse navigation'}
             aria-expanded={!isDesktopCollapsed}
-            aria-controls="employee-sidebar"
+            aria-controls={sidebarId}
           >
             {isDesktopCollapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
           </button>
@@ -114,14 +137,14 @@ function DashboardLayout() {
             className="icon-button sidebar__mobile-close"
             onClick={() => setIsMobileSidebarOpen(false)}
             aria-label="Close navigation"
-            aria-controls="employee-sidebar"
+            aria-controls={sidebarId}
           >
             <X size={20} />
           </button>
         </div>
-        <nav aria-label="Employee navigation">
+        <nav aria-label={`${roleLabel} navigation`}>
           {navigation.map(({ id, to, label, icon: Icon, soon }, index) => {
-            const active = isNavigationActive(id, location.pathname)
+            const active = isNavigationActive(id, location.pathname, agent)
             return (
               <Link
                 key={`${label}-${index}`}
@@ -158,21 +181,21 @@ function DashboardLayout() {
             onClick={() => setIsMobileSidebarOpen(true)}
             aria-label="Open navigation"
             aria-expanded={isMobileSidebarOpen}
-            aria-controls="employee-sidebar"
+            aria-controls={sidebarId}
           >
             <Menu size={22} />
           </button>
           <h1>{pageTitle}</h1>
           <div className="topbar__user">
-            <span className="avatar">{user?.firstName?.[0] ?? 'E'}</span>
+            <span className="avatar">{user?.firstName?.[0]?.toUpperCase() ?? roleLabel[0]}</span>
             <span>
-              <strong>{user ? `${user.firstName} ${user.lastName}` : 'Employee'}</strong>
-              <small>Employee</small>
+              <strong>{fullName || user?.email || roleLabel}</strong>
+              <small>{roleLabel}</small>
             </span>
           </div>
         </header>
         <main className="dashboard-content">
-          <Outlet context={{ user }} />
+          <Outlet context={{ user, role: roleLabel }} />
         </main>
       </div>
     </div>

@@ -7,6 +7,7 @@ import {
   updateDraft,
   uploadAttachment,
 } from '../services/ticketService.js'
+import { formatTicketReference } from '../utils/ticketReference.js'
 
 function CreateTicketPage() {
   const navigate = useNavigate()
@@ -29,9 +30,10 @@ function CreateTicketPage() {
             failed.push(file.name)
           }
         }
+        const ticketReference = formatTicketReference(ticket)
         const notice = failed.length
-          ? `Ticket created. These attachments could not be uploaded: ${failed.join(', ')}.`
-          : 'Ticket created successfully.'
+          ? `${ticketReference} was created. These attachments could not be uploaded: ${failed.join(', ')}.`
+          : `${ticketReference} was created successfully.`
         navigate(`/employee/tickets/${ticket.id}`, { replace: true, state: { notice } })
       }} />
     </>
