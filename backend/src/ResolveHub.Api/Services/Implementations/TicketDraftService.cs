@@ -9,13 +9,30 @@ namespace ResolveHub.Api.Services.Implementations;
 
 public sealed class TicketDraftService(
     ApplicationDbContext dbContext,
-    ITicketService ticketService) : ITicketDraftService
+    ITicketService ticketService,
+    ILogger<TicketDraftService> logger) : ITicketDraftService
 {
     public async Task<IReadOnlyCollection<TicketDraftDto>> GetAllAsync(
-        int userId, CancellationToken token) =>
-        await Project(dbContext.TicketDrafts.AsNoTracking()
-            .Where(draft => draft.UserAccountID == userId))
-            .OrderByDescending(draft => draft.UpdatedDate).ToListAsync(token);
+        int userId, CancellationToken token)
+    {
+        try
+        {
+            var ownedDrafts = dbContext.TicketDrafts
+                .AsNoTracking()
+                .Where(draft => draft.UserAccountID == userId)
+                .OrderByDescending(draft => draft.UpdatedDate);
+
+            return await Project(ownedDrafts).ToListAsync(token);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.LogError(
+                exception,
+                "Failed to load ticket drafts for authenticated user {UserId}.",
+                userId);
+            throw;
+        }
+    }
 
     public Task<TicketDraftDto?> GetAsync(int userId, int id, CancellationToken token) =>
         Project(dbContext.TicketDrafts.AsNoTracking()

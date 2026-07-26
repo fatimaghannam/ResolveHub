@@ -14,6 +14,9 @@ namespace ResolveHub.Api.Controllers;
 public sealed class TicketDraftsController(ITicketDraftService service) : ControllerBase
 {
     [HttpGet]
+    [ProducesResponseType(typeof(IReadOnlyCollection<TicketDraftDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> All(CancellationToken token) =>
         Ok(await service.GetAllAsync(UserId, token));
     [HttpGet("{id:int}")]
@@ -57,6 +60,16 @@ public sealed class TicketDraftsController(ITicketDraftService service) : Contro
             _ => BadRequest(new { message = result.Message })
         };
     }
-    private int UserId =>
-        int.Parse(User.FindFirst(JwtRegisteredClaimNames.Sub)!.Value);
+    private int UserId
+    {
+        get
+        {
+            var value = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+            if (int.TryParse(value, out var userId))
+                return userId;
+
+            throw new InvalidOperationException(
+                "The authenticated user identifier is invalid.");
+        }
+    }
 }

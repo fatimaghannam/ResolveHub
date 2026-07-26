@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
+using ResolveHub.Api.Constants;
 using ResolveHub.Api.DTOs.Auth;
 using ResolveHub.Api.DTOs.Tickets;
 using Xunit;
@@ -85,6 +86,93 @@ public sealed class TicketAssetsAttachmentsAndDraftsTests
         Assert.Equal(HttpStatusCode.Created, save.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, otherRead.StatusCode);
         Assert.Equal(0, dashboard!.TotalTickets);
+    }
+
+    [Fact]
+    public async Task GetDrafts_ReturnsEmptyArrayForNewEmployee()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        var owner = await factory.CreateUserAsync(
+            "draft-empty@resolvehub.test", Password);
+        using var client = await LoginAsync(factory, owner.Email!);
+
+        var response = await client.GetAsync("/api/ticket-drafts");
+        var drafts = await response.Content
+            .ReadFromJsonAsync<IReadOnlyCollection<TicketDraftDto>>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(drafts);
+        Assert.Empty(drafts);
+    }
+
+    [Fact]
+    public async Task GetDrafts_ReturnsOnlyAuthenticatedEmployeesDrafts()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        var owner = await factory.CreateUserAsync(
+            "draft-list-owner@resolvehub.test", Password);
+        var other = await factory.CreateUserAsync(
+            "draft-list-other@resolvehub.test", Password);
+        using var ownerClient = await LoginAsync(factory, owner.Email!);
+        using var otherClient = await LoginAsync(factory, other.Email!);
+
+        await ownerClient.PostAsJsonAsync(
+            "/api/ticket-drafts", new { title = "Owner draft" });
+        await otherClient.PostAsJsonAsync(
+            "/api/ticket-drafts", new { title = "Other draft" });
+
+        var response = await ownerClient.GetAsync("/api/ticket-drafts");
+        var drafts = await response.Content
+            .ReadFromJsonAsync<IReadOnlyCollection<TicketDraftDto>>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var draft = Assert.Single(drafts!);
+        Assert.Equal("Owner draft", draft.Title);
+    }
+
+    [Fact]
+    public async Task DraftEndpoints_RequireEmployeeAuthentication()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        using var anonymousClient = factory.CreateHttpsClient();
+        var manager = await factory.CreateUserAsync(
+            "draft-manager@resolvehub.test", Password, RoleNames.Manager);
+        using var managerClient = await LoginAsync(factory, manager.Email!);
+
+        var anonymousResponse = await anonymousClient.GetAsync(
+            "/api/ticket-drafts");
+        var managerResponse = await managerClient.GetAsync(
+            "/api/ticket-drafts");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, anonymousResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, managerResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateAndDeleteDraft_ChangeOnlyTheOwnedDraftRecord()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        var owner = await factory.CreateUserAsync(
+            "draft-update@resolvehub.test", Password);
+        using var client = await LoginAsync(factory, owner.Email!);
+        var save = await client.PostAsJsonAsync(
+            "/api/ticket-drafts", new { title = "Before update" });
+        var draft = await save.Content.ReadFromJsonAsync<TicketDraftDto>();
+
+        var update = await client.PutAsJsonAsync(
+            $"/api/ticket-drafts/{draft!.Id}",
+            new { title = "After update", description = "Saved details" });
+        var updated = await update.Content.ReadFromJsonAsync<TicketDraftDto>();
+        var delete = await client.DeleteAsync(
+            $"/api/ticket-drafts/{draft.Id}");
+        var missing = await client.GetAsync(
+            $"/api/ticket-drafts/{draft.Id}");
+
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+        Assert.Equal("After update", updated!.Title);
+        Assert.Equal("Saved details", updated.Description);
+        Assert.Equal(HttpStatusCode.NoContent, delete.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
     }
 
     [Fact]
