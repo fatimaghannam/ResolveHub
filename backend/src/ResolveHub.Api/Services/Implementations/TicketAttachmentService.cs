@@ -119,6 +119,41 @@ public sealed class TicketAttachmentService(
             item.ContentType, item.FileName);
     }
 
+    public async Task<AttachmentDownload?> DownloadForAssignedAgentAsync(
+        int agentId,
+        string ticketReference,
+        int attachmentId,
+        CancellationToken cancellationToken)
+    {
+        var item = await dbContext.TicketAttachments.AsNoTracking()
+            .Where(attachment =>
+                attachment.ID == attachmentId &&
+                !attachment.IsDeleted &&
+                !attachment.Ticket.IsDeleted &&
+                attachment.Ticket.TicketReferenceNumber == ticketReference &&
+                attachment.Ticket.AssignedToUserAccountID == agentId)
+            .Select(attachment => new
+            {
+                attachment.FilePath,
+                attachment.ContentType,
+                attachment.FileName
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (item is null) return null;
+
+        var root = Path.GetFullPath(Path.Combine(
+            environment.ContentRootPath, options.Value.UploadRoot));
+        var path = Path.GetFullPath(Path.Combine(root, item.FilePath));
+        if (!path.StartsWith(root, StringComparison.OrdinalIgnoreCase) ||
+            !File.Exists(path))
+            return null;
+
+        return new AttachmentDownload(
+            new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read),
+            item.ContentType,
+            item.FileName);
+    }
+
     public async Task<TicketServiceResult<bool>> DeleteAsync(
         int userId, int ticketId, int attachmentId, CancellationToken cancellationToken)
     {

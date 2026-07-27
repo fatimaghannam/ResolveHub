@@ -144,10 +144,14 @@ public sealed class TicketService(ApplicationDbContext dbContext)
             throw new InvalidOperationException("The Open ticket status is not configured.");
 
         var now = DateTime.UtcNow;
+        await using var transaction = dbContext.Database.IsRelational()
+            ? await dbContext.Database.BeginTransactionAsync(cancellationToken)
+            : null;
         var ticket = new Ticket
         {
-            TicketReferenceNumber =
-                $"RH-{now.Year}-{Guid.NewGuid():N}"[..17].ToUpperInvariant(),
+            // The temporary value is never committed or returned. The identity
+            // value below is the concurrency-safe public numeric sequence.
+            TicketReferenceNumber = $"PENDING-{Guid.NewGuid():N}"[..32],
             CreatedByUserAccountID = userId,
             TicketCategoryID = request.TicketCategoryId,
             TicketPriorityID = request.TicketPriorityId,
@@ -161,6 +165,19 @@ public sealed class TicketService(ApplicationDbContext dbContext)
 
         dbContext.Tickets.Add(ticket);
         await dbContext.SaveChangesAsync(cancellationToken);
+        ticket.TicketReferenceNumber = $"RH-{now.Year}-{ticket.ID:D4}";
+        dbContext.TicketHistory.Add(new TicketHistory
+        {
+            TicketID = ticket.ID,
+            PerformedByUserAccountID = userId,
+            ActionType = TicketHistoryActionNames.TicketCreated,
+            NewValue = ticket.TicketReferenceNumber,
+            Description = "Ticket created.",
+            CreatedDate = now
+        });
+        await dbContext.SaveChangesAsync(cancellationToken);
+        if (transaction is not null)
+            await transaction.CommitAsync(cancellationToken);
 
         var details = await GetTicketAsync(userId, ticket.ID, cancellationToken)
             ?? throw new InvalidOperationException("The created ticket could not be loaded.");

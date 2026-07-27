@@ -13,6 +13,9 @@ public interface ITicketAttachmentService
         int userId, int ticketId, IFormFile file, CancellationToken cancellationToken);
     Task<AttachmentDownload?> DownloadAsync(
         int userId, int ticketId, int attachmentId, CancellationToken cancellationToken);
+    Task<AttachmentDownload?> DownloadForAssignedAgentAsync(
+        int agentId, string ticketReference, int attachmentId,
+        CancellationToken cancellationToken);
     Task<TicketServiceResult<bool>> DeleteAsync(
         int userId, int ticketId, int attachmentId, CancellationToken cancellationToken);
 }

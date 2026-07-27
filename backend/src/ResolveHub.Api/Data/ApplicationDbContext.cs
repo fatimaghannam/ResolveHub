@@ -27,9 +27,10 @@ public sealed class ApplicationDbContext
     public DbSet<TicketCategory> TicketCategories => Set<TicketCategory>();
     public DbSet<TicketPriority> TicketPriorities => Set<TicketPriority>();
     public DbSet<TicketStatus> TicketStatuses => Set<TicketStatus>();
-    public DbSet<Asset> Assets => Set<Asset>();
     public DbSet<TicketAttachment> TicketAttachments => Set<TicketAttachment>();
     public DbSet<TicketDraft> TicketDrafts => Set<TicketDraft>();
+    public DbSet<TicketComment> TicketComments => Set<TicketComment>();
+    public DbSet<TicketHistory> TicketHistory => Set<TicketHistory>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -43,9 +44,10 @@ public sealed class ApplicationDbContext
         ConfigureTicketPriority(builder);
         ConfigureTicketStatus(builder);
         ConfigureTicket(builder);
-        ConfigureAsset(builder);
         ConfigureTicketAttachment(builder);
         ConfigureTicketDraft(builder);
+        ConfigureTicketComment(builder);
+        ConfigureTicketHistory(builder);
         ConfigureIdentitySupportTables(builder);
     }
 
@@ -105,6 +107,8 @@ public sealed class ApplicationDbContext
             entity.Property(ticket => ticket.Description)
                 .HasMaxLength(5000).IsRequired();
             entity.Property(ticket => ticket.CancelledReason).HasMaxLength(500);
+            entity.Property(ticket => ticket.ResolutionSummary).HasMaxLength(5000);
+            entity.Property(ticket => ticket.RowVersion).IsRowVersion();
             entity.Property(ticket => ticket.CreatedDate).HasColumnType("datetime2");
             entity.Property(ticket => ticket.UpdatedDate).HasColumnType("datetime2");
             entity.Property(ticket => ticket.AssignedDate).HasColumnType("datetime2");
@@ -118,7 +122,20 @@ public sealed class ApplicationDbContext
             entity.HasIndex(ticket => ticket.TicketCategoryID);
             entity.HasIndex(ticket => ticket.TicketPriorityID);
             entity.HasIndex(ticket => ticket.CreatedDate);
-            entity.HasIndex(ticket => ticket.AssetID);
+            entity.HasIndex(ticket => ticket.AssignedToUserAccountID);
+            entity.HasIndex(ticket => new
+            {
+                ticket.AssignedToUserAccountID,
+                ticket.IsDeleted,
+                ticket.TicketStatusID
+            });
+            entity.HasIndex(ticket => new
+            {
+                ticket.AssignedToUserAccountID,
+                ticket.IsDeleted,
+                ticket.AssignedDate
+            });
+            entity.HasIndex(ticket => ticket.ResolvedDate);
             entity.HasIndex(ticket => new
             {
                 ticket.CreatedByUserAccountID,
@@ -146,40 +163,65 @@ public sealed class ApplicationDbContext
                 .WithMany(status => status.Tickets)
                 .HasForeignKey(ticket => ticket.TicketStatusID)
                 .OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(ticket => ticket.Asset)
-                .WithMany(asset => asset.Tickets)
-                .HasForeignKey(ticket => ticket.AssetID)
-                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(ticket => ticket.ResolvedByUserAccount)
+                .WithMany(user => user.ResolvedTickets)
+                .HasForeignKey(ticket => ticket.ResolvedByUserAccountID)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 
-    private static void ConfigureAsset(ModelBuilder builder)
+    private static void ConfigureTicketComment(ModelBuilder builder)
     {
-        builder.Entity<Asset>(entity =>
+        builder.Entity<TicketComment>(entity =>
         {
-            entity.ToTable("Asset");
-            entity.HasKey(asset => asset.ID);
-            entity.Property(asset => asset.ID).UseIdentityColumn();
-            entity.Property(asset => asset.AssetTag).HasMaxLength(50).IsRequired();
-            entity.Property(asset => asset.AssetName).HasMaxLength(150).IsRequired();
-            entity.Property(asset => asset.AssetType).HasMaxLength(100).IsRequired();
-            entity.Property(asset => asset.SerialNumber).HasMaxLength(100);
-            entity.Property(asset => asset.Location).HasMaxLength(150);
-            entity.Property(asset => asset.AssetStatus).HasMaxLength(50).IsRequired();
-            entity.Property(asset => asset.IsActive).HasDefaultValue(true);
-            entity.Property(asset => asset.CreatedDate).HasColumnType("datetime2");
-            entity.Property(asset => asset.UpdatedDate).HasColumnType("datetime2");
-            entity.HasIndex(asset => asset.AssetTag).IsUnique();
-            entity.HasIndex(asset => asset.AssignedToUserAccountID);
-            entity.HasIndex(asset => asset.DepartmentID);
-            entity.HasOne(asset => asset.Department)
-                .WithMany(department => department.Assets)
-                .HasForeignKey(asset => asset.DepartmentID)
-                .OnDelete(DeleteBehavior.SetNull);
-            entity.HasOne(asset => asset.AssignedToUserAccount)
-                .WithMany(user => user.AssignedAssets)
-                .HasForeignKey(asset => asset.AssignedToUserAccountID)
-                .OnDelete(DeleteBehavior.SetNull);
+            entity.ToTable("TicketComment");
+            entity.HasKey(comment => comment.ID);
+            entity.Property(comment => comment.ID).UseIdentityColumn();
+            entity.Property(comment => comment.Content).HasMaxLength(5000).IsRequired();
+            entity.Property(comment => comment.CreatedDate).HasColumnType("datetime2");
+            entity.Property(comment => comment.UpdatedDate).HasColumnType("datetime2");
+            entity.Property(comment => comment.IsEdited).HasDefaultValue(false);
+            entity.Property(comment => comment.IsDeleted).HasDefaultValue(false);
+            entity.HasIndex(comment => new
+            {
+                comment.TicketID,
+                comment.IsInternal,
+                comment.IsDeleted,
+                comment.CreatedDate
+            });
+            entity.HasIndex(comment => comment.AuthorUserAccountID);
+            entity.HasOne(comment => comment.Ticket)
+                .WithMany(ticket => ticket.Comments)
+                .HasForeignKey(comment => comment.TicketID)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(comment => comment.AuthorUserAccount)
+                .WithMany(user => user.TicketComments)
+                .HasForeignKey(comment => comment.AuthorUserAccountID)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureTicketHistory(ModelBuilder builder)
+    {
+        builder.Entity<TicketHistory>(entity =>
+        {
+            entity.ToTable("TicketHistory");
+            entity.HasKey(history => history.ID);
+            entity.Property(history => history.ID).UseIdentityColumn();
+            entity.Property(history => history.ActionType).HasMaxLength(100).IsRequired();
+            entity.Property(history => history.OldValue).HasMaxLength(500);
+            entity.Property(history => history.NewValue).HasMaxLength(500);
+            entity.Property(history => history.Description).HasMaxLength(1000);
+            entity.Property(history => history.CreatedDate).HasColumnType("datetime2");
+            entity.HasIndex(history => new { history.TicketID, history.CreatedDate });
+            entity.HasOne(history => history.Ticket)
+                .WithMany(ticket => ticket.History)
+                .HasForeignKey(history => history.TicketID)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(history => history.PerformedByUserAccount)
+                .WithMany(user => user.TicketHistoryEntries)
+                .HasForeignKey(history => history.PerformedByUserAccountID)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 
@@ -232,10 +274,6 @@ public sealed class ApplicationDbContext
             entity.HasOne(draft => draft.TicketPriority)
                 .WithMany(priority => priority.TicketDrafts)
                 .HasForeignKey(draft => draft.TicketPriorityID)
-                .OnDelete(DeleteBehavior.SetNull);
-            entity.HasOne(draft => draft.Asset)
-                .WithMany(asset => asset.TicketDrafts)
-                .HasForeignKey(draft => draft.AssetID)
                 .OnDelete(DeleteBehavior.SetNull);
         });
     }

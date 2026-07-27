@@ -97,7 +97,7 @@ The current implementation focuses on the secure backend foundation required bef
 - Login page connected to the backend API
 - Frontend role-based navigation
 - Complete ticket-management features
-- Notifications, reporting, SLA tracking, assets, and knowledge base modules
+- Notifications, reporting, SLA tracking, and knowledge base modules
 
 ---
 
@@ -382,16 +382,6 @@ ResolveHub aims to:
 - File sharing
 - Real-time message notifications
 
-### QR Code Asset Management
-
-- Register IT assets
-- Generate a unique QR code for each asset
-- Scan QR codes to view asset details
-- Link support tickets to assets
-- Track asset assignments
-- Track maintenance and repair history
-- Record warranties, locations, and asset status
-
 ### User Preferences 
 
 - Light and dark theme preferences
@@ -512,7 +502,6 @@ The repository includes Entity Framework Core migration files and an application
 | **Files and Notifications** | `TicketAttachment`, `Notification` |
 | **SLA Management** | `SlaPolicy`, `TicketSlaTracking` |
 | **Auditing** | `ActivityLog` |
-| **Asset Management** | `Asset`, `AssetMaintenanceHistory` |
 | **AI Assistance** | `AISuggestion` |
 | **Preferences and Reports** | `UserPreference`, `ReportExport` |
 

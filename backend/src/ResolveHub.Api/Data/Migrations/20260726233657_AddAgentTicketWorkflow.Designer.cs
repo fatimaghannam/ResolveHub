@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ResolveHub.Api.Data;
 
@@ -11,9 +12,11 @@ using ResolveHub.Api.Data;
 namespace ResolveHub.Api.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260726233657_AddAgentTicketWorkflow")]
+    partial class AddAgentTicketWorkflow
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -116,6 +119,71 @@ namespace ResolveHub.Api.Data.Migrations
                     b.ToTable("UserAccountToken", (string)null);
                 });
 
+            modelBuilder.Entity("ResolveHub.Api.Entities.Asset", b =>
+                {
+                    b.Property<int>("ID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ID"));
+
+                    b.Property<string>("AssetName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("AssetStatus")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("AssetTag")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("AssetType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int?>("AssignedToUserAccountID")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("DepartmentID")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("SerialNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("ID");
+
+                    b.HasIndex("AssetTag")
+                        .IsUnique();
+
+                    b.HasIndex("AssignedToUserAccountID");
+
+                    b.HasIndex("DepartmentID");
+
+                    b.ToTable("Asset", (string)null);
+                });
+
             modelBuilder.Entity("ResolveHub.Api.Entities.Department", b =>
                 {
                     b.Property<int>("ID")
@@ -205,6 +273,9 @@ namespace ResolveHub.Api.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ID"));
 
+                    b.Property<int?>("AssetID")
+                        .HasColumnType("int");
+
                     b.Property<DateTime?>("AssignedDate")
                         .HasColumnType("datetime2");
 
@@ -276,6 +347,8 @@ namespace ResolveHub.Api.Data.Migrations
                         .HasColumnType("datetime2");
 
                     b.HasKey("ID");
+
+                    b.HasIndex("AssetID");
 
                     b.HasIndex("AssignedToUserAccountID");
 
@@ -452,6 +525,9 @@ namespace ResolveHub.Api.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ID"));
 
+                    b.Property<int?>("AssetID")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("CreatedDate")
                         .HasColumnType("datetime2");
 
@@ -476,6 +552,8 @@ namespace ResolveHub.Api.Data.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("ID");
+
+                    b.HasIndex("AssetID");
 
                     b.HasIndex("TicketCategoryID");
 
@@ -779,8 +857,30 @@ namespace ResolveHub.Api.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("ResolveHub.Api.Entities.Asset", b =>
+                {
+                    b.HasOne("ResolveHub.Api.Entities.UserAccount", "AssignedToUserAccount")
+                        .WithMany("AssignedAssets")
+                        .HasForeignKey("AssignedToUserAccountID")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ResolveHub.Api.Entities.Department", "Department")
+                        .WithMany("Assets")
+                        .HasForeignKey("DepartmentID")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("AssignedToUserAccount");
+
+                    b.Navigation("Department");
+                });
+
             modelBuilder.Entity("ResolveHub.Api.Entities.Ticket", b =>
                 {
+                    b.HasOne("ResolveHub.Api.Entities.Asset", "Asset")
+                        .WithMany("Tickets")
+                        .HasForeignKey("AssetID")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("ResolveHub.Api.Entities.UserAccount", "AssignedToUserAccount")
                         .WithMany("AssignedTickets")
                         .HasForeignKey("AssignedToUserAccountID")
@@ -814,6 +914,8 @@ namespace ResolveHub.Api.Data.Migrations
                         .HasForeignKey("TicketStatusID")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Asset");
 
                     b.Navigation("AssignedToUserAccount");
 
@@ -868,6 +970,11 @@ namespace ResolveHub.Api.Data.Migrations
 
             modelBuilder.Entity("ResolveHub.Api.Entities.TicketDraft", b =>
                 {
+                    b.HasOne("ResolveHub.Api.Entities.Asset", "Asset")
+                        .WithMany("TicketDrafts")
+                        .HasForeignKey("AssetID")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("ResolveHub.Api.Entities.TicketCategory", "TicketCategory")
                         .WithMany("TicketDrafts")
                         .HasForeignKey("TicketCategoryID")
@@ -883,6 +990,8 @@ namespace ResolveHub.Api.Data.Migrations
                         .HasForeignKey("UserAccountID")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Asset");
 
                     b.Navigation("TicketCategory");
 
@@ -946,8 +1055,17 @@ namespace ResolveHub.Api.Data.Migrations
                     b.Navigation("UserAccount");
                 });
 
+            modelBuilder.Entity("ResolveHub.Api.Entities.Asset", b =>
+                {
+                    b.Navigation("TicketDrafts");
+
+                    b.Navigation("Tickets");
+                });
+
             modelBuilder.Entity("ResolveHub.Api.Entities.Department", b =>
                 {
+                    b.Navigation("Assets");
+
                     b.Navigation("UserAccounts");
                 });
 
@@ -986,6 +1104,8 @@ namespace ResolveHub.Api.Data.Migrations
 
             modelBuilder.Entity("ResolveHub.Api.Entities.UserAccount", b =>
                 {
+                    b.Navigation("AssignedAssets");
+
                     b.Navigation("AssignedTickets");
 
                     b.Navigation("CreatedTickets");

@@ -9,7 +9,7 @@ using Xunit;
 
 namespace ResolveHub.Api.Tests;
 
-public sealed class TicketAssetsAttachmentsAndDraftsTests
+public sealed class TicketAttachmentsAndDraftsTests
 {
     private const string Password = "ValidPassword1!";
 

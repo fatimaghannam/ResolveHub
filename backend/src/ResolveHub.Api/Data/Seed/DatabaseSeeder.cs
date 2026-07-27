@@ -38,6 +38,20 @@ public static class DatabaseSeeder
             RoleName: RoleNames.Manager)
     ];
 
+    private static readonly SeedUser[] DevelopmentTicketRequesters =
+    [
+        new("olivia.bennett@resolvehub.test", "Olivia", "Bennett", "Employee", RoleNames.Employee),
+        new("daniel.brooks@resolvehub.test", "Daniel", "Brooks", "Employee", RoleNames.Employee),
+        new("sophia.mitchell@resolvehub.test", "Sophia", "Mitchell", "Employee", RoleNames.Employee),
+        new("ethan.parker@resolvehub.test", "Ethan", "Parker", "Employee", RoleNames.Employee),
+        new("ava.collins@resolvehub.test", "Ava", "Collins", "Employee", RoleNames.Employee),
+        new("michael.reed@resolvehub.test", "Michael", "Reed", "Employee", RoleNames.Employee),
+        new("jessica.morgan@resolvehub.test", "Jessica", "Morgan", "Employee", RoleNames.Employee),
+        new("ryan.cooper@resolvehub.test", "Ryan", "Cooper", "Employee", RoleNames.Employee),
+        new("hannah.foster@resolvehub.test", "Hannah", "Foster", "Employee", RoleNames.Employee),
+        new("brandon.turner@resolvehub.test", "Brandon", "Turner", "Employee", RoleNames.Employee)
+    ];
+
     public static async Task SeedAsync(
         IServiceProvider services,
         IConfiguration configuration,
@@ -72,7 +86,16 @@ public static class DatabaseSeeder
             defaultPassword,
             TestUsers,
             includeEmailInErrors: true);
-        await SeedDevelopmentAssetsAsync(dbContext, userManager, environment);
+
+        if (environment.IsDevelopment())
+        {
+            await SeedUsersAsync(
+                userManager,
+                defaultPassword,
+                DevelopmentTicketRequesters,
+                includeEmailInErrors: true);
+            await SeedDevelopmentAgentTicketsAsync(dbContext, userManager);
+        }
 
         var passwordResetTestEmail =
             configuration["SeedData:PasswordResetTestEmail"]
@@ -108,43 +131,115 @@ public static class DatabaseSeeder
         await dbContext.SaveChangesAsync();
     }
 
-    private static async Task SeedDevelopmentAssetsAsync(
+    private static async Task SeedDevelopmentAgentTicketsAsync(
         ApplicationDbContext dbContext,
-        UserManager<UserAccount> userManager,
-        IWebHostEnvironment environment)
+        UserManager<UserAccount> userManager)
     {
-        if (!environment.IsDevelopment())
-            return;
-        var employee = await userManager.FindByEmailAsync(
-            "employee@resolvehub.test");
-        if (employee is null)
-            return;
+        var agent = await userManager.FindByEmailAsync("agent@resolvehub.test")
+            ?? throw new InvalidOperationException(
+                "The development IT Support Agent account was not found.");
 
-        var assets = new[]
+        var requesterEmails = DevelopmentTicketRequesters
+            .Select(user => user.Email)
+            .ToArray();
+        var requesters = await dbContext.Users
+            .Where(user => requesterEmails.Contains(user.Email!))
+            .ToDictionaryAsync(user => user.Email!, StringComparer.OrdinalIgnoreCase);
+
+        var categories = await dbContext.TicketCategories
+            .ToDictionaryAsync(item => item.Name, StringComparer.OrdinalIgnoreCase);
+        var priorities = await dbContext.TicketPriorities
+            .ToDictionaryAsync(item => item.Name, StringComparer.OrdinalIgnoreCase);
+        var statuses = await dbContext.TicketStatuses
+            .ToDictionaryAsync(item => item.Name, StringComparer.OrdinalIgnoreCase);
+
+        SeedAgentTicket[] seedTickets =
+        [
+            new("RH-2026-9001", "olivia.bennett@resolvehub.test",
+                "VPN access unavailable after password change", "Network", "Critical",
+                TicketStatusNames.Assigned, 2),
+            new("RH-2026-9002", "daniel.brooks@resolvehub.test",
+                "Finance shared printer is offline", "Hardware", "High",
+                TicketStatusNames.Assigned, 3),
+            new("RH-2026-9003", "sophia.mitchell@resolvehub.test",
+                "Suspicious email attachment reported", "Security", "Medium",
+                TicketStatusNames.Assigned, 4),
+            new("RH-2026-9004", "ethan.parker@resolvehub.test",
+                "Outlook calendar is not synchronizing", "Email", "Critical",
+                TicketStatusNames.InProgress, 6),
+            new("RH-2026-9005", "ava.collins@resolvehub.test",
+                "Intermittent Wi-Fi in conference room", "Network", "High",
+                TicketStatusNames.InProgress, 7),
+            new("RH-2026-9006", "michael.reed@resolvehub.test",
+                "Payroll application closes unexpectedly", "Software", "Medium",
+                TicketStatusNames.InProgress, 9),
+            new("RH-2026-9007", "jessica.morgan@resolvehub.test",
+                "New employee workstation setup", "Hardware", "High",
+                TicketStatusNames.Pending, 11),
+            new("RH-2026-9008", "ryan.cooper@resolvehub.test",
+                "Cannot open archived project folder", "Access Request", "Medium",
+                TicketStatusNames.Pending, 13),
+            new("RH-2026-9009", "hannah.foster@resolvehub.test",
+                "Browser certificate warning on intranet", "Security", "Low",
+                TicketStatusNames.Pending, 15),
+            new("RH-2026-9010", "brandon.turner@resolvehub.test",
+                "Teams microphone is not detected", "Hardware", "Medium",
+                TicketStatusNames.Resolved, 17),
+            new("RH-2026-9011", "olivia.bennett@resolvehub.test",
+                "Distribution list delivery delayed", "Email", "Low",
+                TicketStatusNames.Resolved, 20),
+            new("RH-2026-9012", "daniel.brooks@resolvehub.test",
+                "Ethernet connection drops periodically", "Network", "Low",
+                TicketStatusNames.Resolved, 23)
+        ];
+
+        var references = seedTickets
+            .Select(ticket => ticket.Reference)
+            .ToArray();
+        var existingReferences = await dbContext.Tickets
+            .Where(ticket => references.Contains(ticket.TicketReferenceNumber))
+            .Select(ticket => ticket.TicketReferenceNumber)
+            .ToListAsync();
+        var existingReferenceSet = existingReferences.ToHashSet(
+            StringComparer.OrdinalIgnoreCase);
+
+        foreach (var seedTicket in seedTickets)
         {
-            new Asset
+            if (existingReferenceSet.Contains(seedTicket.Reference))
+                continue;
+
+            var createdDate = new DateTime(
+                2026, 7, seedTicket.Day, 8 + seedTicket.Day % 8, 0, 0,
+                DateTimeKind.Utc);
+            var assignedDate = createdDate.AddHours(2);
+            var isResolved = seedTicket.Status == TicketStatusNames.Resolved;
+            var resolvedDate = isResolved
+                ? assignedDate.AddDays(1).AddHours(3)
+                : (DateTime?)null;
+
+            dbContext.Tickets.Add(new Ticket
             {
-                AssetTag = "LAP-001",
-                AssetName = "Dell Latitude Laptop",
-                AssetType = "Laptop",
-                SerialNumber = "DL-5440-001",
-                Location = "Beirut Office",
-                AssignedToUserAccountID = employee.Id
-            },
-            new Asset
-            {
-                AssetTag = "MON-001",
-                AssetName = "Dell Monitor",
-                AssetType = "Monitor",
-                SerialNumber = "DM-2422-001",
-                Location = "Beirut Office",
-                AssignedToUserAccountID = employee.Id
-            }
-        };
-        var existing = await dbContext.Assets
-            .Select(asset => asset.AssetTag).ToListAsync();
-        dbContext.Assets.AddRange(assets.Where(asset =>
-            !existing.Contains(asset.AssetTag, StringComparer.OrdinalIgnoreCase)));
+                TicketReferenceNumber = seedTicket.Reference,
+                CreatedByUserAccountID = requesters[seedTicket.RequesterEmail].Id,
+                AssignedToUserAccountID = agent.Id,
+                TicketCategoryID = categories[seedTicket.Category].ID,
+                TicketPriorityID = priorities[seedTicket.Priority].ID,
+                TicketStatusID = statuses[seedTicket.Status].ID,
+                Title = seedTicket.Title,
+                Description =
+                    $"Development seed ticket for {seedTicket.Title.ToLowerInvariant()}.",
+                CreatedDate = createdDate,
+                UpdatedDate = resolvedDate ?? assignedDate,
+                AssignedDate = assignedDate,
+                ResolvedDate = resolvedDate,
+                ResolutionSummary = isResolved
+                    ? "Issue resolved and confirmed with the requester."
+                    : null,
+                ResolvedByUserAccountID = isResolved ? agent.Id : null,
+                IsDeleted = false
+            });
+        }
+
         await dbContext.SaveChangesAsync();
     }
 
@@ -362,4 +457,13 @@ public static class DatabaseSeeder
         string LastName,
         string JobTitle,
         string RoleName);
+
+    private sealed record SeedAgentTicket(
+        string Reference,
+        string RequesterEmail,
+        string Title,
+        string Category,
+        string Priority,
+        string Status,
+        int Day);
 }

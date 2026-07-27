@@ -1,17 +1,44 @@
 import { ArrowLeft, MessageSquareText, NotebookPen, RefreshCw } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { EmptyState } from '../components/common/States.jsx'
+import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
 import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
-import { agentTickets, mockAssignedAgent } from '../data/agentDashboardMockData.js'
+import { getAgentTicketDetails } from '../services/agentTicketService.js'
 import { formatLocalDate } from '../utils/dateTime.js'
 import { formatTicketReference } from '../utils/ticketReference.js'
 
 function AgentTicketDetailsPage() {
   const { id } = useParams()
-  const ticket = agentTickets.find((item) => formatTicketReference(item) === id)
+  const [ticket, setTicket] = useState(null)
+  const [error, setError] = useState(null)
+  const [reload, setReload] = useState(0)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    setTicket(null)
+    setError(null)
+    getAgentTicketDetails(id, controller.signal)
+      .then((result) => {
+        if (!controller.signal.aborted) setTicket(result)
+      })
+      .catch((requestError) => {
+        if (requestError.name !== 'AbortError' && !controller.signal.aborted) {
+          setError(requestError)
+        }
+      })
+    return () => controller.abort()
+  }, [id, reload])
+
+  if (error?.status === 404) {
+    return <EmptyState title="Ticket not found" message="This assigned ticket is not available." action={<Link className="button button--secondary" to="/agent/tickets">Back to Assigned Tickets</Link>} />
+  }
+
+  if (error) {
+    return <ErrorState message={error.message} onRetry={() => setReload((value) => value + 1)} />
+  }
 
   if (!ticket) {
-    return <EmptyState title="Ticket not found" message="This temporary ticket is not available." action={<Link className="button button--secondary" to="/agent/tickets">Back to Assigned Tickets</Link>} />
+    return <LoadingState message="Loading ticket details…" />
   }
 
   return (
@@ -35,12 +62,12 @@ function AgentTicketDetailsPage() {
         <aside className="panel details-side">
           <h2>Ticket Information</h2>
           <dl>
-            <div><dt>Requester</dt><dd>{ticket.requester}</dd></div>
-            <div><dt>Category</dt><dd>{ticket.category}</dd></div>
-            <div><dt>Priority</dt><dd><TicketPriorityBadge value={ticket.priority} /></dd></div>
-            <div><dt>Status</dt><dd><TicketStatusBadge value={ticket.status} /></dd></div>
+            <div><dt>Requester</dt><dd>{ticket.requesterName}</dd></div>
+            <div><dt>Category</dt><dd>{ticket.categoryName}</dd></div>
+            <div><dt>Priority</dt><dd><TicketPriorityBadge value={ticket.priorityName} /></dd></div>
+            <div><dt>Status</dt><dd><TicketStatusBadge value={ticket.statusName} /></dd></div>
             <div><dt>Created</dt><dd>{formatLocalDate(ticket.createdDate)}</dd></div>
-            <div><dt>Assigned agent</dt><dd>{mockAssignedAgent}</dd></div>
+            <div><dt>Assigned agent</dt><dd>{ticket.assignedAgentName}</dd></div>
           </dl>
         </aside>
       </div>

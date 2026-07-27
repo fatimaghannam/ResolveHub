@@ -238,12 +238,17 @@ public sealed class ResolveHubApiFactory
             new TicketCategory { Name = "Software", SortOrder = 2 });
         context.TicketPriorities.AddRange(
             new TicketPriority { Name = "Low", SortOrder = 1 },
-            new TicketPriority { Name = "High", SortOrder = 2 });
+            new TicketPriority { Name = "Medium", SortOrder = 2 },
+            new TicketPriority { Name = "High", SortOrder = 3 },
+            new TicketPriority { Name = "Critical", SortOrder = 4 });
         context.TicketStatuses.AddRange(
             new TicketStatus { Name = TicketStatusNames.Open, SortOrder = 1 },
             new TicketStatus { Name = TicketStatusNames.Assigned, SortOrder = 2 },
             new TicketStatus { Name = TicketStatusNames.InProgress, SortOrder = 3 },
-            new TicketStatus { Name = TicketStatusNames.Resolved, SortOrder = 4 });
+            new TicketStatus { Name = TicketStatusNames.Pending, SortOrder = 4 },
+            new TicketStatus { Name = TicketStatusNames.Resolved, SortOrder = 5 },
+            new TicketStatus { Name = TicketStatusNames.Closed, SortOrder = 6 },
+            new TicketStatus { Name = TicketStatusNames.Cancelled, SortOrder = 7 });
         await context.SaveChangesAsync();
     }
 
@@ -272,6 +277,12 @@ public sealed class ResolveHubApiFactory
             .Select(status => status.ID)
             .SingleAsync();
         ticket.AssignedToUserAccountID = assignedUserId;
+        ticket.AssignedDate = assignedUserId.HasValue
+            ? ticket.AssignedDate ?? DateTime.UtcNow
+            : null;
+        ticket.ResolvedDate = statusName == TicketStatusNames.Resolved
+            ? DateTime.UtcNow
+            : null;
         await context.SaveChangesAsync();
     }
 
@@ -287,30 +298,6 @@ public sealed class ResolveHubApiFactory
         ticket.CreatedDate = createdDate;
         ticket.UpdatedDate = createdDate;
         await context.SaveChangesAsync();
-    }
-
-    public async Task<Asset> CreateAssetAsync(
-        int? assignedUserId = null,
-        int? departmentId = null,
-        bool isActive = true)
-    {
-        using var scope = Services.CreateScope();
-        var context = scope.ServiceProvider
-            .GetRequiredService<ApplicationDbContext>();
-        var asset = new Asset
-        {
-            AssetTag = $"TEST-{Guid.NewGuid():N}"[..18],
-            AssetName = "Integration Test Laptop",
-            AssetType = "Laptop",
-            SerialNumber = Guid.NewGuid().ToString("N"),
-            Location = "Test Office",
-            AssignedToUserAccountID = assignedUserId,
-            DepartmentID = departmentId,
-            IsActive = isActive
-        };
-        context.Assets.Add(asset);
-        await context.SaveChangesAsync();
-        return asset;
     }
 
     public async Task<TicketTestSnapshot> GetTicketSnapshotAsync(int ticketId)

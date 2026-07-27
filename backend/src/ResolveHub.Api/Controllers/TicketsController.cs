@@ -12,7 +12,9 @@ namespace ResolveHub.Api.Controllers;
 [ApiController]
 [Route("api/tickets")]
 [Authorize(Roles = RoleNames.Employee)]
-public sealed class TicketsController(ITicketService ticketService)
+public sealed class TicketsController(
+    ITicketService ticketService,
+    IAgentTicketService agentTicketService)
     : ControllerBase
 {
     [HttpGet]
@@ -97,6 +99,17 @@ public sealed class TicketsController(ITicketService ticketService)
                 Conflict(new { message = result.Message }),
             _ => BadRequest(new { message = result.Message })
         };
+    }
+
+    [HttpGet("{id:int}/comments")]
+    [ProducesResponseType(typeof(IReadOnlyCollection<TicketCommentDto>), 200)]
+    [ProducesResponseType(404)]
+    public async Task<ActionResult<IReadOnlyCollection<TicketCommentDto>>> GetComments(
+        int id, CancellationToken cancellationToken)
+    {
+        var comments = await agentTicketService.GetEmployeeCommentsAsync(
+            GetUserId(), id, cancellationToken);
+        return comments is null ? NotFound() : Ok(comments);
     }
 
     private int GetUserId()

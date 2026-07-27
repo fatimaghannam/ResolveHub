@@ -30,6 +30,7 @@ public sealed class EmployeeTicketFlowTests
         Assert.Null(stored.AssignedToUserAccountID);
         Assert.False(stored.IsDeleted);
         Assert.StartsWith($"RH-{DateTime.UtcNow.Year}-", ticket.TicketReferenceNumber);
+        Assert.Matches(@"^RH-\d{4}-\d{4,}$", ticket.TicketReferenceNumber);
     }
 
     [Fact]
