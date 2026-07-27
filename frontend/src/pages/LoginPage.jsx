@@ -7,6 +7,7 @@ import {
   clearStoredAuth,
   isEmployee,
   isItAgent,
+  isAdministrator,
 } from '../services/authStorage.js'
 import '../styles/login.css'
 
@@ -77,6 +78,8 @@ function LoginPage() {
         navigate('/employee/dashboard', { replace: true })
       } else if (isItAgent(authData)) {
         navigate('/agent/dashboard', { replace: true })
+      } else if (isAdministrator(authData)) {
+        navigate('/admin/dashboard', { replace: true })
       } else {
         clearStoredAuth()
         setMessage('This account role is not supported in the dashboard yet.')

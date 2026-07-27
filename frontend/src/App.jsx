@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import ForgotPasswordPage from './pages/ForgotPasswordPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
@@ -17,7 +18,18 @@ import AgentTicketsPage from './pages/AgentTicketsPage.jsx'
 import AgentTicketDetailsPage from './pages/AgentTicketDetailsPage.jsx'
 import AgentNotificationsPage from './pages/AgentNotificationsPage.jsx'
 import AgentProfilePage from './pages/AgentProfilePage.jsx'
-import { EMPLOYEE_ROLE, IT_AGENT_ROLE } from './services/authStorage.js'
+import AdminTicketsPage from './pages/AdminTicketsPage.jsx'
+import AdminAssignmentsPage from './pages/AdminAssignmentsPage.jsx'
+import AdminUsersPage from './pages/AdminUsersPage.jsx'
+import AdminCategoriesPage from './pages/AdminCategoriesPage.jsx'
+import AdminActivityPage from './pages/AdminActivityPage.jsx'
+import AdminNotificationsPage from './pages/AdminNotificationsPage.jsx'
+import AdminProfilePage from './pages/AdminProfilePage.jsx'
+import AdminTicketDetailsPage from './pages/AdminTicketDetailsPage.jsx'
+import AdminUserDetailsPage from './pages/AdminUserDetailsPage.jsx'
+import { ADMIN_ROLE, EMPLOYEE_ROLE, IT_AGENT_ROLE } from './services/authStorage.js'
+
+const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage.jsx'))
 
 function App() {
   return (
@@ -59,6 +71,27 @@ function App() {
           <Route path="tickets/:id" element={<AgentTicketDetailsPage />} />
           <Route path="notifications" element={<AgentNotificationsPage />} />
           <Route path="profile" element={<AgentProfilePage />} />
+        </Route>
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute allowedRoles={[ADMIN_ROLE]}>
+              <DashboardLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<Suspense fallback={<div className="state-panel" role="status">Loading Administrator dashboard…</div>}><AdminDashboardPage /></Suspense>} />
+          <Route path="tickets" element={<AdminTicketsPage />} />
+          <Route path="tickets/create" element={<CreateTicketPage roleArea="admin" />} />
+          <Route path="tickets/:ticketReference" element={<AdminTicketDetailsPage />} />
+          <Route path="assignments" element={<AdminAssignmentsPage />} />
+          <Route path="users" element={<AdminUsersPage />} />
+          <Route path="users/:userId" element={<AdminUserDetailsPage />} />
+          <Route path="categories" element={<AdminCategoriesPage />} />
+          <Route path="activity" element={<AdminActivityPage />} />
+          <Route path="notifications" element={<AdminNotificationsPage />} />
+          <Route path="profile" element={<AdminProfilePage />} />
         </Route>
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>

@@ -330,13 +330,16 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+if (!app.Environment.IsEnvironment("Testing"))
 {
     await DatabaseSeeder.SeedAsync(
         app.Services,
         app.Configuration,
         app.Environment);
+}
 
+if (app.Environment.IsDevelopment())
+{
     app.MapOpenApi();
 
     app.UseSwaggerUI(options =>

@@ -73,9 +73,28 @@ public static class DatabaseSeeder
         // Apply pending migrations during local development.
         await dbContext.Database.MigrateAsync();
 
+        await ProductionSeeder.SeedAsync(dbContext, roleManager);
+
+        if (environment.IsDevelopment())
+            await DemoDataSeeder.SeedAsync(
+                dbContext,
+                userManager,
+                configuration);
+    }
+
+    internal static async Task SeedProductionDataAsync(
+        ApplicationDbContext dbContext,
+        RoleManager<Role> roleManager)
+    {
         await SeedRolesAsync(roleManager);
         await SeedTicketLookupsAsync(dbContext);
+    }
 
+    internal static async Task SeedDemoDataAsync(
+        ApplicationDbContext dbContext,
+        UserManager<UserAccount> userManager,
+        IConfiguration configuration)
+    {
         var defaultPassword =
             configuration["SeedData:DefaultPassword"]
             ?? throw new InvalidOperationException(
@@ -86,40 +105,34 @@ public static class DatabaseSeeder
             defaultPassword,
             TestUsers,
             includeEmailInErrors: true);
-
-        if (environment.IsDevelopment())
-        {
-            await SeedUsersAsync(
-                userManager,
-                defaultPassword,
-                DevelopmentTicketRequesters,
-                includeEmailInErrors: true);
-            await SeedDevelopmentAgentTicketsAsync(dbContext, userManager);
-        }
+        await SeedUsersAsync(
+            userManager,
+            defaultPassword,
+            DevelopmentTicketRequesters,
+            includeEmailInErrors: true);
+        await SeedDevelopmentAgentTicketsAsync(dbContext, userManager);
 
         var passwordResetTestEmail =
-            configuration["SeedData:PasswordResetTestEmail"]
-                ?.Trim();
+            configuration["SeedData:PasswordResetTestEmail"]?.Trim();
 
-        if (environment.IsDevelopment() &&
-            !string.IsNullOrWhiteSpace(passwordResetTestEmail))
-        {
-            SeedUser[] passwordResetTestUsers =
-            [
-                new(
-                    Email: passwordResetTestEmail,
-                    FirstName: "Password",
-                    LastName: "Tester",
-                    JobTitle: "Employee",
-                    RoleName: RoleNames.Employee)
-            ];
+        if (string.IsNullOrWhiteSpace(passwordResetTestEmail))
+            return;
 
-            await SeedUsersAsync(
-                userManager,
-                defaultPassword,
-                passwordResetTestUsers,
-                includeEmailInErrors: false);
-        }
+        SeedUser[] passwordResetTestUsers =
+        [
+            new(
+                Email: passwordResetTestEmail,
+                FirstName: "Password",
+                LastName: "Tester",
+                JobTitle: "Employee",
+                RoleName: RoleNames.Employee)
+        ];
+
+        await SeedUsersAsync(
+            userManager,
+            defaultPassword,
+            passwordResetTestUsers,
+            includeEmailInErrors: false);
     }
 
     private static async Task SeedTicketLookupsAsync(

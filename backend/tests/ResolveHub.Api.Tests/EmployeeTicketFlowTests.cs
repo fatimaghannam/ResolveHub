@@ -34,6 +34,51 @@ public sealed class EmployeeTicketFlowTests
     }
 
     [Fact]
+    public async Task Administrator_CanCreateTicketAsAuthenticatedRequester()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        await factory.SeedTicketLookupsAsync();
+        var administrator = await factory.CreateUserAsync(
+            "admin-ticket-creator@resolvehub.test", Password, RoleNames.Admin);
+        using var client = await CreateEmployeeClientAsync(factory, administrator.Email!);
+
+        var categories = await client.GetAsync("/api/ticket-categories");
+        var priorities = await client.GetAsync("/api/ticket-priorities");
+        var ticket = await CreateTicketAsync(
+            factory, client, "Administrator support request");
+        var stored = await factory.GetTicketSnapshotAsync(ticket.Id);
+
+        Assert.Equal(HttpStatusCode.OK, categories.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, priorities.StatusCode);
+        Assert.Equal(administrator.Id, stored.CreatedByUserAccountID);
+        Assert.Equal(TicketStatusNames.Open, stored.StatusName);
+        Assert.Null(stored.AssignedToUserAccountID);
+    }
+
+    [Fact]
+    public async Task ItSupportAgent_CannotCreateTicketsOrLoadCreationLookups()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        await factory.SeedTicketLookupsAsync();
+        var agent = await factory.CreateUserAsync(
+            "agent-ticket-creator@resolvehub.test", Password, RoleNames.ITAgent);
+        using var client = await CreateEmployeeClientAsync(factory, agent.Email!);
+        var lookups = await factory.GetTicketLookupIdsAsync();
+
+        var createResponse = await client.PostAsJsonAsync("/api/tickets", new
+        {
+            title = "Agent should not create this ticket",
+            description = "IT Support Agents must not have ticket creation access.",
+            ticketCategoryId = lookups.CategoryId,
+            ticketPriorityId = lookups.PriorityId
+        });
+        var lookupResponse = await client.GetAsync("/api/ticket-categories");
+
+        Assert.Equal(HttpStatusCode.Forbidden, createResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, lookupResponse.StatusCode);
+    }
+
+    [Fact]
     public async Task TicketQueries_ReturnOnlyAuthenticatedEmployeesOwnTickets()
     {
         await using var factory = new ResolveHubApiFactory();

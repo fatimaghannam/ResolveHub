@@ -1,20 +1,26 @@
 import { useEffect, useState } from 'react'
 import {
   Bell,
+  ClipboardCheck,
   CircleUserRound,
+  FileClock,
+  FilePlus2,
   LayoutDashboard,
   LogOut,
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
   PlusCircle,
+  Tags,
   Ticket,
+  Users,
   X,
 } from 'lucide-react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   clearStoredAuth,
   getStoredAuth,
+  isAdministrator,
   isItAgent,
 } from '../../services/authStorage.js'
 import '../../styles/dashboard.css'
@@ -34,11 +40,27 @@ const agentNavigation = [
   { id: 'profile', to: '/agent/profile', label: 'Profile', icon: CircleUserRound },
 ]
 
-function isNavigationActive(id, pathname, agent) {
-  const base = agent ? '/agent' : '/employee'
+const adminNavigation = [
+  { id: 'dashboard', to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'tickets', to: '/admin/tickets', label: 'All Tickets', icon: Ticket },
+  { id: 'create', to: '/admin/tickets/create', label: 'Create Ticket', icon: FilePlus2 },
+  { id: 'assignments', to: '/admin/assignments', label: 'Ticket Assignments', icon: ClipboardCheck },
+  { id: 'users', to: '/admin/users', label: 'Users', icon: Users },
+  { id: 'categories', to: '/admin/categories', label: 'Categories', icon: Tags },
+  { id: 'activity', to: '/admin/activity', label: 'Activity Logs', icon: FileClock },
+  { id: 'notifications', to: '/admin/notifications', label: 'Notifications', icon: Bell },
+  { id: 'profile', to: '/admin/profile', label: 'Profile', icon: CircleUserRound },
+]
+
+function isNavigationActive(id, pathname, roleArea) {
+  const base = `/${roleArea}`
   if (id === 'dashboard') return pathname === `${base}/dashboard`
   if (id === 'create') return pathname === `${base}/tickets/create`
-  if (id === 'tickets' && agent) return pathname.startsWith('/agent/tickets')
+  if (id === 'tickets' && roleArea === 'agent') return pathname.startsWith(`${base}/tickets`)
+  if (id === 'tickets' && roleArea === 'admin') {
+    return pathname.startsWith('/admin/tickets') && pathname !== '/admin/tickets/create'
+  }
+  if (id === 'users' && roleArea === 'admin') return pathname.startsWith('/admin/users')
   if (id === 'tickets') {
     return (
       pathname === '/employee/tickets' ||
@@ -49,8 +71,23 @@ function isNavigationActive(id, pathname, agent) {
   return pathname === `${base}/${id}`
 }
 
-function getPageTitle(pathname, agent) {
-  if (agent) {
+function getPageTitle(pathname, roleArea) {
+  if (roleArea === 'admin') {
+    if (pathname === '/admin/tickets/create') return 'Create Ticket'
+    if (/\/admin\/tickets\/[^/]+$/.test(pathname)) return 'Ticket Details'
+    if (/\/admin\/users\/[^/]+$/.test(pathname)) return 'User Details'
+    const titles = {
+      '/admin/tickets': 'All Tickets',
+      '/admin/assignments': 'Ticket Assignments',
+      '/admin/users': 'Users',
+      '/admin/categories': 'Ticket Categories',
+      '/admin/activity': 'Activity Logs',
+      '/admin/notifications': 'Notifications',
+      '/admin/profile': 'Profile',
+    }
+    return titles[pathname] ?? 'Dashboard'
+  }
+  if (roleArea === 'agent') {
     if (/\/agent\/tickets\/[^/]+$/.test(pathname)) return 'Ticket Details'
     if (pathname.endsWith('/tickets')) return 'Assigned Tickets'
     if (pathname.endsWith('/notifications')) return 'Notifications'
@@ -74,8 +111,10 @@ function DashboardLayout() {
   const auth = getStoredAuth()
   const user = auth?.user
   const agent = isItAgent(auth)
-  const navigation = agent ? agentNavigation : employeeNavigation
-  const roleLabel = agent ? 'IT Support Agent' : 'Employee'
+  const admin = isAdministrator(auth)
+  const roleArea = admin ? 'admin' : agent ? 'agent' : 'employee'
+  const navigation = admin ? adminNavigation : agent ? agentNavigation : employeeNavigation
+  const roleLabel = admin ? 'Administrator' : agent ? 'IT Support Agent' : 'Employee'
   const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ')
   const sidebarId = 'dashboard-sidebar'
 
@@ -100,7 +139,7 @@ function DashboardLayout() {
     navigate('/login', { replace: true })
   }
 
-  const pageTitle = getPageTitle(location.pathname, agent)
+  const pageTitle = getPageTitle(location.pathname, roleArea)
 
   return (
     <div className={`dashboard-shell ${isDesktopCollapsed ? 'dashboard-shell--collapsed' : ''}`}>
@@ -144,7 +183,7 @@ function DashboardLayout() {
         </div>
         <nav aria-label={`${roleLabel} navigation`}>
           {navigation.map(({ id, to, label, icon: Icon, soon }, index) => {
-            const active = isNavigationActive(id, location.pathname, agent)
+            const active = isNavigationActive(id, location.pathname, roleArea)
             return (
               <Link
                 key={`${label}-${index}`}

@@ -26,6 +26,27 @@ A modern full-stack platform for managing internal IT support requests through a
 
 ---
 
+## Development and Production Data
+
+### Development / Demo mode
+
+Development uses realistic demonstration users, tickets, assignments,
+notifications, activity, statistics, and charts for internship presentations,
+portfolio demonstrations, UI testing, and feature development. Frontend demo
+records live under `frontend/src/data/demo/`. The backend routes development
+accounts and tickets through `DemoDataSeeder`.
+
+### Production mode
+
+Production starts without fictional business records. It seeds only system
+roles and ticket lookup values through `ProductionSeeder`; users and ticket
+history are created naturally by the deployed company. The frontend production
+data source starts empty until each screen is connected to its real API.
+
+Both modes use the same components and visual design. Moving a feature to
+production requires replacing its data-source implementation, not redesigning
+the UI.
+
 > [!IMPORTANT]
 > **Current implementation status:** The ASP.NET Core backend authentication module is implemented and tested. It includes SQL Server integration, Entity Framework Core migrations, ASP.NET Core Identity, JWT authentication, protected API endpoints, role-based authorization, account lockout, seeded demo users, and Swagger testing.
 >

@@ -1,3 +1,34 @@
+# ResolveHub Frontend
+
+## Data modes
+
+ResolveHub keeps page components independent from their temporary data source.
+Administrator pages import data through `src/data/index.js`, so changing the
+source does not require redesigning the UI.
+
+### Development / Demo mode
+
+`npm run dev` uses `VITE_DATA_MODE=demo` from `.env.development`. It loads the
+realistic company dataset in `src/data/demo/` for presentations, portfolio
+demos, UI testing, and feature development.
+
+Use `npm run build:demo` when a deployable demo build is needed.
+
+### Production mode
+
+`npm run build` uses `VITE_DATA_MODE=production` from `.env.production`.
+Production data collections start empty and contain no fictional users,
+tickets, activity, notifications, assignments, or statistics. System ticket
+lookups remain available while the corresponding API repositories are being
+connected.
+
+Future production integration will replace the exports behind
+`src/data/index.js` with calls such as `GET /api/users` and `GET /api/tickets`.
+The dashboard, tables, filters, and other UI components do not need to be
+redesigned; only the data source changes.
+
+---
+
 # React + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.

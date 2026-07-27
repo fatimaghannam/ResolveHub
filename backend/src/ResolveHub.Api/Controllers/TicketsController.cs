@@ -11,13 +11,14 @@ namespace ResolveHub.Api.Controllers;
 
 [ApiController]
 [Route("api/tickets")]
-[Authorize(Roles = RoleNames.Employee)]
+[Authorize]
 public sealed class TicketsController(
     ITicketService ticketService,
     IAgentTicketService agentTicketService)
     : ControllerBase
 {
     [HttpGet]
+    [Authorize(Roles = RoleNames.Employee)]
     [ProducesResponseType(typeof(PagedResultDto<TicketListItemDto>), 200)]
     public async Task<ActionResult<PagedResultDto<TicketListItemDto>>> GetTickets(
         [FromQuery] TicketFilterDto filter,
@@ -28,6 +29,7 @@ public sealed class TicketsController(
     }
 
     [HttpGet("{id:int}")]
+    [Authorize(Roles = RoleNames.Employee)]
     [ProducesResponseType(typeof(TicketDetailsDto), 200)]
     [ProducesResponseType(404)]
     public async Task<ActionResult<TicketDetailsDto>> GetTicket(
@@ -40,6 +42,7 @@ public sealed class TicketsController(
     }
 
     [HttpPost]
+    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin)]
     [ProducesResponseType(typeof(TicketDetailsDto), 201)]
     [ProducesResponseType(400)]
     public async Task<ActionResult<TicketDetailsDto>> CreateTicket(
@@ -58,6 +61,7 @@ public sealed class TicketsController(
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Roles = RoleNames.Employee)]
     [ProducesResponseType(typeof(TicketDetailsDto), 200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(404)]
@@ -80,6 +84,7 @@ public sealed class TicketsController(
     }
 
     [HttpPost("{id:int}/cancel")]
+    [Authorize(Roles = RoleNames.Employee)]
     [ProducesResponseType(204)]
     [ProducesResponseType(400)]
     [ProducesResponseType(404)]
@@ -102,6 +107,7 @@ public sealed class TicketsController(
     }
 
     [HttpGet("{id:int}/comments")]
+    [Authorize(Roles = RoleNames.Employee)]
     [ProducesResponseType(typeof(IReadOnlyCollection<TicketCommentDto>), 200)]
     [ProducesResponseType(404)]
     public async Task<ActionResult<IReadOnlyCollection<TicketCommentDto>>> GetComments(

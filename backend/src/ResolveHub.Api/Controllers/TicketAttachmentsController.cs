@@ -10,11 +10,12 @@ namespace ResolveHub.Api.Controllers;
 
 [ApiController]
 [Route("api/tickets/{ticketId:int}/attachments")]
-[Authorize(Roles = RoleNames.Employee)]
+[Authorize]
 public sealed class TicketAttachmentsController(
     ITicketAttachmentService attachmentService) : ControllerBase
 {
     [HttpPost]
+    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin)]
     [RequestSizeLimit(10 * 1024 * 1024 + 64 * 1024)]
     public async Task<ActionResult<TicketAttachmentDto>> Upload(
         int ticketId, IFormFile file, CancellationToken cancellationToken)
@@ -33,6 +34,7 @@ public sealed class TicketAttachmentsController(
     }
 
     [HttpGet("{attachmentId:int}/download")]
+    [Authorize(Roles = RoleNames.Employee)]
     public async Task<IActionResult> Download(
         int ticketId, int attachmentId, CancellationToken cancellationToken)
     {
@@ -44,6 +46,7 @@ public sealed class TicketAttachmentsController(
     }
 
     [HttpDelete("{attachmentId:int}")]
+    [Authorize(Roles = RoleNames.Employee)]
     public async Task<IActionResult> Delete(
         int ticketId, int attachmentId, CancellationToken cancellationToken)
     {
