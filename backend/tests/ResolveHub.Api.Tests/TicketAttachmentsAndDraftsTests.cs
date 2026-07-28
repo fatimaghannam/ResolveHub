@@ -196,10 +196,43 @@ public sealed class TicketAttachmentsAndDraftsTests
             $"/api/ticket-drafts/{draft!.Id}/submit", null);
         var ticket = await submit.Content.ReadFromJsonAsync<TicketDetailsDto>();
         var missingDraft = await client.GetAsync($"/api/ticket-drafts/{draft.Id}");
+        var snapshot = await factory.GetDraftSubmissionSnapshotAsync(
+            ticket!.Id, draft.Id);
 
         Assert.Equal(HttpStatusCode.OK, submit.StatusCode);
-        Assert.Equal("Open", ticket!.StatusName);
+        Assert.Equal("Complete draft ticket", snapshot.Title);
+        Assert.Equal(
+            "This draft contains enough information to submit.",
+            snapshot.Description);
+        Assert.Equal(lookups.CategoryId, snapshot.CategoryId);
+        Assert.Equal(lookups.PriorityId, snapshot.PriorityId);
+        Assert.Equal(owner.Id, snapshot.CreatorId);
+        Assert.Equal(TicketStatusNames.Open, snapshot.StatusName);
+        Assert.Equal(1, snapshot.CreatedHistoryEntries);
+        Assert.False(snapshot.DraftExists);
         Assert.Equal(HttpStatusCode.NotFound, missingDraft.StatusCode);
+    }
+
+    [Fact]
+    public async Task SubmittingInvalidDraft_LeavesDraftAndCreatesNoTicket()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        await factory.SeedTicketLookupsAsync();
+        var owner = await factory.CreateUserAsync(
+            "draft-invalid-submit@resolvehub.test", Password);
+        using var client = await LoginAsync(factory, owner.Email!);
+        var save = await client.PostAsJsonAsync(
+            "/api/ticket-drafts",
+            new { title = "Incomplete draft" });
+        var draft = await save.Content.ReadFromJsonAsync<TicketDraftDto>();
+
+        var submit = await client.PostAsync(
+            $"/api/ticket-drafts/{draft!.Id}/submit", null);
+        var snapshot = await factory.GetDraftFailureSnapshotAsync(draft.Id);
+
+        Assert.Equal(HttpStatusCode.BadRequest, submit.StatusCode);
+        Assert.True(snapshot.DraftExists);
+        Assert.Equal(0, snapshot.Tickets);
     }
 
     private static async Task<HttpClient> LoginAsync(

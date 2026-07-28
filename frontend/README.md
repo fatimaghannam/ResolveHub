@@ -12,6 +12,10 @@ source does not require redesigning the UI.
 realistic company dataset in `src/data/demo/` for presentations, portfolio
 demos, UI testing, and feature development.
 
+Demo identities consistently use lowercase
+`FirstName.LastName@resolvehub.test` addresses. Authentication still comes
+from ASP.NET Core Identity; frontend demo records are presentation data only.
+
 Use `npm run build:demo` when a deployable demo build is needed.
 
 ### Production mode

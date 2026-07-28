@@ -94,13 +94,29 @@ public sealed class TicketDraftService(
         await using var transaction = dbContext.Database.IsRelational()
             ? await dbContext.Database.BeginTransactionAsync(token)
             : null;
-        var result = await ticketService.CreateTicketAsync(userId, request, token);
-        if (result.Status != TicketOperationStatus.Success) return result;
-        dbContext.TicketDrafts.Remove(draft);
-        await dbContext.SaveChangesAsync(token);
-        if (transaction is not null)
-            await transaction.CommitAsync(token);
-        return result;
+        try
+        {
+            var result = await ticketService.CreateTicketAsync(
+                userId, request, token);
+            if (result.Status != TicketOperationStatus.Success)
+            {
+                if (transaction is not null)
+                    await transaction.RollbackAsync(CancellationToken.None);
+                return result;
+            }
+
+            dbContext.TicketDrafts.Remove(draft);
+            await dbContext.SaveChangesAsync(token);
+            if (transaction is not null)
+                await transaction.CommitAsync(token);
+            return result;
+        }
+        catch
+        {
+            if (transaction is not null)
+                await transaction.RollbackAsync(CancellationToken.None);
+            throw;
+        }
     }
 
     private async Task<string?> ValidateAsync(

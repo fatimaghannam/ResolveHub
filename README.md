@@ -36,6 +36,18 @@ portfolio demonstrations, UI testing, and feature development. Frontend demo
 records live under `frontend/src/data/demo/`. The backend routes development
 accounts and tickets through `DemoDataSeeder`.
 
+Development login accounts use the fictional `resolvehub.test` domain:
+
+- `ryan.whitmore@resolvehub.test` — Administrator
+- `lauren.prescott@resolvehub.test` — Manager
+- `natalie.hayes@resolvehub.test` — IT Support Agent
+- `emily.carter@resolvehub.test` — IT Support Agent
+- `michael.thompson@resolvehub.test` — IT Support Agent
+- `ethan.brooks@resolvehub.test` — Employee
+
+Their shared development password is read from the
+`SeedData:DefaultPassword` User Secret and is never stored in source control.
+
 ### Production mode
 
 Production starts without fictional business records. It seeds only system

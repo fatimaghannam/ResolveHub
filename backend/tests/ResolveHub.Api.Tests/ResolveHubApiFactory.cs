@@ -318,6 +318,44 @@ public sealed class ResolveHubApiFactory
             .SingleAsync();
     }
 
+    public async Task<DraftSubmissionTestSnapshot> GetDraftSubmissionSnapshotAsync(
+        int ticketId,
+        int draftId)
+    {
+        using var scope = Services.CreateScope();
+        var context = scope.ServiceProvider
+            .GetRequiredService<ApplicationDbContext>();
+        var ticket = await context.Tickets
+            .Where(item => item.ID == ticketId)
+            .Select(item => new DraftSubmissionTestSnapshot(
+                item.Title,
+                item.Description,
+                item.TicketCategoryID,
+                item.TicketPriorityID,
+                item.CreatedByUserAccountID,
+                item.TicketStatus.Name,
+                item.History.Count(history =>
+                    history.ActionType == TicketHistoryActionNames.TicketCreated),
+                false))
+            .SingleAsync();
+        return ticket with
+        {
+            DraftExists = await context.TicketDrafts.AnyAsync(
+                draft => draft.ID == draftId)
+        };
+    }
+
+    public async Task<(int Tickets, bool DraftExists)> GetDraftFailureSnapshotAsync(
+        int draftId)
+    {
+        using var scope = Services.CreateScope();
+        var context = scope.ServiceProvider
+            .GetRequiredService<ApplicationDbContext>();
+        return (
+            await context.Tickets.CountAsync(),
+            await context.TicketDrafts.AnyAsync(draft => draft.ID == draftId));
+    }
+
     private static void EnsureSucceeded(IdentityResult result)
     {
         if (result.Succeeded)
@@ -340,6 +378,16 @@ public sealed record TicketTestSnapshot(
     bool IsDeleted,
     DateTime? CancelledDate,
     string? CancelledReason);
+
+public sealed record DraftSubmissionTestSnapshot(
+    string Title,
+    string Description,
+    int CategoryId,
+    int PriorityId,
+    int CreatorId,
+    string StatusName,
+    int CreatedHistoryEntries,
+    bool DraftExists);
 
 public sealed class ThrowingPasswordResetService
     : IPasswordResetService

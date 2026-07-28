@@ -218,17 +218,29 @@ function AgentTicketsPage() {
                 message={hasActiveFilters ? 'Try changing or clearing the current filters.' : 'Tickets assigned to you will appear here.'}
               />
             ) : (
-              <div className="table-scroll">
+              <div className="table-scroll agent-ticket-table-wrap">
                 <table className="ticket-table agent-ticket-table">
+                  <colgroup>
+                    <col className="agent-ticket-col--number" />
+                    <col className="agent-ticket-col--title" />
+                    <col className="agent-ticket-col--requester" />
+                    <col className="agent-ticket-col--category" />
+                    <col className="agent-ticket-col--priority" />
+                    <col className="agent-ticket-col--status" />
+                    <col className="agent-ticket-col--created" />
+                    <col className="agent-ticket-col--action" />
+                  </colgroup>
                   <thead><tr><th>Ticket Number</th><th>Title</th><th>Requester</th><th>Category</th><th>Priority</th><th>Status</th><th>Created</th><th>Action</th></tr></thead>
                   <tbody>
                     {data.items.map((ticket) => (
                       <tr key={ticket.id}>
-                        <td><strong>{formatTicketReference(ticket)}</strong></td><td>{ticket.title}</td>
-                        <td>{ticket.requesterName}</td><td>{ticket.categoryName}</td>
+                        <td><strong>{formatTicketReference(ticket)}</strong></td>
+                        <td><span className="agent-ticket-title" title={ticket.title}>{ticket.title}</span></td>
+                        <td><span className="agent-ticket-ellipsis" title={ticket.requesterName}>{ticket.requesterName}</span></td>
+                        <td><span className="agent-ticket-ellipsis" title={ticket.categoryName}>{ticket.categoryName}</span></td>
                         <td><TicketPriorityBadge value={ticket.priorityName} /></td>
                         <td><TicketStatusBadge value={ticket.statusName} /></td>
-                        <td>{formatLocalDate(ticket.createdDate)}</td>
+                        <td><span className="agent-ticket-ellipsis" title={formatLocalDate(ticket.createdDate)}>{formatLocalDate(ticket.createdDate)}</span></td>
                         <td><Link className="table-action" to={`/agent/tickets/${formatTicketReference(ticket)}`}>View</Link></td>
                       </tr>
                     ))}

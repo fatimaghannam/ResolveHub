@@ -10,42 +10,42 @@ public static class DatabaseSeeder
     private static readonly SeedUser[] TestUsers =
     [
         new(
-            Email: "employee@resolvehub.test",
+            Email: "ethan.brooks@resolvehub.test",
             FirstName: "Ethan",
             LastName: "Brooks",
             JobTitle: "Employee",
             RoleName: RoleNames.Employee),
 
         new(
-            Email: "agent@resolvehub.test",
+            Email: "natalie.hayes@resolvehub.test",
             FirstName: "Natalie",
             LastName: "Hayes",
             JobTitle: "IT Support Agent",
             RoleName: RoleNames.ITAgent),
 
         new(
-            Email: "Emily.Carter@company.com",
+            Email: "emily.carter@resolvehub.test",
             FirstName: "Emily",
             LastName: "Carter",
             JobTitle: "IT Support Agent",
             RoleName: RoleNames.ITAgent),
 
         new(
-            Email: "Michael.Thompson@company.com",
+            Email: "michael.thompson@resolvehub.test",
             FirstName: "Michael",
             LastName: "Thompson",
             JobTitle: "IT Support Agent",
             RoleName: RoleNames.ITAgent),
 
         new(
-            Email: "admin@resolvehub.test",
+            Email: "ryan.whitmore@resolvehub.test",
             FirstName: "Ryan",
             LastName: "Whitmore",
             JobTitle: "System Administrator",
             RoleName: RoleNames.Admin),
 
         new(
-            Email: "manager@resolvehub.test",
+            Email: "lauren.prescott@resolvehub.test",
             FirstName: "Lauren",
             LastName: "Prescott",
             JobTitle: "Department Manager",
@@ -109,6 +109,8 @@ public static class DatabaseSeeder
         UserManager<UserAccount> userManager,
         IConfiguration configuration)
     {
+        await RenameLegacyDemoUsersAsync(userManager);
+
         var defaultPassword =
             configuration["SeedData:DefaultPassword"]
             ?? throw new InvalidOperationException(
@@ -149,6 +151,58 @@ public static class DatabaseSeeder
             includeEmailInErrors: false);
     }
 
+    private static async Task RenameLegacyDemoUsersAsync(
+        UserManager<UserAccount> userManager)
+    {
+        LegacyDemoUser[] users =
+        [
+            new("employee@resolvehub.test", "ethan.brooks@resolvehub.test",
+                "Ethan", "Brooks", "Employee"),
+            new("agent@resolvehub.test", "natalie.hayes@resolvehub.test",
+                "Natalie", "Hayes", "IT Support Agent"),
+            new("admin@resolvehub.test", "ryan.whitmore@resolvehub.test",
+                "Ryan", "Whitmore", "System Administrator"),
+            new("manager@resolvehub.test", "lauren.prescott@resolvehub.test",
+                "Lauren", "Prescott", "Department Manager"),
+            new("Emily.Carter@company.com", "emily.carter@resolvehub.test",
+                "Emily", "Carter", "IT Support Agent"),
+            new("Michael.Thompson@company.com", "michael.thompson@resolvehub.test",
+                "Michael", "Thompson", "IT Support Agent")
+        ];
+
+        foreach (var item in users)
+        {
+            var legacy = await userManager.FindByEmailAsync(item.LegacyEmail);
+            if (legacy is null)
+                continue;
+
+            var canonical = await userManager.FindByEmailAsync(item.Email);
+            if (canonical is not null && canonical.Id != legacy.Id)
+            {
+                legacy.IsActive = false;
+                EnsureSucceeded(
+                    await userManager.UpdateAsync(legacy),
+                    "disabling a duplicate legacy demo user");
+                continue;
+            }
+
+            EnsureSucceeded(
+                await userManager.SetEmailAsync(legacy, item.Email),
+                "standardizing a development user email");
+            EnsureSucceeded(
+                await userManager.SetUserNameAsync(legacy, item.Email),
+                "standardizing a development username");
+            legacy.FirstName = item.FirstName;
+            legacy.LastName = item.LastName;
+            legacy.JobTitle = item.JobTitle;
+            legacy.EmailConfirmed = true;
+            legacy.IsActive = true;
+            EnsureSucceeded(
+                await userManager.UpdateAsync(legacy),
+                "updating a standardized development user");
+        }
+    }
+
     private static async Task SeedTicketLookupsAsync(
         ApplicationDbContext dbContext)
     {
@@ -164,9 +218,9 @@ public static class DatabaseSeeder
     {
         string[] agentEmails =
         [
-            "agent@resolvehub.test",
-            "Emily.Carter@company.com",
-            "Michael.Thompson@company.com"
+            "natalie.hayes@resolvehub.test",
+            "emily.carter@resolvehub.test",
+            "michael.thompson@resolvehub.test"
         ];
         var agents = await dbContext.Users
             .Where(user => agentEmails.Contains(user.Email!))
@@ -194,34 +248,34 @@ public static class DatabaseSeeder
             new("RH-2026-9002", "daniel.brooks@resolvehub.test", null,
                 "Finance shared printer is offline", "Hardware", "High",
                 TicketStatusNames.Open, 3),
-            new("RH-2026-9003", "sophia.mitchell@resolvehub.test", "Emily.Carter@company.com",
+            new("RH-2026-9003", "sophia.mitchell@resolvehub.test", "emily.carter@resolvehub.test",
                 "Suspicious email attachment reported", "Security", "Medium",
                 TicketStatusNames.Assigned, 4),
-            new("RH-2026-9004", "ethan.parker@resolvehub.test", "Emily.Carter@company.com",
+            new("RH-2026-9004", "ethan.parker@resolvehub.test", "emily.carter@resolvehub.test",
                 "Outlook calendar is not synchronizing", "Email", "Critical",
                 TicketStatusNames.InProgress, 6),
-            new("RH-2026-9005", "ava.collins@resolvehub.test", "Emily.Carter@company.com",
+            new("RH-2026-9005", "ava.collins@resolvehub.test", "emily.carter@resolvehub.test",
                 "Intermittent Wi-Fi in conference room", "Network", "High",
                 TicketStatusNames.InProgress, 7),
-            new("RH-2026-9006", "michael.reed@resolvehub.test", "Emily.Carter@company.com",
+            new("RH-2026-9006", "michael.reed@resolvehub.test", "emily.carter@resolvehub.test",
                 "Payroll application closes unexpectedly", "Software", "Medium",
                 TicketStatusNames.InProgress, 9),
-            new("RH-2026-9007", "jessica.morgan@resolvehub.test", "Michael.Thompson@company.com",
+            new("RH-2026-9007", "jessica.morgan@resolvehub.test", "michael.thompson@resolvehub.test",
                 "New employee workstation setup", "Hardware", "High",
                 TicketStatusNames.Pending, 11),
-            new("RH-2026-9008", "ryan.cooper@resolvehub.test", "Michael.Thompson@company.com",
+            new("RH-2026-9008", "ryan.cooper@resolvehub.test", "michael.thompson@resolvehub.test",
                 "Cannot open archived project folder", "Access Request", "Medium",
                 TicketStatusNames.Pending, 13),
-            new("RH-2026-9009", "hannah.foster@resolvehub.test", "Michael.Thompson@company.com",
+            new("RH-2026-9009", "hannah.foster@resolvehub.test", "michael.thompson@resolvehub.test",
                 "Browser certificate warning on intranet", "Security", "Low",
                 TicketStatusNames.Pending, 15),
-            new("RH-2026-9010", "brandon.turner@resolvehub.test", "agent@resolvehub.test",
+            new("RH-2026-9010", "brandon.turner@resolvehub.test", "natalie.hayes@resolvehub.test",
                 "Teams microphone is not detected", "Hardware", "Medium",
                 TicketStatusNames.Resolved, 17),
-            new("RH-2026-9011", "olivia.bennett@resolvehub.test", "agent@resolvehub.test",
+            new("RH-2026-9011", "olivia.bennett@resolvehub.test", "natalie.hayes@resolvehub.test",
                 "Distribution list delivery delayed", "Email", "Low",
                 TicketStatusNames.Resolved, 20),
-            new("RH-2026-9012", "daniel.brooks@resolvehub.test", "agent@resolvehub.test",
+            new("RH-2026-9012", "daniel.brooks@resolvehub.test", "natalie.hayes@resolvehub.test",
                 "Ethernet connection drops periodically", "Network", "Low",
                 TicketStatusNames.Resolved, 23)
         ];
@@ -499,4 +553,11 @@ public static class DatabaseSeeder
         string Priority,
         string Status,
         int Day);
+
+    private sealed record LegacyDemoUser(
+        string LegacyEmail,
+        string Email,
+        string FirstName,
+        string LastName,
+        string JobTitle);
 }
