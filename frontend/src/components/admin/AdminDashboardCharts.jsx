@@ -13,13 +13,6 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import {
-  adminStatistics,
-  monthlyTicketTrend,
-  ticketStatusChartData,
-  ticketsByCategory,
-} from '../../data/index.js'
-
 const tooltipStyle = {
   border: '1px solid #dfe7f0',
   borderRadius: 8,
@@ -30,7 +23,11 @@ function ChartHeading({ title, description }) {
   return <div className="chart-heading"><h2>{title}</h2><p>{description}</p></div>
 }
 
-export function TicketStatusChart() {
+export function TicketStatusChart({ data, totalTickets }) {
+  const ticketStatusChartData = data.map((item, index) => ({
+    name: item.name, value: item.value,
+    color: ['#1769c2', '#6f42a6', '#d17a00', '#087b8c', '#18794e', '#68778c'][index % 6],
+  }))
   const summary = ticketStatusChartData
     .map((item) => `${item.name}: ${item.value}`)
     .join(', ')
@@ -38,7 +35,7 @@ export function TicketStatusChart() {
   return (
     <section className="panel chart-panel">
       <ChartHeading title="Ticket Status Overview" description="Current distribution of tickets by workflow status." />
-      <div className="chart-box chart-box--pie" role="img" aria-label={`Ticket status overview. ${summary}. Total: ${adminStatistics.totalTickets}.`}>
+      <div className="chart-box chart-box--pie" role="img" aria-label={`Ticket status overview. ${summary}. Total: ${totalTickets}.`}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie data={ticketStatusChartData} dataKey="value" nameKey="name" cx="50%" cy="45%" innerRadius={58} outerRadius={86} paddingAngle={2} isAnimationActive={false}>
@@ -48,13 +45,13 @@ export function TicketStatusChart() {
             <Legend verticalAlign="bottom" iconType="circle" />
           </PieChart>
         </ResponsiveContainer>
-        <div className="pie-total" aria-hidden="true"><strong>{adminStatistics.totalTickets}</strong><span>Total Tickets</span></div>
+        <div className="pie-total" aria-hidden="true"><strong>{totalTickets}</strong><span>Total Tickets</span></div>
       </div>
     </section>
   )
 }
 
-export function TicketTrendChart() {
+export function TicketTrendChart({ data: monthlyTicketTrend }) {
   const summary = monthlyTicketTrend
     .map((item) => `${item.month}: ${item.created} created and ${item.resolved} resolved`)
     .join(', ')
@@ -79,7 +76,8 @@ export function TicketTrendChart() {
   )
 }
 
-export function TicketCategoryChart() {
+export function TicketCategoryChart({ data }) {
+  const ticketsByCategory = data.map((item) => ({ category: item.name, tickets: item.value }))
   const summary = ticketsByCategory
     .map((item) => `${item.category}: ${item.tickets}`)
     .join(', ')

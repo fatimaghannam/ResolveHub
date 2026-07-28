@@ -25,7 +25,7 @@ public sealed class TicketLookupsController(ITicketService ticketService)
         Ok(await ticketService.GetPrioritiesAsync(token));
 
     [HttpGet("ticket-statuses")]
-    [Authorize(Roles = RoleNames.Employee)]
+    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin)]
     [ProducesResponseType(typeof(IReadOnlyCollection<TicketLookupDto>), 200)]
     public async Task<IActionResult> Statuses(CancellationToken token) =>
         Ok(await ticketService.GetStatusesAsync(token));

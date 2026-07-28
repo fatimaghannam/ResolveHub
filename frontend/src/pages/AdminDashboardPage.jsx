@@ -79,12 +79,12 @@ function AdminDashboardPage() {
       </section>
 
       <div className="admin-chart-grid">
-        <TicketStatusChart />
-        <TicketTrendChart />
+        <TicketStatusChart data={data.ticketCountsByStatus} totalTickets={data.totalTickets} />
+        <TicketTrendChart data={data.monthlyTrend} />
       </div>
 
       <div className="admin-chart-grid admin-chart-grid--secondary">
-        <TicketCategoryChart />
+        <TicketCategoryChart data={data.ticketsByCategory} />
         <section className="panel chart-panel">
           <div className="chart-heading"><h2>IT Agent Workload</h2><p>Current active workload and capacity status by support agent.</p></div>
           <div className="dashboard-workload-list">

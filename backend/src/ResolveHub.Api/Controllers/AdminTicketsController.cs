@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ResolveHub.Api.Constants;
 using ResolveHub.Api.DTOs.Tickets;
+using ResolveHub.Api.DTOs.Common;
 using ResolveHub.Api.Services.Interfaces;
 using ResolveHub.Api.Services.Models;
 
@@ -24,6 +25,24 @@ public sealed class AdminTicketsController(IAdminTicketService service)
         CancellationToken token) =>
         Ok(await service.GetDashboardAsync(token));
 
+    [HttpGet("users/agents")]
+    public async Task<ActionResult<IReadOnlyCollection<AdminAgentWorkloadDto>>> Agents(
+        CancellationToken token) =>
+        Ok(await service.GetAgentsAsync(token));
+
+    [HttpGet("tickets")]
+    public async Task<ActionResult<PagedResultDto<AdminTicketListItemDto>>> Tickets(
+        [FromQuery] AdminTicketFilterDto filter, CancellationToken token) =>
+        Ok(await service.GetTicketsAsync(filter, token));
+
+    [HttpGet("tickets/{ticketReference}")]
+    public async Task<ActionResult<AdminTicketDetailsDto>> Ticket(
+        string ticketReference, CancellationToken token)
+    {
+        var ticket = await service.GetTicketAsync(ticketReference, token);
+        return ticket is null ? NotFound() : Ok(ticket);
+    }
+
     [HttpPost("tickets/{ticketReference}/assign")]
     public async Task<IActionResult> Assign(
         string ticketReference,
@@ -38,6 +57,22 @@ public sealed class AdminTicketsController(IAdminTicketService service)
             TicketOperationStatus.NotFound => NotFound(),
             TicketOperationStatus.Conflict =>
                 Conflict(new { message = result.Message }),
+            _ => BadRequest(new { message = result.Message })
+        };
+    }
+
+    [HttpPut("tickets/{ticketReference}/assignment")]
+    public async Task<IActionResult> UpdateAssignment(
+        string ticketReference, [FromBody] UpdateTicketAssignmentDto request,
+        CancellationToken token)
+    {
+        var result = await service.AssignAsync(
+            GetUserId(), ticketReference, request.AgentUserId, token);
+        return result.Status switch
+        {
+            TicketOperationStatus.Success => NoContent(),
+            TicketOperationStatus.NotFound => NotFound(),
+            TicketOperationStatus.Conflict => Conflict(new { message = result.Message }),
             _ => BadRequest(new { message = result.Message })
         };
     }

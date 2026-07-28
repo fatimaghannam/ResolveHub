@@ -1,17 +1,17 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { FilePlus2 } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import Pagination from '../components/common/Pagination.jsx'
-import { EmptyState } from '../components/common/States.jsx'
+import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
 import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
-import { ticketCategories, ticketMockData } from '../data/index.js'
-import { getLocalQuickDateRange, parseLocalDateInput } from '../utils/dateRange.js'
+import { getAdminTickets } from '../services/adminService.js'
+import { getCategories, getPriorities, getStatuses } from '../services/ticketService.js'
+import { getLocalQuickDateRange } from '../utils/dateRange.js'
 import { formatLocalDate } from '../utils/dateTime.js'
 
 const pageSize = 8
 const blankFilters = { search: '', status: '', category: '', priority: '', assignment: '', dateRange: 'all', fromDate: '', toDate: '' }
 const dateOptions = [['all', 'All Dates'], ['yesterday', 'Yesterday'], ['last7Days', 'Last 7 Days'], ['last30Days', 'Last 30 Days'], ['custom', 'Custom Range']]
-const uniqueValues = (field) => [...new Set(ticketMockData.map((ticket) => ticket[field]))]
 
 function AdminTicketsPage() {
   const location = useLocation()
@@ -19,29 +19,32 @@ function AdminTicketsPage() {
   const [filters, setFilters] = useState(blankFilters)
   const [page, setPage] = useState(1)
   const [dateError, setDateError] = useState('')
+  const [data, setData] = useState(null)
+  const [lookups, setLookups] = useState({ statuses: [], categories: [], priorities: [] })
+  const [error, setError] = useState('')
 
-  const filtered = useMemo(() => ticketMockData.filter((ticket) => {
-    const search = filters.search.trim().toLowerCase()
-    if (search && ![ticket.ticketReferenceNumber, ticket.title, ticket.requesterName].some((value) => value.toLowerCase().includes(search))) return false
-    if (filters.status && ticket.statusName !== filters.status) return false
-    if (filters.category && ticket.categoryName !== filters.category) return false
-    if (filters.priority && ticket.priorityName !== filters.priority) return false
-    if (filters.assignment === 'assigned' && !ticket.assignedAgentName) return false
-    if (filters.assignment === 'unassigned' && ticket.assignedAgentName) return false
-    if (filters.fromDate || filters.toDate) {
-      const created = new Date(ticket.createdDate)
-      const start = parseLocalDateInput(filters.fromDate)
-      const end = parseLocalDateInput(filters.toDate)
-      if (start && created < start) return false
-      if (end) {
-        end.setDate(end.getDate() + 1)
-        if (created >= end) return false
-      }
-    }
-    return true
-  }), [filters])
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
-  const rows = filtered.slice((page - 1) * pageSize, page * pageSize)
+  useEffect(() => {
+    const controller = new AbortController()
+    Promise.all([getStatuses(controller.signal), getCategories(controller.signal), getPriorities(controller.signal)])
+      .then(([statuses, categories, priorities]) => setLookups({ statuses, categories, priorities }))
+      .catch((requestError) => { if (requestError.name !== 'AbortError') setError(requestError.message) })
+    return () => controller.abort()
+  }, [])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    setError('')
+    getAdminTickets({
+      search: filters.search, statusId: filters.status, categoryId: filters.category,
+      priorityId: filters.priority,
+      unassignedOnly: filters.assignment === 'unassigned' ? true : undefined,
+      assignedOnly: filters.assignment === 'assigned' ? true : undefined,
+      fromDate: filters.fromDate, toDate: filters.toDate, page, pageSize,
+    }, controller.signal).then(setData)
+      .catch((requestError) => { if (requestError.name !== 'AbortError') setError(requestError.message) })
+    return () => controller.abort()
+  }, [filters, page])
+  const rows = data?.items ?? []
 
   function applyFilters(event) {
     event.preventDefault()
@@ -73,8 +76,8 @@ function AdminTicketsPage() {
       <form className="filter-panel ticket-filters" onSubmit={applyFilters}>
         <div className="ticket-filters__grid admin-ticket-filters">
           <label className="filter-search"><span>Search</span><input value={draft.search} onChange={(event) => setDraft({ ...draft, search: event.target.value })} placeholder="Ticket number, title, or requester" /></label>
-          {[['status', 'Status', uniqueValues('statusName')], ['category', 'Category', ticketCategories], ['priority', 'Priority', uniqueValues('priorityName')]].map(([key, label, options]) => (
-            <label key={key}><span>{label}</span><select value={draft[key]} onChange={(event) => setDraft({ ...draft, [key]: event.target.value })}><option value="">All</option>{options.map((option) => <option key={option}>{option}</option>)}</select></label>
+          {[['status', 'Status', lookups.statuses], ['category', 'Category', lookups.categories], ['priority', 'Priority', lookups.priorities]].map(([key, label, options]) => (
+            <label key={key}><span>{label}</span><select value={draft[key]} onChange={(event) => setDraft({ ...draft, [key]: event.target.value })}><option value="">All</option>{options.map((option) => <option value={option.id} key={option.id}>{option.name}</option>)}</select></label>
           ))}
           <label><span>Assignment</span><select value={draft.assignment} onChange={(event) => setDraft({ ...draft, assignment: event.target.value })}><option value="">All</option><option value="assigned">Assigned</option><option value="unassigned">Unassigned</option></select></label>
           <label><span>Date Range</span><select value={draft.dateRange} onChange={(event) => changeDateRange(event.target.value)}>{dateOptions.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
@@ -88,14 +91,17 @@ function AdminTicketsPage() {
         </div>
         {dateError && <p className="filter-validation" role="alert">{dateError}</p>}
       </form>
+      {error && <ErrorState message={error} />}
+      {!error && !data && <LoadingState message="Loading tickets…" />}
+      {data &&
       <section className="panel">
-        <div className="results-count">{filtered.length} ticket{filtered.length === 1 ? '' : 's'}</div>
+        <div className="results-count">{data.totalItems} ticket{data.totalItems === 1 ? '' : 's'}</div>
         {rows.length === 0 ? <EmptyState title="No tickets found" message="Try changing or clearing the current filters." /> : <div className="table-scroll"><table className="ticket-table admin-ticket-table">
           <thead><tr><th>Ticket Number</th><th>Title</th><th>Requester</th><th>Category</th><th>Priority</th><th>Status</th><th>Assigned Agent</th><th>Created</th><th>Action</th></tr></thead>
           <tbody>{rows.map((ticket) => <tr key={ticket.id}><td><strong>{ticket.ticketReferenceNumber}</strong></td><td>{ticket.title}</td><td>{ticket.requesterName}</td><td>{ticket.categoryName}</td><td><TicketPriorityBadge value={ticket.priorityName} /></td><td><TicketStatusBadge value={ticket.statusName} /></td><td>{ticket.assignedAgentName ?? 'Unassigned'}</td><td>{formatLocalDate(ticket.createdDate)}</td><td><Link className="table-action" to={`/admin/tickets/${ticket.ticketReferenceNumber}`}>View</Link></td></tr>)}</tbody>
         </table></div>}
-        <Pagination page={page} totalPages={totalPages} onChange={setPage} />
-      </section>
+        <Pagination page={page} totalPages={data.totalPages} onChange={setPage} />
+      </section>}
     </>
   )
 }
