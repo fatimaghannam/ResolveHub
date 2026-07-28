@@ -5,19 +5,14 @@ import { EmptyState, ErrorState, LoadingState } from '../components/common/State
 import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
 import { cancelTicket, getCategories, getPriorities, getStatuses, getTickets } from '../services/ticketService.js'
 import { formatLocalDate } from '../utils/dateTime.js'
-import { getLocalQuickDateRange, getUtcDateRange } from '../utils/dateRange.js'
+import {
+  getLocalQuickDateRange,
+  getUtcDateRange,
+  STANDARD_DATE_RANGE_OPTIONS,
+} from '../utils/dateRange.js'
 import { formatTicketReference } from '../utils/ticketReference.js'
 
-const dateRangeOptions = [
-  ['all', 'All Dates'],
-  ['today', 'Today'],
-  ['yesterday', 'Yesterday'],
-  ['last7Days', 'Last 7 Days'],
-  ['last30Days', 'Last 30 Days'],
-  ['thisMonth', 'This Month'],
-  ['lastMonth', 'Last Month'],
-  ['custom', 'Custom Range'],
-]
+const dateRangeOptions = STANDARD_DATE_RANGE_OPTIONS
 const supportedDateRanges = new Set(dateRangeOptions.map(([value]) => value))
 const emptyFilters = { search: '', statusId: '', categoryId: '', priorityId: '', dateRange: 'all', fromDate: '', toDate: '', page: 1, pageSize: 10 }
 

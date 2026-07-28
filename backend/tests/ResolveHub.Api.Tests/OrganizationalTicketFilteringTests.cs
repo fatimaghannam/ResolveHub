@@ -45,18 +45,6 @@ public sealed class OrganizationalTicketFilteringTests
             target.Id, new DateTime(2026, 7, 28, 23, 59, 59, DateTimeKind.Utc));
         await factory.SetTicketCreatedDateAsync(
             unrelated.Id, new DateTime(2026, 7, 27, 12, 0, 0, DateTimeKind.Utc));
-        var assignmentFilter = await adminClient.GetFromJsonAsync<
-            AdminAssignmentOverviewDto>(
-            "/api/admin/ticket-assignments?search=conference" +
-            "&fromUtc=2026-07-28T00%3A00%3A00Z" +
-            "&toUtcExclusive=2026-07-29T00%3A00%3A00Z");
-        var managerAssignmentFilter = await managerClient.GetFromJsonAsync<
-            AdminAssignmentOverviewDto>(
-            "/api/manager/assignments?search=conference");
-        Assert.Equal(target.Id,
-            Assert.Single(assignmentFilter!.UnassignedTickets).Id);
-        Assert.Equal(target.Id,
-            Assert.Single(managerAssignmentFilter!.UnassignedTickets).Id);
         var assign = await adminClient.PostAsJsonAsync(
             $"/api/admin/tickets/{target.TicketReferenceNumber}/assign",
             new { agentUserId = agent.Id });

@@ -6,11 +6,21 @@ import { assignAdminTicket, getAdminAssignments } from '../services/adminService
 import { assignManagerTicket, getManagerAssignments } from '../services/managerService.js'
 import { getCategories, getPriorities } from '../services/ticketService.js'
 import { formatLocalDate } from '../utils/dateTime.js'
-import { getUtcDateRange } from '../utils/dateRange.js'
+import {
+  getLocalQuickDateRange,
+  getUtcDateRange,
+  STANDARD_DATE_RANGE_OPTIONS,
+} from '../utils/dateRange.js'
 
 const blankFilters = {
-  search: '', categoryId: '', priorityId: '', fromDate: '', toDate: '',
+  search: '',
+  categoryId: '',
+  priorityId: '',
+  dateRange: 'all',
+  fromDate: '',
+  toDate: '',
 }
+const dateRangeOptions = STANDARD_DATE_RANGE_OPTIONS
 
 function AdminAssignmentsPage({ roleArea = 'admin' }) {
   const [searchParams] = useSearchParams()
@@ -65,8 +75,8 @@ function AdminAssignmentsPage({ roleArea = 'admin' }) {
 
   function applyFilters(event) {
     event.preventDefault()
-    if ((draftFilters.fromDate && !draftFilters.toDate) ||
-        (!draftFilters.fromDate && draftFilters.toDate)) {
+    if (draftFilters.dateRange === 'custom' &&
+        (!draftFilters.fromDate || !draftFilters.toDate)) {
       setDateError('Select both a start date and an end date.')
       return
     }
@@ -75,13 +85,30 @@ function AdminAssignmentsPage({ roleArea = 'admin' }) {
       setDateError('The end date cannot be earlier than the start date.')
       return
     }
+    const dates = draftFilters.dateRange === 'custom'
+      ? { fromDate: draftFilters.fromDate, toDate: draftFilters.toDate }
+      : getLocalQuickDateRange(draftFilters.dateRange)
+    const next = { ...draftFilters, ...dates }
     setDateError('')
-    setFilters(draftFilters)
+    setDraftFilters(next)
+    setFilters(next)
   }
 
   function clearFilters() {
     setDraftFilters(blankFilters)
     setFilters(blankFilters)
+    setDateError('')
+  }
+
+  function changeDateRange(value) {
+    const dates = value === 'custom'
+      ? { fromDate: '', toDate: '' }
+      : getLocalQuickDateRange(value)
+    setDraftFilters((current) => ({
+      ...current,
+      dateRange: value,
+      ...dates,
+    }))
     setDateError('')
   }
 
@@ -109,13 +136,20 @@ function AdminAssignmentsPage({ roleArea = 'admin' }) {
   return (
     <>
       <section className="page-heading"><h2>Ticket Assignments</h2><p>Assign unassigned requests and review current IT Agent workloads.</p></section>
-      <form className="filter-panel assignment-filters" onSubmit={applyFilters}>
-        <label className="filter-search"><span>Search</span><input value={draftFilters.search} onChange={(event) => setDraftFilters({ ...draftFilters, search: event.target.value })} placeholder="Ticket number, title, or requester" /></label>
-        <label><span>Category</span><select value={draftFilters.categoryId} onChange={(event) => setDraftFilters({ ...draftFilters, categoryId: event.target.value })}><option value="">All</option>{lookups.categories.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
-        <label><span>Priority</span><select value={draftFilters.priorityId} onChange={(event) => setDraftFilters({ ...draftFilters, priorityId: event.target.value })}><option value="">All</option>{lookups.priorities.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
-        <label><span>From Date</span><input type="date" value={draftFilters.fromDate} onChange={(event) => setDraftFilters({ ...draftFilters, fromDate: event.target.value })} /></label>
-        <label><span>To Date</span><input type="date" value={draftFilters.toDate} onChange={(event) => setDraftFilters({ ...draftFilters, toDate: event.target.value })} /></label>
-        <div className="filter-actions"><button className="button button--primary" type="submit">Apply Filters</button><button className="button button--secondary" type="button" onClick={clearFilters}>Clear</button></div>
+      <form className="filter-panel ticket-filters" onSubmit={applyFilters}>
+        <div className="ticket-filters__grid manager-assignment-filters">
+          <label className="filter-search"><span>Search</span><input value={draftFilters.search} onChange={(event) => setDraftFilters({ ...draftFilters, search: event.target.value })} placeholder="Ticket number or title" /></label>
+          <label><span>Category</span><select value={draftFilters.categoryId} onChange={(event) => setDraftFilters({ ...draftFilters, categoryId: event.target.value })}><option value="">All</option>{lookups.categories.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
+          <label><span>Priority</span><select value={draftFilters.priorityId} onChange={(event) => setDraftFilters({ ...draftFilters, priorityId: event.target.value })}><option value="">All</option>{lookups.priorities.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
+          <label><span>Date Range</span><select value={draftFilters.dateRange} onChange={(event) => changeDateRange(event.target.value)}>{dateRangeOptions.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
+        </div>
+        <div className={`ticket-filters__custom-date-row ${draftFilters.dateRange === 'custom' ? 'ticket-filters__custom-date-row--visible' : ''}`}>
+          {draftFilters.dateRange === 'custom' && <>
+            <label><span>From Date</span><input type="date" value={draftFilters.fromDate} onChange={(event) => setDraftFilters({ ...draftFilters, fromDate: event.target.value })} /></label>
+            <label><span>To Date</span><input type="date" value={draftFilters.toDate} onChange={(event) => setDraftFilters({ ...draftFilters, toDate: event.target.value })} /></label>
+          </>}
+          <div className="filter-actions"><button className="button button--primary" type="submit">Apply Filters</button><button className="button button--secondary" type="button" onClick={clearFilters}>Clear</button></div>
+        </div>
         {dateError && <p className="filter-validation" role="alert">{dateError}</p>}
       </form>
       {notice && <div className="inline-notice" role="status">{notice}</div>}

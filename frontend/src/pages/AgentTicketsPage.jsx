@@ -6,17 +6,16 @@ import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/Ti
 import { getAssignedTickets } from '../services/agentTicketService.js'
 import { getCategories, getPriorities, getStatuses } from '../services/ticketService.js'
 import { formatLocalDate } from '../utils/dateTime.js'
-import { getLocalQuickDateRange, getUtcDateRange } from '../utils/dateRange.js'
+import {
+  getLocalQuickDateRange,
+  getUtcDateRange,
+  STANDARD_DATE_RANGE_OPTIONS,
+} from '../utils/dateRange.js'
 import { formatTicketReference } from '../utils/ticketReference.js'
 
 const pageSize = 8
-const dateRangeOptions = [
-  ['all', 'All Dates'],
-  ['yesterday', 'Yesterday'],
-  ['last7Days', 'Last 7 Days'],
-  ['last30Days', 'Last 30 Days'],
-  ['custom', 'Custom Range'],
-]
+const dateRangeOptions = STANDARD_DATE_RANGE_OPTIONS
+const supportedDateRanges = new Set(dateRangeOptions.map(([value]) => value))
 const emptyDraft = {
   search: '',
   statusId: '',
@@ -30,9 +29,13 @@ const emptyFilters = { ...emptyDraft, page: 1, pageSize }
 
 function initialFilters(searchParams) {
   const query = Object.fromEntries(searchParams)
+  const dateRange = supportedDateRanges.has(query.dateRange)
+    ? query.dateRange
+    : query.fromDate || query.toDate ? 'custom' : 'all'
   return {
     ...emptyFilters,
     ...query,
+    dateRange,
     page: Math.max(1, Number(query.page) || 1),
     pageSize,
   }

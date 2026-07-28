@@ -5,22 +5,31 @@ import Pagination from '../components/common/Pagination.jsx'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
 import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
 import { getAdminAssignments, getAdminTickets } from '../services/adminService.js'
-import { getManagerAssignments, getManagerTickets } from '../services/managerService.js'
+import { getManagerTickets } from '../services/managerService.js'
 import { getCategories, getPriorities, getStatuses } from '../services/ticketService.js'
-import { getLocalQuickDateRange, getUtcDateRange } from '../utils/dateRange.js'
+import {
+  getLocalQuickDateRange,
+  getUtcDateRange,
+  STANDARD_DATE_RANGE_OPTIONS,
+} from '../utils/dateRange.js'
 import { formatLocalDate } from '../utils/dateTime.js'
 
 const pageSize = 8
 const blankFilters = { search: '', status: '', category: '', priority: '', assignment: '', dateRange: 'all', fromDate: '', toDate: '', sort: 'createdDate:desc' }
-const dateOptions = [['all', 'All Dates'], ['yesterday', 'Yesterday'], ['last7Days', 'Last 7 Days'], ['last30Days', 'Last 30 Days'], ['custom', 'Custom Range']]
+const dateOptions = STANDARD_DATE_RANGE_OPTIONS
+const supportedDateRanges = new Set(dateOptions.map(([value]) => value))
 const sortOptions = [['createdDate:desc', 'Newest first'], ['createdDate:asc', 'Oldest first'], ['title:asc', 'Title A–Z'], ['priority:desc', 'Highest priority']]
 
 function initialFilters(searchParams) {
   const query = Object.fromEntries(searchParams)
   delete query.page
+  const dateRange = supportedDateRanges.has(query.dateRange)
+    ? query.dateRange
+    : query.fromDate || query.toDate ? 'custom' : 'all'
   return {
     ...blankFilters,
     ...query,
+    dateRange,
     assignment: query.agent ? `agent:${query.agent}` : query.assignment ?? '',
   }
 }
@@ -70,10 +79,9 @@ function AdminTicketsPage({ roleArea = 'admin' }) {
   }, [])
 
   useEffect(() => {
+    if (roleArea !== 'admin') return undefined
     const controller = new AbortController()
-    const loadAssignments =
-      roleArea === 'manager' ? getManagerAssignments : getAdminAssignments
-    loadAssignments({}, controller.signal)
+    getAdminAssignments({}, controller.signal)
       .then((result) => {
         if (!controller.signal.aborted) setAgents(result.agentWorkloads)
       })
@@ -95,10 +103,10 @@ function AdminTicketsPage({ roleArea = 'admin' }) {
     loadTickets({
       search: filters.search, statusId: filters.status, categoryId: filters.category,
       priorityId: filters.priority,
-      agentUserId: filters.assignment.startsWith('agent:')
+      agentUserId: roleArea === 'admin' && filters.assignment.startsWith('agent:')
         ? filters.assignment.slice(6) : undefined,
-      unassignedOnly: filters.assignment === 'unassigned' ? true : undefined,
-      assignedOnly: filters.assignment === 'assigned' ? true : undefined,
+      unassignedOnly: roleArea === 'admin' && filters.assignment === 'unassigned' ? true : undefined,
+      assignedOnly: roleArea === 'admin' && filters.assignment === 'assigned' ? true : undefined,
       fromUtc, toUtcExclusive,
       sortBy, sortDirection, page, pageSize,
     }, controller.signal).then(setData)
@@ -136,14 +144,14 @@ function AdminTicketsPage({ roleArea = 'admin' }) {
       </section>
       {location.state?.notice && <div className="inline-alert inline-alert--success" role="status">{location.state.notice}</div>}
       <form className="filter-panel ticket-filters" onSubmit={applyFilters}>
-        <div className="ticket-filters__grid admin-ticket-filters">
-          <label className="filter-search"><span>Search</span><input value={draft.search} onChange={(event) => setDraft({ ...draft, search: event.target.value })} placeholder="Ticket number, title, or requester" /></label>
+        <div className={`ticket-filters__grid admin-ticket-filters ${roleArea === 'manager' ? 'manager-ticket-filters' : ''}`}>
+          <label className="filter-search"><span>Search</span><input value={draft.search} onChange={(event) => setDraft({ ...draft, search: event.target.value })} placeholder={roleArea === 'manager' ? 'Ticket number or title' : 'Ticket number, title, or requester'} /></label>
           {[['status', 'Status', lookups.statuses], ['category', 'Category', lookups.categories], ['priority', 'Priority', lookups.priorities]].map(([key, label, options]) => (
             <label key={key}><span>{label}</span><select value={draft[key]} onChange={(event) => setDraft({ ...draft, [key]: event.target.value })}><option value="">All</option>{options.map((option) => <option value={option.id} key={option.id}>{option.name}</option>)}</select></label>
           ))}
-          <label><span>Assigned Agent</span><select value={draft.assignment} onChange={(event) => setDraft({ ...draft, assignment: event.target.value })}><option value="">All agents</option><option value="unassigned">Unassigned</option><option value="assigned">Any assigned</option>{agents.map((agent) => <option value={`agent:${agent.userId}`} key={agent.userId}>{agent.name}</option>)}</select></label>
+          {roleArea === 'admin' && <label><span>Assigned Agent</span><select value={draft.assignment} onChange={(event) => setDraft({ ...draft, assignment: event.target.value })}><option value="">All agents</option><option value="unassigned">Unassigned</option><option value="assigned">Any assigned</option>{agents.map((agent) => <option value={`agent:${agent.userId}`} key={agent.userId}>{agent.name}</option>)}</select></label>}
           <label><span>Date Range</span><select value={draft.dateRange} onChange={(event) => changeDateRange(event.target.value)}>{dateOptions.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
-          <label><span>Sort By</span><select value={draft.sort} onChange={(event) => setDraft({ ...draft, sort: event.target.value })}>{sortOptions.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
+          {roleArea === 'admin' && <label><span>Sort By</span><select value={draft.sort} onChange={(event) => setDraft({ ...draft, sort: event.target.value })}>{sortOptions.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>}
         </div>
         <div className={`ticket-filters__custom-date-row ${draft.dateRange === 'custom' ? 'ticket-filters__custom-date-row--visible' : ''}`}>
           {draft.dateRange === 'custom' && <>
