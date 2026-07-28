@@ -3,6 +3,7 @@ namespace ResolveHub.Api.Constants;
 public static class TicketHistoryActionNames
 {
     public const string TicketCreated = "Ticket Created";
+    public const string TicketAssigned = "Ticket Assigned";
     public const string StatusChanged = "Status Changed";
     public const string CommentAdded = "Comment Added";
     public const string InternalNoteAdded = "Internal Note Added";

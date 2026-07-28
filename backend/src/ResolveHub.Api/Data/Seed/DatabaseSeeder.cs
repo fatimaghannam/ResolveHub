@@ -24,6 +24,20 @@ public static class DatabaseSeeder
             RoleName: RoleNames.ITAgent),
 
         new(
+            Email: "Emily.Carter@company.com",
+            FirstName: "Emily",
+            LastName: "Carter",
+            JobTitle: "IT Support Agent",
+            RoleName: RoleNames.ITAgent),
+
+        new(
+            Email: "Michael.Thompson@company.com",
+            FirstName: "Michael",
+            LastName: "Thompson",
+            JobTitle: "IT Support Agent",
+            RoleName: RoleNames.ITAgent),
+
+        new(
             Email: "admin@resolvehub.test",
             FirstName: "Ryan",
             LastName: "Whitmore",
@@ -148,9 +162,15 @@ public static class DatabaseSeeder
         ApplicationDbContext dbContext,
         UserManager<UserAccount> userManager)
     {
-        var agent = await userManager.FindByEmailAsync("agent@resolvehub.test")
-            ?? throw new InvalidOperationException(
-                "The development IT Support Agent account was not found.");
+        string[] agentEmails =
+        [
+            "agent@resolvehub.test",
+            "Emily.Carter@company.com",
+            "Michael.Thompson@company.com"
+        ];
+        var agents = await dbContext.Users
+            .Where(user => agentEmails.Contains(user.Email!))
+            .ToDictionaryAsync(user => user.Email!, StringComparer.OrdinalIgnoreCase);
 
         var requesterEmails = DevelopmentTicketRequesters
             .Select(user => user.Email)
@@ -168,40 +188,40 @@ public static class DatabaseSeeder
 
         SeedAgentTicket[] seedTickets =
         [
-            new("RH-2026-9001", "olivia.bennett@resolvehub.test",
+            new("RH-2026-9001", "olivia.bennett@resolvehub.test", null,
                 "VPN access unavailable after password change", "Network", "Critical",
-                TicketStatusNames.Assigned, 2),
-            new("RH-2026-9002", "daniel.brooks@resolvehub.test",
+                TicketStatusNames.Open, 2),
+            new("RH-2026-9002", "daniel.brooks@resolvehub.test", null,
                 "Finance shared printer is offline", "Hardware", "High",
-                TicketStatusNames.Assigned, 3),
-            new("RH-2026-9003", "sophia.mitchell@resolvehub.test",
+                TicketStatusNames.Open, 3),
+            new("RH-2026-9003", "sophia.mitchell@resolvehub.test", "Emily.Carter@company.com",
                 "Suspicious email attachment reported", "Security", "Medium",
                 TicketStatusNames.Assigned, 4),
-            new("RH-2026-9004", "ethan.parker@resolvehub.test",
+            new("RH-2026-9004", "ethan.parker@resolvehub.test", "Emily.Carter@company.com",
                 "Outlook calendar is not synchronizing", "Email", "Critical",
                 TicketStatusNames.InProgress, 6),
-            new("RH-2026-9005", "ava.collins@resolvehub.test",
+            new("RH-2026-9005", "ava.collins@resolvehub.test", "Emily.Carter@company.com",
                 "Intermittent Wi-Fi in conference room", "Network", "High",
                 TicketStatusNames.InProgress, 7),
-            new("RH-2026-9006", "michael.reed@resolvehub.test",
+            new("RH-2026-9006", "michael.reed@resolvehub.test", "Emily.Carter@company.com",
                 "Payroll application closes unexpectedly", "Software", "Medium",
                 TicketStatusNames.InProgress, 9),
-            new("RH-2026-9007", "jessica.morgan@resolvehub.test",
+            new("RH-2026-9007", "jessica.morgan@resolvehub.test", "Michael.Thompson@company.com",
                 "New employee workstation setup", "Hardware", "High",
                 TicketStatusNames.Pending, 11),
-            new("RH-2026-9008", "ryan.cooper@resolvehub.test",
+            new("RH-2026-9008", "ryan.cooper@resolvehub.test", "Michael.Thompson@company.com",
                 "Cannot open archived project folder", "Access Request", "Medium",
                 TicketStatusNames.Pending, 13),
-            new("RH-2026-9009", "hannah.foster@resolvehub.test",
+            new("RH-2026-9009", "hannah.foster@resolvehub.test", "Michael.Thompson@company.com",
                 "Browser certificate warning on intranet", "Security", "Low",
                 TicketStatusNames.Pending, 15),
-            new("RH-2026-9010", "brandon.turner@resolvehub.test",
+            new("RH-2026-9010", "brandon.turner@resolvehub.test", "agent@resolvehub.test",
                 "Teams microphone is not detected", "Hardware", "Medium",
                 TicketStatusNames.Resolved, 17),
-            new("RH-2026-9011", "olivia.bennett@resolvehub.test",
+            new("RH-2026-9011", "olivia.bennett@resolvehub.test", "agent@resolvehub.test",
                 "Distribution list delivery delayed", "Email", "Low",
                 TicketStatusNames.Resolved, 20),
-            new("RH-2026-9012", "daniel.brooks@resolvehub.test",
+            new("RH-2026-9012", "daniel.brooks@resolvehub.test", "agent@resolvehub.test",
                 "Ethernet connection drops periodically", "Network", "Low",
                 TicketStatusNames.Resolved, 23)
         ];
@@ -209,18 +229,14 @@ public static class DatabaseSeeder
         var references = seedTickets
             .Select(ticket => ticket.Reference)
             .ToArray();
-        var existingReferences = await dbContext.Tickets
+        var existingTickets = await dbContext.Tickets
             .Where(ticket => references.Contains(ticket.TicketReferenceNumber))
-            .Select(ticket => ticket.TicketReferenceNumber)
-            .ToListAsync();
-        var existingReferenceSet = existingReferences.ToHashSet(
-            StringComparer.OrdinalIgnoreCase);
+            .ToDictionaryAsync(
+                ticket => ticket.TicketReferenceNumber,
+                StringComparer.OrdinalIgnoreCase);
 
         foreach (var seedTicket in seedTickets)
         {
-            if (existingReferenceSet.Contains(seedTicket.Reference))
-                continue;
-
             var createdDate = new DateTime(
                 2026, 7, seedTicket.Day, 8 + seedTicket.Day % 8, 0, 0,
                 DateTimeKind.Utc);
@@ -230,27 +246,30 @@ public static class DatabaseSeeder
                 ? assignedDate.AddDays(1).AddHours(3)
                 : (DateTime?)null;
 
-            dbContext.Tickets.Add(new Ticket
-            {
-                TicketReferenceNumber = seedTicket.Reference,
-                CreatedByUserAccountID = requesters[seedTicket.RequesterEmail].Id,
-                AssignedToUserAccountID = agent.Id,
-                TicketCategoryID = categories[seedTicket.Category].ID,
-                TicketPriorityID = priorities[seedTicket.Priority].ID,
-                TicketStatusID = statuses[seedTicket.Status].ID,
-                Title = seedTicket.Title,
-                Description =
-                    $"Development seed ticket for {seedTicket.Title.ToLowerInvariant()}.",
-                CreatedDate = createdDate,
-                UpdatedDate = resolvedDate ?? assignedDate,
-                AssignedDate = assignedDate,
-                ResolvedDate = resolvedDate,
-                ResolutionSummary = isResolved
-                    ? "Issue resolved and confirmed with the requester."
-                    : null,
-                ResolvedByUserAccountID = isResolved ? agent.Id : null,
-                IsDeleted = false
-            });
+            var ticket = existingTickets.GetValueOrDefault(seedTicket.Reference)
+                ?? new Ticket { TicketReferenceNumber = seedTicket.Reference };
+            var assignedAgent = seedTicket.AgentEmail is null
+                ? null
+                : agents[seedTicket.AgentEmail];
+            ticket.CreatedByUserAccountID = requesters[seedTicket.RequesterEmail].Id;
+            ticket.AssignedToUserAccountID = assignedAgent?.Id;
+            ticket.TicketCategoryID = categories[seedTicket.Category].ID;
+            ticket.TicketPriorityID = priorities[seedTicket.Priority].ID;
+            ticket.TicketStatusID = statuses[seedTicket.Status].ID;
+            ticket.Title = seedTicket.Title;
+            ticket.Description =
+                $"Development seed ticket for {seedTicket.Title.ToLowerInvariant()}.";
+            ticket.CreatedDate = createdDate;
+            ticket.UpdatedDate = resolvedDate ?? assignedDate;
+            ticket.AssignedDate = assignedAgent is null ? null : assignedDate;
+            ticket.ResolvedDate = resolvedDate;
+            ticket.ResolutionSummary = isResolved
+                ? "Issue resolved and confirmed with the requester."
+                : null;
+            ticket.ResolvedByUserAccountID = isResolved ? assignedAgent?.Id : null;
+            ticket.IsDeleted = false;
+            if (!existingTickets.ContainsKey(seedTicket.Reference))
+                dbContext.Tickets.Add(ticket);
         }
 
         await dbContext.SaveChangesAsync();
@@ -474,6 +493,7 @@ public static class DatabaseSeeder
     private sealed record SeedAgentTicket(
         string Reference,
         string RequesterEmail,
+        string? AgentEmail,
         string Title,
         string Category,
         string Priority,

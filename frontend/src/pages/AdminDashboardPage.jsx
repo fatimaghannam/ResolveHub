@@ -10,6 +10,7 @@ import {
   UserRoundCheck,
   Users,
 } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
 import {
   TicketCategoryChart,
@@ -17,11 +18,8 @@ import {
   TicketTrendChart,
 } from '../components/admin/AdminDashboardCharts.jsx'
 import { TicketPriorityBadge } from '../components/tickets/TicketBadges.jsx'
-import {
-  agentWorkloads,
-  adminStatistics,
-  unassignedTickets,
-} from '../data/index.js'
+import { ErrorState, LoadingState } from '../components/common/States.jsx'
+import { getAdminDashboard } from '../services/adminService.js'
 import { formatLocalDate } from '../utils/dateTime.js'
 
 const statistics = [
@@ -42,6 +40,24 @@ const quickActions = [
 
 function AdminDashboardPage() {
   const { user } = useOutletContext()
+  const [data, setData] = useState(null)
+  const [error, setError] = useState('')
+  const [reload, setReload] = useState(0)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    setError('')
+    getAdminDashboard(controller.signal)
+      .then((result) => {
+        if (!controller.signal.aborted) setData(result)
+      })
+      .catch((requestError) => {
+        if (requestError.name !== 'AbortError' && !controller.signal.aborted) {
+          setError(requestError.message)
+        }
+      })
+    return () => controller.abort()
+  }, [reload])
 
   return (
     <>
@@ -50,11 +66,14 @@ function AdminDashboardPage() {
         <p>Monitor system performance and manage help desk operations from one place.</p>
       </section>
 
+      {error && <ErrorState message={error} onRetry={() => setReload((value) => value + 1)} />}
+      {!error && !data && <LoadingState message="Loading Administrator dashboard…" />}
+      {data && <>
       <section className="stat-grid stat-grid--six" aria-label="Administrative statistics">
         {statistics.map(([label, field, Icon, tone]) => (
           <article className="stat-card" key={field}>
             <span className={`stat-card__icon tone-${tone}`}><Icon size={22} aria-hidden="true" /></span>
-            <span><small>{label}</small><strong>{adminStatistics[field]}</strong></span>
+            <span><small>{label}</small><strong>{data[field]}</strong></span>
           </article>
         ))}
       </section>
@@ -69,7 +88,7 @@ function AdminDashboardPage() {
         <section className="panel chart-panel">
           <div className="chart-heading"><h2>IT Agent Workload</h2><p>Current active workload and capacity status by support agent.</p></div>
           <div className="dashboard-workload-list">
-            {agentWorkloads.map((agent) => (
+            {data.agentWorkloads.map((agent) => (
               <article className="dashboard-workload-item" key={agent.name}>
                 <div><strong>{agent.name}</strong><small>{agent.activeAssigned} active ticket{agent.activeAssigned === 1 ? '' : 's'}</small></div>
                 <span className={`capacity-badge capacity-badge--${agent.capacity.toLowerCase().replace(' ', '-')}`}>{agent.capacity}</span>
@@ -99,7 +118,7 @@ function AdminDashboardPage() {
               <col className="assignment-col--action" />
             </colgroup>
             <thead><tr><th>Ticket Number</th><th>Title</th><th>Requester</th><th>Category</th><th>Priority</th><th>Created</th><th>Action</th></tr></thead>
-            <tbody>{unassignedTickets.slice(0, 5).map((ticket) => (
+            <tbody>{data.ticketsRequiringAssignment.map((ticket) => (
               <tr key={ticket.id}>
                 <td><strong>{ticket.ticketReferenceNumber}</strong></td>
                 <td><span className="assignment-title" title={ticket.title}>{ticket.title}</span></td><td>{ticket.requesterName}</td><td>{ticket.categoryName}</td>
@@ -126,6 +145,7 @@ function AdminDashboardPage() {
           ))}
         </div>
       </section>
+      </>}
     </>
   )
 }
