@@ -11,7 +11,8 @@ public interface IManagerTicketService
         AdminTicketFilterDto filter, CancellationToken token);
     Task<AdminTicketDetailsDto?> GetTicketAsync(
         string ticketReference, CancellationToken token);
-    Task<AdminAssignmentOverviewDto> GetAssignmentsAsync(CancellationToken token);
+    Task<AdminAssignmentOverviewDto> GetAssignmentsAsync(
+        AdminTicketFilterDto filter, CancellationToken token);
     Task<IReadOnlyCollection<ManagerAgentWorkloadDto>> GetWorkloadAsync(
         CancellationToken token);
     Task<ManagerActivityResultDto> GetActivityAsync(CancellationToken token);

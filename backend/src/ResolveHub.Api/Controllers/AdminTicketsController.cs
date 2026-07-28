@@ -17,8 +17,8 @@ public sealed class AdminTicketsController(IAdminTicketService service)
 {
     [HttpGet("ticket-assignments")]
     public async Task<ActionResult<AdminAssignmentOverviewDto>> GetAssignments(
-        CancellationToken token) =>
-        Ok(await service.GetAssignmentsAsync(token));
+        [FromQuery] AdminTicketFilterDto filter, CancellationToken token) =>
+        Ok(await service.GetAssignmentsAsync(filter, token));
 
     [HttpGet("dashboard")]
     public async Task<ActionResult<AdminDashboardSummaryDto>> GetDashboard(

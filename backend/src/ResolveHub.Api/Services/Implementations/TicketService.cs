@@ -64,9 +64,10 @@ public sealed class TicketService(ApplicationDbContext dbContext)
         var search = filter.Search?.Trim();
         if (!string.IsNullOrWhiteSpace(search))
         {
+            var normalizedSearch = search.ToLower();
             query = query.Where(ticket =>
-                ticket.Title.Contains(search) ||
-                ticket.TicketReferenceNumber.Contains(search));
+                ticket.Title.ToLower().Contains(normalizedSearch) ||
+                ticket.TicketReferenceNumber.ToLower().Contains(normalizedSearch));
         }
 
         if (filter.StatusId.HasValue)

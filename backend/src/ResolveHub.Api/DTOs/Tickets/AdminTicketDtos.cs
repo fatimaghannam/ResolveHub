@@ -36,12 +36,17 @@ public sealed class AdminTicketFilterDto
     public int? CategoryId { get; init; }
     public int? PriorityId { get; init; }
     public int? AgentUserId { get; init; }
+    public int? RequesterId { get; init; }
     public bool? UnassignedOnly { get; init; }
     public bool? AssignedOnly { get; init; }
     public DateTime? FromDate { get; init; }
     public DateTime? ToDate { get; init; }
+    public DateTimeOffset? FromUtc { get; init; }
+    public DateTimeOffset? ToUtcExclusive { get; init; }
     [Range(1, int.MaxValue)] public int Page { get; init; } = 1;
     [Range(1, 100)] public int PageSize { get; init; } = 10;
+    public string? SortBy { get; init; } = "createdDate";
+    public string? SortDirection { get; init; } = "desc";
 }
 
 public sealed record AdminTicketListItemDto(

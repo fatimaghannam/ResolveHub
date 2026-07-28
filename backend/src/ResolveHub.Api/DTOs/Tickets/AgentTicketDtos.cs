@@ -11,6 +11,8 @@ public sealed class AgentTicketFilterDto : IValidatableObject
     public int? PriorityId { get; init; }
     public DateTime? FromDate { get; init; }
     public DateTime? ToDate { get; init; }
+    public DateTimeOffset? FromUtc { get; init; }
+    public DateTimeOffset? ToUtcExclusive { get; init; }
     [Range(1, int.MaxValue)]
     public int Page { get; init; } = 1;
     [Range(1, 100)]
@@ -25,6 +27,13 @@ public sealed class AgentTicketFilterDto : IValidatableObject
                 [nameof(FromDate), nameof(ToDate)]);
         else if (FromDate.HasValue && ToDate!.Value.Date < FromDate.Value.Date)
             yield return new("toDate cannot be earlier than fromDate.", [nameof(ToDate)]);
+        if (FromUtc.HasValue != ToUtcExclusive.HasValue)
+            yield return new("Both fromUtc and toUtcExclusive must be provided together.",
+                [nameof(FromUtc), nameof(ToUtcExclusive)]);
+        else if (FromUtc.HasValue &&
+                 ToUtcExclusive!.Value <= FromUtc.Value)
+            yield return new("toUtcExclusive must be later than fromUtc.",
+                [nameof(ToUtcExclusive)]);
     }
 }
 

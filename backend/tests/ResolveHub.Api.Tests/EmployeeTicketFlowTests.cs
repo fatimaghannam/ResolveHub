@@ -56,7 +56,7 @@ public sealed class EmployeeTicketFlowTests
     }
 
     [Fact]
-    public async Task ItSupportAgent_CannotCreateTicketsOrLoadCreationLookups()
+    public async Task ItSupportAgent_CannotCreateTickets_ButCanLoadFilterLookups()
     {
         await using var factory = new ResolveHubApiFactory();
         await factory.SeedTicketLookupsAsync();
@@ -75,7 +75,7 @@ public sealed class EmployeeTicketFlowTests
         var lookupResponse = await client.GetAsync("/api/ticket-categories");
 
         Assert.Equal(HttpStatusCode.Forbidden, createResponse.StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, lookupResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, lookupResponse.StatusCode);
     }
 
     [Fact]

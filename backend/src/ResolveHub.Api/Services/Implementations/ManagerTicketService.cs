@@ -24,8 +24,8 @@ public sealed class ManagerTicketService(
         adminTicketService.GetTicketAsync(ticketReference, token);
 
     public Task<AdminAssignmentOverviewDto> GetAssignmentsAsync(
-        CancellationToken token) =>
-        adminTicketService.GetAssignmentsAsync(token);
+        AdminTicketFilterDto filter, CancellationToken token) =>
+        adminTicketService.GetAssignmentsAsync(filter, token);
 
     public Task<TicketServiceResult<bool>> AssignAsync(
         int managerId, string ticketReference, int agentUserId,
@@ -81,7 +81,8 @@ public sealed class ManagerTicketService(
             })
             .OrderBy(item => item.SortOrder).ThenBy(item => item.Name)
             .ToListAsync(token);
-        var assignments = await adminTicketService.GetAssignmentsAsync(token);
+        var assignments = await adminTicketService.GetAssignmentsAsync(
+            new AdminTicketFilterDto(), token);
         var workload = await GetWorkloadAsync(token);
         var activity = await GetActivityAsync(token);
         var attention = await tickets

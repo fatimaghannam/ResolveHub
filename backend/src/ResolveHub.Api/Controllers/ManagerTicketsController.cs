@@ -33,8 +33,8 @@ public sealed class ManagerTicketsController(IManagerTicketService service) : Co
 
     [HttpGet("assignments")]
     public async Task<ActionResult<AdminAssignmentOverviewDto>> Assignments(
-        CancellationToken token) =>
-        Ok(await service.GetAssignmentsAsync(token));
+        [FromQuery] AdminTicketFilterDto filter, CancellationToken token) =>
+        Ok(await service.GetAssignmentsAsync(filter, token));
 
     [HttpPost("tickets/{ticketReference}/assign")]
     public async Task<IActionResult> Assign(

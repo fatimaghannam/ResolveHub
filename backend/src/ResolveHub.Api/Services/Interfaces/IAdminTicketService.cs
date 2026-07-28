@@ -6,7 +6,8 @@ namespace ResolveHub.Api.Services.Interfaces;
 
 public interface IAdminTicketService
 {
-    Task<AdminAssignmentOverviewDto> GetAssignmentsAsync(CancellationToken token);
+    Task<AdminAssignmentOverviewDto> GetAssignmentsAsync(
+        AdminTicketFilterDto filter, CancellationToken token);
     Task<AdminDashboardSummaryDto> GetDashboardAsync(CancellationToken token);
     Task<IReadOnlyCollection<AdminAgentWorkloadDto>> GetAgentsAsync(
         CancellationToken token);

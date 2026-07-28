@@ -9,8 +9,8 @@ export const getManagerTickets = (filters, signal) =>
 export const getManagerTicket = (ticketReference, signal) =>
   apiRequest(`/api/manager/tickets/${encodeURIComponent(ticketReference)}`, { signal })
 
-export const getManagerAssignments = (signal) =>
-  apiRequest('/api/manager/assignments', { signal })
+export const getManagerAssignments = (filters = {}, signal) =>
+  apiRequest(`/api/manager/assignments${toQueryString(filters)}`, { signal })
 
 export const assignManagerTicket = (ticketReference, agentUserId) =>
   apiRequest(`/api/manager/tickets/${encodeURIComponent(ticketReference)}/assign`, {

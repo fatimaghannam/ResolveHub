@@ -16,9 +16,9 @@ public sealed class AdminTicketService(ApplicationDbContext dbContext)
         [TicketStatusNames.Assigned, TicketStatusNames.InProgress, TicketStatusNames.Pending];
 
     public async Task<AdminAssignmentOverviewDto> GetAssignmentsAsync(
-        CancellationToken token) =>
+        AdminTicketFilterDto filter, CancellationToken token) =>
         new(
-            await GetUnassignedTickets().ToListAsync(token),
+            await GetUnassignedTickets(filter).ToListAsync(token),
             await GetAgentWorkloadsAsync(token));
 
     public async Task<AdminDashboardSummaryDto> GetDashboardAsync(
@@ -113,7 +113,8 @@ public sealed class AdminTicketService(ApplicationDbContext dbContext)
             statusCounts,
             monthlyTrend,
             categoryCounts,
-            await GetUnassignedTickets().Take(5).ToListAsync(token),
+            await GetUnassignedTickets(new AdminTicketFilterDto())
+                .Take(5).ToListAsync(token),
             await GetAgentWorkloadsAsync(token));
     }
 
@@ -127,9 +128,22 @@ public sealed class AdminTicketService(ApplicationDbContext dbContext)
             .Where(ticket => !ticket.IsDeleted);
         var search = filter.Search?.Trim();
         if (!string.IsNullOrEmpty(search))
+        {
+            var normalizedSearch = search.ToLower();
             query = query.Where(ticket =>
-                ticket.TicketReferenceNumber.Contains(search) ||
-                ticket.Title.Contains(search));
+                ticket.TicketReferenceNumber.ToLower().Contains(normalizedSearch) ||
+                ticket.Title.ToLower().Contains(normalizedSearch) ||
+                ticket.CreatedByUserAccount.FirstName.ToLower().Contains(normalizedSearch) ||
+                ticket.CreatedByUserAccount.LastName.ToLower().Contains(normalizedSearch) ||
+                (ticket.CreatedByUserAccount.FirstName + " " +
+                 ticket.CreatedByUserAccount.LastName).ToLower().Contains(normalizedSearch) ||
+                (ticket.AssignedToUserAccount != null &&
+                 (ticket.AssignedToUserAccount.FirstName.ToLower().Contains(normalizedSearch) ||
+                  ticket.AssignedToUserAccount.LastName.ToLower().Contains(normalizedSearch) ||
+                  (ticket.AssignedToUserAccount.FirstName + " " +
+                   ticket.AssignedToUserAccount.LastName).ToLower()
+                      .Contains(normalizedSearch))));
+        }
         if (filter.StatusId.HasValue)
             query = query.Where(ticket => ticket.TicketStatusID == filter.StatusId);
         if (filter.CategoryId.HasValue)
@@ -138,21 +152,29 @@ public sealed class AdminTicketService(ApplicationDbContext dbContext)
             query = query.Where(ticket => ticket.TicketPriorityID == filter.PriorityId);
         if (filter.AgentUserId.HasValue)
             query = query.Where(ticket => ticket.AssignedToUserAccountID == filter.AgentUserId);
+        if (filter.RequesterId.HasValue)
+            query = query.Where(ticket => ticket.CreatedByUserAccountID == filter.RequesterId);
         if (filter.UnassignedOnly == true)
             query = query.Where(ticket => ticket.AssignedToUserAccountID == null);
         if (filter.AssignedOnly == true)
             query = query.Where(ticket => ticket.AssignedToUserAccountID != null);
-        if (filter.FromDate.HasValue)
+        if (filter.FromUtc.HasValue)
+            query = query.Where(ticket =>
+                ticket.CreatedDate >= filter.FromUtc.Value.UtcDateTime);
+        else if (filter.FromDate.HasValue)
             query = query.Where(ticket => ticket.CreatedDate >= filter.FromDate.Value.Date);
-        if (filter.ToDate.HasValue)
+        if (filter.ToUtcExclusive.HasValue)
+            query = query.Where(ticket =>
+                ticket.CreatedDate < filter.ToUtcExclusive.Value.UtcDateTime);
+        else if (filter.ToDate.HasValue)
         {
             var end = filter.ToDate.Value.Date.AddDays(1);
             query = query.Where(ticket => ticket.CreatedDate < end);
         }
 
         var total = await query.CountAsync(token);
+        query = ApplySorting(query, filter.SortBy, filter.SortDirection);
         var items = await query
-            .OrderByDescending(ticket => ticket.CreatedDate).ThenByDescending(ticket => ticket.ID)
             .Skip((filter.Page - 1) * filter.PageSize).Take(filter.PageSize)
             .Select(ticket => new AdminTicketListItemDto(
                 ticket.ID, ticket.TicketReferenceNumber, ticket.Title,
@@ -168,6 +190,34 @@ public sealed class AdminTicketService(ApplicationDbContext dbContext)
             .ToListAsync(token);
         return new(items, filter.Page, filter.PageSize, total,
             Math.Max(1, (int)Math.Ceiling(total / (double)filter.PageSize)));
+    }
+
+    private static IQueryable<Ticket> ApplySorting(
+        IQueryable<Ticket> query, string? sortBy, string? direction)
+    {
+        var descending =
+            !string.Equals(direction, "asc", StringComparison.OrdinalIgnoreCase);
+        return sortBy?.ToLowerInvariant() switch
+        {
+            "title" => descending
+                ? query.OrderByDescending(ticket => ticket.Title)
+                    .ThenByDescending(ticket => ticket.ID)
+                : query.OrderBy(ticket => ticket.Title).ThenBy(ticket => ticket.ID),
+            "status" => descending
+                ? query.OrderByDescending(ticket => ticket.TicketStatus.SortOrder)
+                    .ThenByDescending(ticket => ticket.ID)
+                : query.OrderBy(ticket => ticket.TicketStatus.SortOrder)
+                    .ThenBy(ticket => ticket.ID),
+            "priority" => descending
+                ? query.OrderByDescending(ticket => ticket.TicketPriority.SortOrder)
+                    .ThenByDescending(ticket => ticket.ID)
+                : query.OrderBy(ticket => ticket.TicketPriority.SortOrder)
+                    .ThenBy(ticket => ticket.ID),
+            _ => descending
+                ? query.OrderByDescending(ticket => ticket.CreatedDate)
+                    .ThenByDescending(ticket => ticket.ID)
+                : query.OrderBy(ticket => ticket.CreatedDate).ThenBy(ticket => ticket.ID)
+        };
     }
 
     public Task<AdminTicketDetailsDto?> GetTicketAsync(
@@ -299,12 +349,38 @@ public sealed class AdminTicketService(ApplicationDbContext dbContext)
         return new(TicketOperationStatus.Success, true);
     }
 
-    private IQueryable<AdminUnassignedTicketDto> GetUnassignedTickets() =>
-        dbContext.Tickets.AsNoTracking()
+    private IQueryable<AdminUnassignedTicketDto> GetUnassignedTickets(
+        AdminTicketFilterDto filter)
+    {
+        var query = dbContext.Tickets.AsNoTracking()
             .Where(ticket =>
                 !ticket.IsDeleted &&
                 ticket.AssignedToUserAccountID == null &&
-                !ticket.TicketStatus.IsFinalStatus)
+                !ticket.TicketStatus.IsFinalStatus);
+        var search = filter.Search?.Trim();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var normalizedSearch = search.ToLower();
+            query = query.Where(ticket =>
+                ticket.TicketReferenceNumber.ToLower().Contains(normalizedSearch) ||
+                ticket.Title.ToLower().Contains(normalizedSearch) ||
+                (ticket.CreatedByUserAccount.FirstName + " " +
+                 ticket.CreatedByUserAccount.LastName).ToLower()
+                    .Contains(normalizedSearch));
+        }
+        if (filter.CategoryId.HasValue)
+            query = query.Where(ticket =>
+                ticket.TicketCategoryID == filter.CategoryId);
+        if (filter.PriorityId.HasValue)
+            query = query.Where(ticket =>
+                ticket.TicketPriorityID == filter.PriorityId);
+        if (filter.FromUtc.HasValue)
+            query = query.Where(ticket =>
+                ticket.CreatedDate >= filter.FromUtc.Value.UtcDateTime);
+        if (filter.ToUtcExclusive.HasValue)
+            query = query.Where(ticket =>
+                ticket.CreatedDate < filter.ToUtcExclusive.Value.UtcDateTime);
+        return query
             .OrderByDescending(ticket => ticket.TicketPriority.SortOrder)
             .ThenBy(ticket => ticket.CreatedDate)
             .Select(ticket => new AdminUnassignedTicketDto(
@@ -316,6 +392,7 @@ public sealed class AdminTicketService(ApplicationDbContext dbContext)
                 ticket.TicketCategory.Name,
                 ticket.TicketPriority.Name,
                 ticket.CreatedDate));
+    }
 
     private async Task<IReadOnlyCollection<AdminAgentWorkloadDto>>
         GetAgentWorkloadsAsync(CancellationToken token)

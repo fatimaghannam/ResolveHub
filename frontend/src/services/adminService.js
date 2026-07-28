@@ -1,8 +1,8 @@
 import { apiRequest } from './apiClient.js'
 import { toQueryString } from './apiClient.js'
 
-export const getAdminAssignments = (signal) =>
-  apiRequest('/api/admin/ticket-assignments', { signal })
+export const getAdminAssignments = (filters = {}, signal) =>
+  apiRequest(`/api/admin/ticket-assignments${toQueryString(filters)}`, { signal })
 
 export const assignAdminTicket = (ticketReference, agentUserId) =>
   apiRequest(`/api/admin/tickets/${encodeURIComponent(ticketReference)}/assign`, {

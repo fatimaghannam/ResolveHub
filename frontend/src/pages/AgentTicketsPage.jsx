@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import Pagination from '../components/common/Pagination.jsx'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
 import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
 import { getAssignedTickets } from '../services/agentTicketService.js'
+import { getCategories, getPriorities, getStatuses } from '../services/ticketService.js'
 import { formatLocalDate } from '../utils/dateTime.js'
-import { getLocalQuickDateRange } from '../utils/dateRange.js'
+import { getLocalQuickDateRange, getUtcDateRange } from '../utils/dateRange.js'
 import { formatTicketReference } from '../utils/ticketReference.js'
 
 const pageSize = 8
@@ -27,23 +28,31 @@ const emptyDraft = {
 }
 const emptyFilters = { ...emptyDraft, page: 1, pageSize }
 
-function uniqueLookups(items, idField, nameField) {
-  return Array.from(
-    new Map(items.map((item) => [
-      item[idField],
-      { id: item[idField], name: item[nameField] },
-    ])).values(),
-  ).sort((first, second) => first.name.localeCompare(second.name))
+function initialFilters(searchParams) {
+  const query = Object.fromEntries(searchParams)
+  return {
+    ...emptyFilters,
+    ...query,
+    page: Math.max(1, Number(query.page) || 1),
+    pageSize,
+  }
+}
+
+function urlFilters(filters) {
+  return Object.fromEntries(Object.entries(filters).filter(([, value]) =>
+    value !== '' && value !== 'all' && value !== 1 && value !== pageSize))
 }
 
 function getApiFilters(filters) {
+  const { fromUtc, toUtcExclusive } =
+    getUtcDateRange(filters.fromDate, filters.toDate)
   return {
     search: filters.search,
     statusId: filters.statusId,
     categoryId: filters.categoryId,
     priorityId: filters.priorityId,
-    fromDate: filters.fromDate,
-    toDate: filters.toDate,
+    fromUtc,
+    toUtcExclusive,
     page: filters.page,
     pageSize: filters.pageSize,
     sortBy: 'assignedDate',
@@ -52,8 +61,13 @@ function getApiFilters(filters) {
 }
 
 function AgentTicketsPage() {
-  const [draft, setDraft] = useState(emptyDraft)
-  const [filters, setFilters] = useState(emptyFilters)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const initial = initialFilters(searchParams)
+  const [draft, setDraft] = useState({
+    ...emptyDraft,
+    ...initial,
+  })
+  const [filters, setFilters] = useState(initial)
   const [dateError, setDateError] = useState('')
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
@@ -65,24 +79,31 @@ function AgentTicketsPage() {
   })
 
   useEffect(() => {
+    const next = initialFilters(searchParams)
+    setDraft((current) => {
+      const nextDraft = { ...emptyDraft, ...next }
+      return JSON.stringify(current) === JSON.stringify(nextDraft)
+        ? current
+        : nextDraft
+    })
+    setFilters((current) =>
+      JSON.stringify(current) === JSON.stringify(next) ? current : next)
+  }, [searchParams])
+
+  useEffect(() => {
     const controller = new AbortController()
-    getAssignedTickets({
-      page: 1,
-      pageSize: 100,
-      sortBy: 'assignedDate',
-      sortDirection: 'desc',
-    }, controller.signal)
-      .then((result) => {
+    Promise.all([
+      getStatuses(controller.signal),
+      getCategories(controller.signal),
+      getPriorities(controller.signal),
+    ])
+      .then(([statuses, categories, priorities]) => {
         if (controller.signal.aborted) return
-        setLookups({
-          statuses: uniqueLookups(result.items, 'statusId', 'statusName'),
-          categories: uniqueLookups(result.items, 'categoryId', 'categoryName'),
-          priorities: uniqueLookups(result.items, 'priorityId', 'priorityName'),
-        })
+        setLookups({ statuses, categories, priorities })
       })
       .catch((requestError) => {
-        if (requestError.name !== 'AbortError') {
-          // The main request below displays any API failure with a retry action.
+        if (requestError.name !== 'AbortError' && !controller.signal.aborted) {
+          setError(requestError.message)
         }
       })
     return () => controller.abort()
@@ -121,12 +142,15 @@ function AgentTicketsPage() {
     const nextDraft = { ...draft, ...dates }
     setDateError('')
     setDraft(nextDraft)
-    setFilters({ ...nextDraft, page: 1, pageSize })
+    const next = { ...nextDraft, page: 1, pageSize }
+    setFilters(next)
+    setSearchParams(urlFilters(next))
   }
 
   function clearFilters() {
     setDraft(emptyDraft)
     setFilters(emptyFilters)
+    setSearchParams({})
     setDateError('')
   }
 
@@ -251,7 +275,11 @@ function AgentTicketsPage() {
             <Pagination
               page={data.page}
               totalPages={data.totalPages}
-              onChange={(page) => setFilters((current) => ({ ...current, page }))}
+              onChange={(page) => {
+                const next = { ...filters, page }
+                setFilters(next)
+                setSearchParams(urlFilters(next))
+              }}
             />
           </>
         )}

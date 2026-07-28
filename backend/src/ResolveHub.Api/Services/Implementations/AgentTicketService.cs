@@ -64,13 +64,14 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
         var search = filter.Search?.Trim();
         if (!string.IsNullOrWhiteSpace(search))
         {
+            var normalizedSearch = search.ToLower();
             query = query.Where(ticket =>
-                ticket.TicketReferenceNumber.Contains(search) ||
-                ticket.Title.Contains(search) ||
-                ticket.CreatedByUserAccount.FirstName.Contains(search) ||
-                ticket.CreatedByUserAccount.LastName.Contains(search) ||
+                ticket.TicketReferenceNumber.ToLower().Contains(normalizedSearch) ||
+                ticket.Title.ToLower().Contains(normalizedSearch) ||
+                ticket.CreatedByUserAccount.FirstName.ToLower().Contains(normalizedSearch) ||
+                ticket.CreatedByUserAccount.LastName.ToLower().Contains(normalizedSearch) ||
                 (ticket.CreatedByUserAccount.FirstName + " " +
-                 ticket.CreatedByUserAccount.LastName).Contains(search));
+                 ticket.CreatedByUserAccount.LastName).ToLower().Contains(normalizedSearch));
         }
         if (filter.StatusId.HasValue)
             query = query.Where(ticket => ticket.TicketStatusID == filter.StatusId);
@@ -78,12 +79,22 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
             query = query.Where(ticket => ticket.TicketCategoryID == filter.CategoryId);
         if (filter.PriorityId.HasValue)
             query = query.Where(ticket => ticket.TicketPriorityID == filter.PriorityId);
-        if (filter.FromDate.HasValue)
+        if (filter.FromUtc.HasValue)
+        {
+            var start = filter.FromUtc.Value.UtcDateTime;
+            query = query.Where(ticket => ticket.CreatedDate >= start);
+        }
+        else if (filter.FromDate.HasValue)
         {
             var start = DateTime.SpecifyKind(filter.FromDate.Value.Date, DateTimeKind.Utc);
             query = query.Where(ticket => ticket.CreatedDate >= start);
         }
-        if (filter.ToDate.HasValue)
+        if (filter.ToUtcExclusive.HasValue)
+        {
+            var endExclusive = filter.ToUtcExclusive.Value.UtcDateTime;
+            query = query.Where(ticket => ticket.CreatedDate < endExclusive);
+        }
+        else if (filter.ToDate.HasValue)
         {
             var endExclusive = DateTime.SpecifyKind(
                 filter.ToDate.Value.Date.AddDays(1), DateTimeKind.Utc);
