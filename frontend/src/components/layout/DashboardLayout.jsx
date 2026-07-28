@@ -5,6 +5,7 @@ import {
   CircleUserRound,
   FileClock,
   FilePlus2,
+  Files,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -46,8 +47,8 @@ const agentNavigation = [
 const adminNavigation = [
   { id: 'dashboard', to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'tickets', to: '/admin/tickets', label: 'All Tickets', icon: Ticket },
+  { id: 'my-tickets', to: '/admin/my-tickets', label: 'My Tickets', icon: Files },
   { id: 'create', to: '/admin/tickets/create', label: 'Create Ticket', icon: FilePlus2 },
-  { id: 'drafts', to: '/admin/tickets/drafts', label: 'Drafts', icon: FileClock },
   { id: 'assignments', to: '/admin/assignments', label: 'Ticket Assignments', icon: ClipboardCheck },
   { id: 'users', to: '/admin/users', label: 'Users', icon: Users },
   { id: 'categories', to: '/admin/categories', label: 'Categories', icon: Tags },
@@ -59,8 +60,8 @@ const adminNavigation = [
 const managerNavigation = [
   { id: 'dashboard', to: '/manager/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'tickets', to: '/manager/tickets', label: 'All Tickets', icon: Ticket },
+  { id: 'my-tickets', to: '/manager/my-tickets', label: 'My Tickets', icon: Files },
   { id: 'create', to: '/manager/tickets/create', label: 'Create Ticket', icon: FilePlus2 },
-  { id: 'drafts', to: '/manager/tickets/drafts', label: 'Drafts', icon: FileClock },
   { id: 'assignments', to: '/manager/assignments', label: 'Ticket Assignments', icon: ClipboardCheck },
   { id: 'workload', to: '/manager/workload', label: 'Team Workload', icon: BarChart3 },
   { id: 'activity', to: '/manager/activity', label: 'Activity', icon: Activity },
@@ -73,6 +74,7 @@ function isNavigationActive(id, pathname, roleArea) {
   if (id === 'dashboard') return pathname === `${base}/dashboard`
   if (id === 'create') return pathname === `${base}/tickets/create`
   if (id === 'drafts') return pathname.startsWith(`${base}/tickets/drafts`)
+  if (id === 'my-tickets') return pathname.startsWith(`${base}/my-tickets`)
   if (id === 'tickets' && roleArea === 'agent') return pathname.startsWith(`${base}/tickets`)
   if (id === 'tickets' && roleArea === 'admin') {
     return pathname.startsWith('/admin/tickets') &&
@@ -97,6 +99,7 @@ function isNavigationActive(id, pathname, roleArea) {
 
 function getPageTitle(pathname, roleArea) {
   if (roleArea === 'manager') {
+    if (pathname.startsWith('/manager/my-tickets')) return 'My Tickets'
     if (pathname === '/manager/tickets/create') return 'Create Ticket'
     if (pathname.startsWith('/manager/tickets/drafts')) return 'Ticket Drafts'
     if (/\/manager\/tickets\/[^/]+$/.test(pathname)) return 'Ticket Details'
@@ -111,6 +114,7 @@ function getPageTitle(pathname, roleArea) {
     return titles[pathname] ?? 'Dashboard'
   }
   if (roleArea === 'admin') {
+    if (pathname.startsWith('/admin/my-tickets')) return 'My Tickets'
     if (pathname === '/admin/tickets/create') return 'Create Ticket'
     if (pathname.startsWith('/admin/tickets/drafts')) return 'Ticket Drafts'
     if (/\/admin\/tickets\/[^/]+$/.test(pathname)) return 'Ticket Details'

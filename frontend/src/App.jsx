@@ -86,6 +86,8 @@ function App() {
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<ManagerDashboardPage />} />
           <Route path="tickets" element={<AdminTicketsPage roleArea="manager" />} />
+          <Route path="my-tickets" element={<EmployeeTicketsPage roleArea="manager" />} />
+          <Route path="my-tickets/:id/edit" element={<EditTicketPage roleArea="manager" />} />
           <Route path="tickets/create" element={<CreateTicketPage roleArea="manager" />} />
           <Route path="tickets/drafts" element={<TicketDraftsPage roleArea="manager" />} />
           <Route path="tickets/drafts/:id" element={<EditTicketDraftPage roleArea="manager" />} />
@@ -107,6 +109,8 @@ function App() {
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<Suspense fallback={<div className="state-panel" role="status">Loading Administrator dashboard…</div>}><AdminDashboardPage /></Suspense>} />
           <Route path="tickets" element={<AdminTicketsPage />} />
+          <Route path="my-tickets" element={<EmployeeTicketsPage roleArea="admin" />} />
+          <Route path="my-tickets/:id/edit" element={<EditTicketPage roleArea="admin" />} />
           <Route path="tickets/create" element={<CreateTicketPage roleArea="admin" />} />
           <Route path="tickets/drafts" element={<TicketDraftsPage roleArea="admin" />} />
           <Route path="tickets/drafts/:id" element={<EditTicketDraftPage roleArea="admin" />} />

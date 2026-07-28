@@ -10,7 +10,7 @@ import {
 } from '../services/ticketService.js'
 import { formatTicketReference } from '../utils/ticketReference.js'
 
-function EditTicketPage() {
+function EditTicketPage({ roleArea = 'employee' }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const [ticket, setTicket] = useState(null)
@@ -36,7 +36,13 @@ function EditTicketPage() {
 
   if (error) return <ErrorState message={error} onRetry={() => setRetry((value) => value + 1)} />
   if (!ticket) return <LoadingState message="Loading ticket…" />
-  if (!ticket.canEdit) return <div className="state-panel"><h2>Ticket is read-only</h2><p>This ticket can no longer be edited because work has already started.</p><button className="button button--secondary" onClick={() => navigate(`/employee/tickets/${id}`)}>Back to Ticket</button></div>
+  const ticketPath = ticket
+    ? roleArea === 'employee'
+      ? `/employee/tickets/${id}`
+      : `/${roleArea}/tickets/${formatTicketReference(ticket)}`
+    : `/${roleArea}/my-tickets`
+
+  if (!ticket.canEdit) return <div className="state-panel"><h2>Ticket is read-only</h2><p>This ticket can no longer be edited because work has already started.</p><button className="button button--secondary" onClick={() => navigate(ticketPath)}>Back to Ticket</button></div>
 
   return (
     <>
@@ -46,7 +52,7 @@ function EditTicketPage() {
         initialValues={{ title: ticket.title, description: ticket.description, ticketCategoryId: ticket.ticketCategoryId, ticketPriorityId: ticket.ticketPriorityId }}
         existingAttachments={ticket.attachments}
         submitLabel="Save Changes"
-        onCancel={() => navigate(`/employee/tickets/${id}`)}
+        onCancel={() => navigate(ticketPath)}
         onDeleteAttachment={async (attachmentId) => {
           await deleteAttachment(id, attachmentId)
           setTicket({ ...ticket, attachments: ticket.attachments.filter((item) => item.id !== attachmentId) })
@@ -64,7 +70,7 @@ function EditTicketPage() {
           const notice = failed.length
             ? `Ticket updated. These attachments could not be uploaded: ${failed.join(', ')}.`
             : 'Ticket updated successfully.'
-          navigate(`/employee/tickets/${id}`, { replace: true, state: { notice } })
+          navigate(ticketPath, { replace: true, state: { notice } })
         }}
       />
     </>

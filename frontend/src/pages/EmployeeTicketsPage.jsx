@@ -63,7 +63,7 @@ function getApiFilters(values) {
   }
 }
 
-function EmployeeTicketsPage() {
+function EmployeeTicketsPage({ roleArea = 'employee' }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const initial = getInitialFilters(searchParams)
   const [draft, setDraft] = useState(initial)
@@ -170,9 +170,21 @@ function EmployeeTicketsPage() {
     } finally { setCancelling(false) }
   }
 
+  function detailsPath(ticket) {
+    return roleArea === 'employee'
+      ? `/employee/tickets/${ticket.id}`
+      : `/${roleArea}/tickets/${formatTicketReference(ticket)}`
+  }
+
+  function editPath(ticket) {
+    return roleArea === 'employee'
+      ? `/employee/tickets/${ticket.id}/edit`
+      : `/${roleArea}/my-tickets/${ticket.id}/edit`
+  }
+
   return (
     <>
-      <section className="page-heading page-heading--action"><div><h2>My Tickets</h2><p>Search, filter, and manage your support requests.</p></div><div className="heading-actions"><Link className="button button--secondary" to="/employee/tickets/drafts">Drafts</Link><Link className="button button--primary" to="/employee/tickets/create">Create Ticket</Link></div></section>
+      <section className="page-heading page-heading--action"><div><h2>My Tickets</h2><p>Search, filter, and manage your support requests.</p></div><div className="heading-actions"><Link className="button button--secondary" to={`/${roleArea}/tickets/drafts`}>Drafts</Link><Link className="button button--primary" to={`/${roleArea}/tickets/create`}>Create Ticket</Link></div></section>
       <form className="filter-panel ticket-filters" onSubmit={applyFilters}>
         <div className="ticket-filters__grid">
           <label className="filter-search"><span>Search</span><input value={draft.search} onChange={(e) => setDraft({ ...draft, search: e.target.value })} placeholder="Ticket number or title" /></label>
@@ -209,7 +221,7 @@ function EmployeeTicketsPage() {
               <td><strong>{formatTicketReference(ticket)}</strong></td><td>{ticket.title}</td><td>{ticket.categoryName}</td>
               <td><TicketPriorityBadge value={ticket.priorityName} /></td><td><TicketStatusBadge value={ticket.statusName} /></td>
               <td>{ticket.assignedToName ?? 'Unassigned'}</td><td>{formatLocalDate(ticket.createdDate)}</td>
-              <td><div className="row-actions"><Link to={`/employee/tickets/${ticket.id}`}>View</Link>{ticket.canEdit && <Link to={`/employee/tickets/${ticket.id}/edit`}>Edit</Link>}{ticket.canDelete && <button onClick={() => setCancelTarget(ticket)}>Delete</button>}</div></td>
+              <td><div className="row-actions"><Link to={detailsPath(ticket)}>View</Link>{ticket.canEdit && <Link to={editPath(ticket)}>Edit</Link>}{ticket.canDelete && <button onClick={() => setCancelTarget(ticket)}>Delete</button>}</div></td>
             </tr>)}</tbody>
           </table></div>
         )}

@@ -34,7 +34,7 @@ public sealed class TicketAttachmentsController(
     }
 
     [HttpGet("{attachmentId:int}/download")]
-    [Authorize(Roles = RoleNames.Employee)]
+    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin + "," + RoleNames.Manager)]
     public async Task<IActionResult> Download(
         int ticketId, int attachmentId, CancellationToken cancellationToken)
     {
@@ -46,7 +46,7 @@ public sealed class TicketAttachmentsController(
     }
 
     [HttpDelete("{attachmentId:int}")]
-    [Authorize(Roles = RoleNames.Employee)]
+    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin + "," + RoleNames.Manager)]
     public async Task<IActionResult> Delete(
         int ticketId, int attachmentId, CancellationToken cancellationToken)
     {

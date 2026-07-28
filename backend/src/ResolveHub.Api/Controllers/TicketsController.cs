@@ -18,7 +18,7 @@ public sealed class TicketsController(
     : ControllerBase
 {
     [HttpGet]
-    [Authorize(Roles = RoleNames.Employee)]
+    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin + "," + RoleNames.Manager)]
     [ProducesResponseType(typeof(PagedResultDto<TicketListItemDto>), 200)]
     public async Task<ActionResult<PagedResultDto<TicketListItemDto>>> GetTickets(
         [FromQuery] TicketFilterDto filter,
@@ -29,7 +29,7 @@ public sealed class TicketsController(
     }
 
     [HttpGet("{id:int}")]
-    [Authorize(Roles = RoleNames.Employee)]
+    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin + "," + RoleNames.Manager)]
     [ProducesResponseType(typeof(TicketDetailsDto), 200)]
     [ProducesResponseType(404)]
     public async Task<ActionResult<TicketDetailsDto>> GetTicket(
@@ -61,7 +61,7 @@ public sealed class TicketsController(
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = RoleNames.Employee)]
+    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin + "," + RoleNames.Manager)]
     [ProducesResponseType(typeof(TicketDetailsDto), 200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(404)]
@@ -78,13 +78,13 @@ public sealed class TicketsController(
             TicketOperationStatus.Success => Ok(result.Value),
             TicketOperationStatus.NotFound => NotFound(),
             TicketOperationStatus.Conflict =>
-                Conflict(new { message = result.Message }),
+                ModificationDenied(result.Message),
             _ => BadRequest(new { message = result.Message })
         };
     }
 
     [HttpPost("{id:int}/cancel")]
-    [Authorize(Roles = RoleNames.Employee)]
+    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin + "," + RoleNames.Manager)]
     [ProducesResponseType(204)]
     [ProducesResponseType(400)]
     [ProducesResponseType(404)]
@@ -101,7 +101,7 @@ public sealed class TicketsController(
             TicketOperationStatus.Success => NoContent(),
             TicketOperationStatus.NotFound => NotFound(),
             TicketOperationStatus.Conflict =>
-                Conflict(new { message = result.Message }),
+                ModificationDenied(result.Message),
             _ => BadRequest(new { message = result.Message })
         };
     }
@@ -126,4 +126,9 @@ public sealed class TicketsController(
             : throw new InvalidOperationException(
                 "The authenticated user identifier is invalid.");
     }
+
+    private ActionResult ModificationDenied(string? message) =>
+        User.IsInRole(RoleNames.Employee)
+            ? Conflict(new { message })
+            : StatusCode(StatusCodes.Status403Forbidden, new { message });
 }

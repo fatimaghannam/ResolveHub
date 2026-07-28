@@ -121,6 +121,8 @@
 .admin-ticket-table { min-width: 1250px; }.admin-assignment-table { min-width: 980px; }.admin-users-table { min-width: 980px; }.admin-activity-table { min-width: 900px; }
 .admin-ticket-title, .admin-ticket-cell-ellipsis { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .admin-ticket-table td:first-child strong { white-space: nowrap; }
+.admin-ticket-table-wrap { width: 100%; max-width: 100%; box-sizing: border-box; }
+.admin-ticket-table .row-actions { align-items: center; white-space: nowrap; }
 .admin-dashboard-assignment-table { table-layout: fixed; }.admin-dashboard-assignment-table .assignment-col--number { width: 14%; }.admin-dashboard-assignment-table .assignment-col--title { width: 29%; }.admin-dashboard-assignment-table .assignment-col--requester { width: 14%; }.admin-dashboard-assignment-table .assignment-col--category { width: 12%; }.admin-dashboard-assignment-table .assignment-col--priority { width: 10%; }.admin-dashboard-assignment-table .assignment-col--created { width: 13%; }.admin-dashboard-assignment-table .assignment-col--action { width: 8%; }.admin-dashboard-assignment-table th, .admin-dashboard-assignment-table td { padding-inline: 10px; }.admin-dashboard-assignment-table td { vertical-align: middle; }.admin-dashboard-assignment-table td:first-child strong { white-space: nowrap; }.assignment-title { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; line-height: 1.4; overflow-wrap: anywhere; }.admin-dashboard-assignment-table .button--compact { min-height: 34px; padding: 6px 11px; white-space: nowrap; font-size: .8rem; }
 .admin-assignments-page-table { table-layout: fixed; }.admin-assignments-page-table .assignments-col--number { width: 12%; }.admin-assignments-page-table .assignments-col--title { width: 30%; }.admin-assignments-page-table .assignments-col--requester { width: 12%; }.admin-assignments-page-table .assignments-col--priority { width: 9%; }.admin-assignments-page-table .assignments-col--created { width: 10%; }.admin-assignments-page-table .assignments-col--agent { width: 17%; }.admin-assignments-page-table .assignments-col--action { width: 10%; }.admin-assignments-page-table th, .admin-assignments-page-table td { padding: 12px 9px; vertical-align: middle; }.assignments-ticket-number, .assignments-created { white-space: nowrap; }.assignments-ticket-title { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; line-height: 1.4; overflow-wrap: anywhere; }.assignments-requester { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.assignment-agent-select { width: 100%; max-width: 160px; height: 35px; box-sizing: border-box; padding: 6px 28px 6px 9px; border: 1px solid #cbd7e4; border-radius: 8px; color: var(--ink); background: white; font: inherit; font-size: .8rem; }.assignment-agent-select:focus-visible { outline: 3px solid rgba(36,120,206,.22); outline-offset: 1px; border-color: var(--blue); }.assignment-submit { min-height: 35px; max-width: 100%; padding: 6px 11px; white-space: nowrap; font-size: .8rem; }
 @media (min-width: 1101px) {
@@ -144,15 +146,15 @@
 @media (min-width: 1280px) {
   .admin-ticket-table-wrap { overflow-x: visible; }
   .admin-ticket-table { width: 100%; min-width: 0; table-layout: fixed; }
-  .admin-ticket-table .admin-ticket-col--number { width: 14%; }
-  .admin-ticket-table .admin-ticket-col--title { width: 24%; }
+  .admin-ticket-table .admin-ticket-col--number { width: 13%; }
+  .admin-ticket-table .admin-ticket-col--title { width: 20%; }
   .admin-ticket-table .admin-ticket-col--requester { width: 11%; }
   .admin-ticket-table .admin-ticket-col--category { width: 9%; }
   .admin-ticket-table .admin-ticket-col--priority { width: 8%; }
   .admin-ticket-table .admin-ticket-col--status { width: 9%; }
   .admin-ticket-table .admin-ticket-col--agent { width: 11%; }
   .admin-ticket-table .admin-ticket-col--created { width: 9%; }
-  .admin-ticket-table .admin-ticket-col--action { width: 5%; }
+  .admin-ticket-table .admin-ticket-col--action { width: 10%; }
   .admin-ticket-table th, .admin-ticket-table td { padding-inline: 7px; }
 }
 .admin-users-table { table-layout: fixed; }.admin-users-table .users-col--name { width: 14%; }.admin-users-table .users-col--email { width: 26%; }.admin-users-table .users-col--role { width: 13%; }.admin-users-table .users-col--department { width: 16%; }.admin-users-table .users-col--status { width: 9%; }.admin-users-table .users-col--created { width: 11%; }.admin-users-table .users-col--actions { width: 11%; }.admin-users-table th, .admin-users-table td { padding: 12px 9px; vertical-align: middle; }.users-cell-ellipsis, .users-role { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.users-department { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; line-height: 1.35; overflow-wrap: anywhere; }.users-created { white-space: nowrap; font-size: .84rem; }
