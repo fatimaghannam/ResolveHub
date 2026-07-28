@@ -8,8 +8,9 @@ import {
   updateDraft,
   uploadAttachment,
 } from '../services/ticketService.js'
+import { formatTicketReference } from '../utils/ticketReference.js'
 
-function EditTicketDraftPage() {
+function EditTicketDraftPage({ roleArea = 'employee' }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const [draft, setDraft] = useState(null)
@@ -39,7 +40,7 @@ function EditTicketDraftPage() {
         mode="draft"
         initialValues={draft}
         submitLabel="Submit Ticket"
-        onCancel={() => navigate('/employee/tickets/drafts')}
+        onCancel={() => navigate(`/${roleArea}/tickets/drafts`)}
         onSaveDraft={(values) => updateDraft(id, values)}
         onSubmit={async (values, files) => {
           await updateDraft(id, values)
@@ -48,7 +49,10 @@ function EditTicketDraftPage() {
           for (const file of files) {
             try { await uploadAttachment(ticket.id, file) } catch { failed.push(file.name) }
           }
-          navigate(`/employee/tickets/${ticket.id}`, {
+          const destination = roleArea === 'admin' || roleArea === 'manager'
+            ? `/${roleArea}/tickets/${formatTicketReference(ticket)}`
+            : `/employee/tickets/${ticket.id}`
+          navigate(destination, {
             replace: true,
             state: {
               notice: failed.length

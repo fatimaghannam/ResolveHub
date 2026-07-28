@@ -42,7 +42,7 @@ public sealed class TicketsController(
     }
 
     [HttpPost]
-    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin)]
+    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin + "," + RoleNames.Manager)]
     [ProducesResponseType(typeof(TicketDetailsDto), 201)]
     [ProducesResponseType(400)]
     public async Task<ActionResult<TicketDetailsDto>> CreateTicket(

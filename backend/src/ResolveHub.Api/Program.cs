@@ -328,6 +328,7 @@ builder.Services.AddScoped<ITicketDraftService, TicketDraftService>();
 builder.Services.AddScoped<IAgentTicketService, AgentTicketService>();
 builder.Services.AddScoped<IAdminTicketService, AdminTicketService>();
 builder.Services.AddScoped<IAdminUserService, AdminUserService>();
+builder.Services.AddScoped<IManagerTicketService, ManagerTicketService>();
 builder.Services.AddAuthorization();
 
 var app = builder.Build();

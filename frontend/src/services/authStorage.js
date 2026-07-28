@@ -2,6 +2,7 @@ export const AUTH_STORAGE_KEY = 'resolveHubAuth'
 export const EMPLOYEE_ROLE = 'Employee'
 export const IT_AGENT_ROLE = 'IT Support Agent'
 export const ADMIN_ROLE = 'Administrator'
+export const MANAGER_ROLE = 'Manager'
 
 export function getStoredAuth() {
   const raw =
@@ -37,4 +38,8 @@ export function isItAgent(auth) {
 
 export function isAdministrator(auth) {
   return auth?.user?.roles?.includes(ADMIN_ROLE) === true
+}
+
+export function isManager(auth) {
+  return auth?.user?.roles?.includes(MANAGER_ROLE) === true
 }

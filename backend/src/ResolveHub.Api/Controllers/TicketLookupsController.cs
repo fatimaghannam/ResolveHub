@@ -13,19 +13,19 @@ public sealed class TicketLookupsController(ITicketService ticketService)
     : ControllerBase
 {
     [HttpGet("ticket-categories")]
-    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin)]
+    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin + "," + RoleNames.Manager)]
     [ProducesResponseType(typeof(IReadOnlyCollection<TicketLookupDto>), 200)]
     public async Task<IActionResult> Categories(CancellationToken token) =>
         Ok(await ticketService.GetCategoriesAsync(token));
 
     [HttpGet("ticket-priorities")]
-    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin)]
+    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin + "," + RoleNames.Manager)]
     [ProducesResponseType(typeof(IReadOnlyCollection<TicketLookupDto>), 200)]
     public async Task<IActionResult> Priorities(CancellationToken token) =>
         Ok(await ticketService.GetPrioritiesAsync(token));
 
     [HttpGet("ticket-statuses")]
-    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin)]
+    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin + "," + RoleNames.Manager)]
     [ProducesResponseType(typeof(IReadOnlyCollection<TicketLookupDto>), 200)]
     public async Task<IActionResult> Statuses(CancellationToken token) =>
         Ok(await ticketService.GetStatusesAsync(token));

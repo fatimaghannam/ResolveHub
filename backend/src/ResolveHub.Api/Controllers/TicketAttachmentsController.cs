@@ -15,7 +15,7 @@ public sealed class TicketAttachmentsController(
     ITicketAttachmentService attachmentService) : ControllerBase
 {
     [HttpPost]
-    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin)]
+    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin + "," + RoleNames.Manager)]
     [RequestSizeLimit(10 * 1024 * 1024 + 64 * 1024)]
     public async Task<ActionResult<TicketAttachmentDto>> Upload(
         int ticketId, IFormFile file, CancellationToken cancellationToken)

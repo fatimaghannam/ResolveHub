@@ -4,7 +4,7 @@ import { ErrorState, LoadingState } from '../components/common/States.jsx'
 import { deleteDraft, getDrafts } from '../services/ticketService.js'
 import { formatLocalDateTime } from '../utils/dateTime.js'
 
-function TicketDraftsPage() {
+function TicketDraftsPage({ roleArea = 'employee' }) {
   const [drafts, setDrafts] = useState(null)
   const [error, setError] = useState('')
   const [reload, setReload] = useState(0)
@@ -24,7 +24,7 @@ function TicketDraftsPage() {
         {drafts.length === 0 ? <p>No saved drafts.</p> : drafts.map((draft) => (
           <div className="draft-row" key={draft.id}>
             <div><strong>{draft.title || 'Untitled draft'}</strong><small>Updated {formatLocalDateTime(draft.updatedDate)}</small></div>
-            <div><Link to={`/employee/tickets/drafts/${draft.id}`}>Continue</Link><button type="button" onClick={async () => { await deleteDraft(draft.id); setReload((value) => value + 1) }}>Delete</button></div>
+            <div><Link to={`/${roleArea}/tickets/drafts/${draft.id}`}>Continue</Link><button type="button" onClick={async () => { await deleteDraft(draft.id); setReload((value) => value + 1) }}>Delete</button></div>
           </div>
         ))}
       </section>

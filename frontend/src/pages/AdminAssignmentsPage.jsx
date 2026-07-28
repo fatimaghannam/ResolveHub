@@ -3,9 +3,10 @@ import { useSearchParams } from 'react-router-dom'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
 import { TicketPriorityBadge } from '../components/tickets/TicketBadges.jsx'
 import { assignAdminTicket, getAdminAssignments } from '../services/adminService.js'
+import { assignManagerTicket, getManagerAssignments } from '../services/managerService.js'
 import { formatLocalDate } from '../utils/dateTime.js'
 
-function AdminAssignmentsPage() {
+function AdminAssignmentsPage({ roleArea = 'admin' }) {
   const [searchParams] = useSearchParams()
   const selectedReference = searchParams.get('ticket')
   const [data, setData] = useState(null)
@@ -18,7 +19,8 @@ function AdminAssignmentsPage() {
   useEffect(() => {
     const controller = new AbortController()
     setError('')
-    getAdminAssignments(controller.signal)
+    const loadAssignments = roleArea === 'manager' ? getManagerAssignments : getAdminAssignments
+    loadAssignments(controller.signal)
       .then((result) => {
         if (!controller.signal.aborted) setData(result)
       })
@@ -28,7 +30,7 @@ function AdminAssignmentsPage() {
         }
       })
     return () => controller.abort()
-  }, [reload])
+  }, [reload, roleArea])
 
   async function assignTicket(ticket) {
     const agentUserId = Number(selections[ticket.ticketReferenceNumber])
@@ -37,7 +39,8 @@ function AdminAssignmentsPage() {
     try {
       setAssigning(ticket.ticketReferenceNumber)
       setNotice('')
-      await assignAdminTicket(ticket.ticketReferenceNumber, agentUserId)
+      const assign = roleArea === 'manager' ? assignManagerTicket : assignAdminTicket
+      await assign(ticket.ticketReferenceNumber, agentUserId)
       setNotice(`${ticket.ticketReferenceNumber} was assigned to ${agent.name}.`)
       setReload((value) => value + 1)
     } catch (requestError) {

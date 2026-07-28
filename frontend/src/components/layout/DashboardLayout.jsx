@@ -14,6 +14,8 @@ import {
   Tags,
   Ticket,
   Users,
+  Activity,
+  BarChart3,
   X,
 } from 'lucide-react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
@@ -22,6 +24,7 @@ import {
   getStoredAuth,
   isAdministrator,
   isItAgent,
+  isManager,
 } from '../../services/authStorage.js'
 import '../../styles/dashboard.css'
 
@@ -44,6 +47,7 @@ const adminNavigation = [
   { id: 'dashboard', to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'tickets', to: '/admin/tickets', label: 'All Tickets', icon: Ticket },
   { id: 'create', to: '/admin/tickets/create', label: 'Create Ticket', icon: FilePlus2 },
+  { id: 'drafts', to: '/admin/tickets/drafts', label: 'Drafts', icon: FileClock },
   { id: 'assignments', to: '/admin/assignments', label: 'Ticket Assignments', icon: ClipboardCheck },
   { id: 'users', to: '/admin/users', label: 'Users', icon: Users },
   { id: 'categories', to: '/admin/categories', label: 'Categories', icon: Tags },
@@ -52,13 +56,33 @@ const adminNavigation = [
   { id: 'profile', to: '/admin/profile', label: 'Profile', icon: CircleUserRound },
 ]
 
+const managerNavigation = [
+  { id: 'dashboard', to: '/manager/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'tickets', to: '/manager/tickets', label: 'All Tickets', icon: Ticket },
+  { id: 'create', to: '/manager/tickets/create', label: 'Create Ticket', icon: FilePlus2 },
+  { id: 'drafts', to: '/manager/tickets/drafts', label: 'Drafts', icon: FileClock },
+  { id: 'assignments', to: '/manager/assignments', label: 'Ticket Assignments', icon: ClipboardCheck },
+  { id: 'workload', to: '/manager/workload', label: 'Team Workload', icon: BarChart3 },
+  { id: 'activity', to: '/manager/activity', label: 'Activity', icon: Activity },
+  { id: 'notifications', to: '/manager/notifications', label: 'Notifications', icon: Bell },
+  { id: 'profile', to: '/manager/profile', label: 'Profile', icon: CircleUserRound },
+]
+
 function isNavigationActive(id, pathname, roleArea) {
   const base = `/${roleArea}`
   if (id === 'dashboard') return pathname === `${base}/dashboard`
   if (id === 'create') return pathname === `${base}/tickets/create`
+  if (id === 'drafts') return pathname.startsWith(`${base}/tickets/drafts`)
   if (id === 'tickets' && roleArea === 'agent') return pathname.startsWith(`${base}/tickets`)
   if (id === 'tickets' && roleArea === 'admin') {
-    return pathname.startsWith('/admin/tickets') && pathname !== '/admin/tickets/create'
+    return pathname.startsWith('/admin/tickets') &&
+      pathname !== '/admin/tickets/create' &&
+      !pathname.startsWith('/admin/tickets/drafts')
+  }
+  if (id === 'tickets' && roleArea === 'manager') {
+    return pathname.startsWith('/manager/tickets') &&
+      pathname !== '/manager/tickets/create' &&
+      !pathname.startsWith('/manager/tickets/drafts')
   }
   if (id === 'users' && roleArea === 'admin') return pathname.startsWith('/admin/users')
   if (id === 'tickets') {
@@ -72,8 +96,23 @@ function isNavigationActive(id, pathname, roleArea) {
 }
 
 function getPageTitle(pathname, roleArea) {
+  if (roleArea === 'manager') {
+    if (pathname === '/manager/tickets/create') return 'Create Ticket'
+    if (pathname.startsWith('/manager/tickets/drafts')) return 'Ticket Drafts'
+    if (/\/manager\/tickets\/[^/]+$/.test(pathname)) return 'Ticket Details'
+    const titles = {
+      '/manager/tickets': 'All Tickets',
+      '/manager/assignments': 'Ticket Assignments',
+      '/manager/workload': 'Team Workload',
+      '/manager/activity': 'Ticket Activity',
+      '/manager/notifications': 'Notifications',
+      '/manager/profile': 'Profile',
+    }
+    return titles[pathname] ?? 'Dashboard'
+  }
   if (roleArea === 'admin') {
     if (pathname === '/admin/tickets/create') return 'Create Ticket'
+    if (pathname.startsWith('/admin/tickets/drafts')) return 'Ticket Drafts'
     if (/\/admin\/tickets\/[^/]+$/.test(pathname)) return 'Ticket Details'
     if (/\/admin\/users\/[^/]+$/.test(pathname)) return 'User Details'
     const titles = {
@@ -112,9 +151,10 @@ function DashboardLayout() {
   const user = auth?.user
   const agent = isItAgent(auth)
   const admin = isAdministrator(auth)
-  const roleArea = admin ? 'admin' : agent ? 'agent' : 'employee'
-  const navigation = admin ? adminNavigation : agent ? agentNavigation : employeeNavigation
-  const roleLabel = admin ? 'Administrator' : agent ? 'IT Support Agent' : 'Employee'
+  const manager = isManager(auth)
+  const roleArea = admin ? 'admin' : manager ? 'manager' : agent ? 'agent' : 'employee'
+  const navigation = admin ? adminNavigation : manager ? managerNavigation : agent ? agentNavigation : employeeNavigation
+  const roleLabel = admin ? 'Administrator' : manager ? 'Manager' : agent ? 'IT Support Agent' : 'Employee'
   const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ')
   const sidebarId = 'dashboard-sidebar'
 

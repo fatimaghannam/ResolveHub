@@ -5,6 +5,7 @@ import Pagination from '../components/common/Pagination.jsx'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
 import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
 import { getAdminTickets } from '../services/adminService.js'
+import { getManagerTickets } from '../services/managerService.js'
 import { getCategories, getPriorities, getStatuses } from '../services/ticketService.js'
 import { getLocalQuickDateRange } from '../utils/dateRange.js'
 import { formatLocalDate } from '../utils/dateTime.js'
@@ -13,7 +14,7 @@ const pageSize = 8
 const blankFilters = { search: '', status: '', category: '', priority: '', assignment: '', dateRange: 'all', fromDate: '', toDate: '' }
 const dateOptions = [['all', 'All Dates'], ['yesterday', 'Yesterday'], ['last7Days', 'Last 7 Days'], ['last30Days', 'Last 30 Days'], ['custom', 'Custom Range']]
 
-function AdminTicketsPage() {
+function AdminTicketsPage({ roleArea = 'admin' }) {
   const location = useLocation()
   const [draft, setDraft] = useState(blankFilters)
   const [filters, setFilters] = useState(blankFilters)
@@ -34,7 +35,8 @@ function AdminTicketsPage() {
   useEffect(() => {
     const controller = new AbortController()
     setError('')
-    getAdminTickets({
+    const loadTickets = roleArea === 'manager' ? getManagerTickets : getAdminTickets
+    loadTickets({
       search: filters.search, statusId: filters.status, categoryId: filters.category,
       priorityId: filters.priority,
       unassignedOnly: filters.assignment === 'unassigned' ? true : undefined,
@@ -43,7 +45,7 @@ function AdminTicketsPage() {
     }, controller.signal).then(setData)
       .catch((requestError) => { if (requestError.name !== 'AbortError') setError(requestError.message) })
     return () => controller.abort()
-  }, [filters, page])
+  }, [filters, page, roleArea])
   const rows = data?.items ?? []
 
   function applyFilters(event) {
@@ -70,7 +72,7 @@ function AdminTicketsPage() {
     <>
       <section className="page-heading page-heading--action">
         <div><h2>All Tickets</h2><p>Review, filter, and manage tickets across the organization.</p></div>
-        <Link className="button button--primary" to="/admin/tickets/create"><FilePlus2 size={17} />Create Ticket</Link>
+        <Link className="button button--primary" to={`/${roleArea}/tickets/create`}><FilePlus2 size={17} />Create Ticket</Link>
       </section>
       {location.state?.notice && <div className="inline-alert inline-alert--success" role="status">{location.state.notice}</div>}
       <form className="filter-panel ticket-filters" onSubmit={applyFilters}>
@@ -96,9 +98,20 @@ function AdminTicketsPage() {
       {data &&
       <section className="panel">
         <div className="results-count">{data.totalItems} ticket{data.totalItems === 1 ? '' : 's'}</div>
-        {rows.length === 0 ? <EmptyState title="No tickets found" message="Try changing or clearing the current filters." /> : <div className="table-scroll"><table className="ticket-table admin-ticket-table">
+        {rows.length === 0 ? <EmptyState title="No tickets found" message="Try changing or clearing the current filters." /> : <div className="table-scroll admin-ticket-table-wrap"><table className="ticket-table admin-ticket-table">
+          <colgroup>
+            <col className="admin-ticket-col--number" />
+            <col className="admin-ticket-col--title" />
+            <col className="admin-ticket-col--requester" />
+            <col className="admin-ticket-col--category" />
+            <col className="admin-ticket-col--priority" />
+            <col className="admin-ticket-col--status" />
+            <col className="admin-ticket-col--agent" />
+            <col className="admin-ticket-col--created" />
+            <col className="admin-ticket-col--action" />
+          </colgroup>
           <thead><tr><th>Ticket Number</th><th>Title</th><th>Requester</th><th>Category</th><th>Priority</th><th>Status</th><th>Assigned Agent</th><th>Created</th><th>Action</th></tr></thead>
-          <tbody>{rows.map((ticket) => <tr key={ticket.id}><td><strong>{ticket.ticketReferenceNumber}</strong></td><td>{ticket.title}</td><td>{ticket.requesterName}</td><td>{ticket.categoryName}</td><td><TicketPriorityBadge value={ticket.priorityName} /></td><td><TicketStatusBadge value={ticket.statusName} /></td><td>{ticket.assignedAgentName ?? 'Unassigned'}</td><td>{formatLocalDate(ticket.createdDate)}</td><td><Link className="table-action" to={`/admin/tickets/${ticket.ticketReferenceNumber}`}>View</Link></td></tr>)}</tbody>
+          <tbody>{rows.map((ticket) => <tr key={ticket.id}><td><strong>{ticket.ticketReferenceNumber}</strong></td><td><span className="admin-ticket-title" title={ticket.title}>{ticket.title}</span></td><td><span className="admin-ticket-cell-ellipsis" title={ticket.requesterName}>{ticket.requesterName}</span></td><td><span className="admin-ticket-cell-ellipsis" title={ticket.categoryName}>{ticket.categoryName}</span></td><td><TicketPriorityBadge value={ticket.priorityName} /></td><td><TicketStatusBadge value={ticket.statusName} /></td><td><span className="admin-ticket-cell-ellipsis" title={ticket.assignedAgentName ?? 'Unassigned'}>{ticket.assignedAgentName ?? 'Unassigned'}</span></td><td><span className="admin-ticket-cell-ellipsis" title={formatLocalDate(ticket.createdDate)}>{formatLocalDate(ticket.createdDate)}</span></td><td><div className="row-actions"><Link className="table-action" to={`/${roleArea}/tickets/${ticket.ticketReferenceNumber}`}>View</Link>{roleArea === 'manager' && !ticket.assignedAgentId && <Link className="table-action" to={`/manager/assignments?ticket=${ticket.ticketReferenceNumber}`}>Assign</Link>}</div></td></tr>)}</tbody>
         </table></div>}
         <Pagination page={page} totalPages={data.totalPages} onChange={setPage} />
       </section>}

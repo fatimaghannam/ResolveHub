@@ -27,7 +27,10 @@ import AdminNotificationsPage from './pages/AdminNotificationsPage.jsx'
 import AdminProfilePage from './pages/AdminProfilePage.jsx'
 import AdminTicketDetailsPage from './pages/AdminTicketDetailsPage.jsx'
 import AdminUserDetailsPage from './pages/AdminUserDetailsPage.jsx'
-import { ADMIN_ROLE, EMPLOYEE_ROLE, IT_AGENT_ROLE } from './services/authStorage.js'
+import { ADMIN_ROLE, EMPLOYEE_ROLE, IT_AGENT_ROLE, MANAGER_ROLE } from './services/authStorage.js'
+import ManagerDashboardPage from './pages/ManagerDashboardPage.jsx'
+import ManagerWorkloadPage from './pages/ManagerWorkloadPage.jsx'
+import ManagerActivityPage from './pages/ManagerActivityPage.jsx'
 
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage.jsx'))
 
@@ -73,6 +76,27 @@ function App() {
           <Route path="profile" element={<AgentProfilePage />} />
         </Route>
         <Route
+          path="/manager"
+          element={
+            <ProtectedRoute allowedRoles={[MANAGER_ROLE]}>
+              <DashboardLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<ManagerDashboardPage />} />
+          <Route path="tickets" element={<AdminTicketsPage roleArea="manager" />} />
+          <Route path="tickets/create" element={<CreateTicketPage roleArea="manager" />} />
+          <Route path="tickets/drafts" element={<TicketDraftsPage roleArea="manager" />} />
+          <Route path="tickets/drafts/:id" element={<EditTicketDraftPage roleArea="manager" />} />
+          <Route path="tickets/:ticketReference" element={<AdminTicketDetailsPage roleArea="manager" />} />
+          <Route path="assignments" element={<AdminAssignmentsPage roleArea="manager" />} />
+          <Route path="workload" element={<ManagerWorkloadPage />} />
+          <Route path="activity" element={<ManagerActivityPage />} />
+          <Route path="notifications" element={<ComingSoonPage roleArea="manager" />} />
+          <Route path="profile" element={<AdminProfilePage />} />
+        </Route>
+        <Route
           path="/admin"
           element={
             <ProtectedRoute allowedRoles={[ADMIN_ROLE]}>
@@ -84,6 +108,8 @@ function App() {
           <Route path="dashboard" element={<Suspense fallback={<div className="state-panel" role="status">Loading Administrator dashboard…</div>}><AdminDashboardPage /></Suspense>} />
           <Route path="tickets" element={<AdminTicketsPage />} />
           <Route path="tickets/create" element={<CreateTicketPage roleArea="admin" />} />
+          <Route path="tickets/drafts" element={<TicketDraftsPage roleArea="admin" />} />
+          <Route path="tickets/drafts/:id" element={<EditTicketDraftPage roleArea="admin" />} />
           <Route path="tickets/:ticketReference" element={<AdminTicketDetailsPage />} />
           <Route path="assignments" element={<AdminAssignmentsPage />} />
           <Route path="users" element={<AdminUsersPage />} />

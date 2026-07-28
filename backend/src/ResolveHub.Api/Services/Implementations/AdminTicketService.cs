@@ -265,6 +265,19 @@ public sealed class AdminTicketService(ApplicationDbContext dbContext)
                     : "Ticket assignment removed.",
             CreatedDate = now
         });
+        dbContext.ActivityLogs.Add(new ActivityLog
+        {
+            PerformedByUserAccountID = administratorId,
+            ActionType = previousAgentId.HasValue ? "Ticket Reassigned" : "Ticket Assigned",
+            EntityType = "Ticket",
+            EntityID = ticket.TicketReferenceNumber,
+            Description = previousAgentId.HasValue
+                ? "Ticket assignment changed to another IT Support Agent."
+                : "Ticket assigned to an IT Support Agent.",
+            OldValue = previousAgentId?.ToString(),
+            NewValue = agentUserId?.ToString(),
+            CreatedDate = now
+        });
         if (!dbContext.Database.IsRelational())
         {
             await dbContext.SaveChangesAsync(token);

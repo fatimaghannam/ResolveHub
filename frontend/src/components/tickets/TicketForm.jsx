@@ -235,7 +235,7 @@ function TicketForm({
           <button type="button" className="button button--secondary" onClick={onCancel} disabled={saving || savingDraft}>Cancel</button>
           {onSaveDraft && (
             <button type="button" className="button button--secondary" onClick={saveDraft} disabled={saving || savingDraft}>
-              <Save size={17} />{savingDraft ? 'Saving…' : 'Save Draft'}
+              <Save size={17} />{savingDraft ? 'Saving…' : 'Save as Draft'}
             </button>
           )}
         </div>

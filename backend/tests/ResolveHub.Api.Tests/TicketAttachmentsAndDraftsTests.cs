@@ -131,7 +131,7 @@ public sealed class TicketAttachmentsAndDraftsTests
     }
 
     [Fact]
-    public async Task DraftEndpoints_RequireEmployeeAuthentication()
+    public async Task DraftEndpoints_RequireAuthentication_AndAllowManager()
     {
         await using var factory = new ResolveHubApiFactory();
         using var anonymousClient = factory.CreateHttpsClient();
@@ -145,7 +145,51 @@ public sealed class TicketAttachmentsAndDraftsTests
             "/api/ticket-drafts");
 
         Assert.Equal(HttpStatusCode.Unauthorized, anonymousResponse.StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, managerResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, managerResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task Administrator_CanSaveOwnDraft_ReopenAndSubmitIt()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        await factory.SeedTicketLookupsAsync();
+        var administrator = await factory.CreateUserAsync(
+            "draft-admin@resolvehub.test", Password, RoleNames.Admin);
+        var otherAdministrator = await factory.CreateUserAsync(
+            "draft-other-admin@resolvehub.test", Password, RoleNames.Admin);
+        using var client = await LoginAsync(factory, administrator.Email!);
+        using var otherClient = await LoginAsync(
+            factory, otherAdministrator.Email!);
+
+        var save = await client.PostAsJsonAsync(
+            "/api/ticket-drafts", new { title = "Partial admin draft" });
+        var draft = await save.Content.ReadFromJsonAsync<TicketDraftDto>();
+        Assert.Equal(HttpStatusCode.Created, save.StatusCode);
+        Assert.NotNull(draft);
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await otherClient.GetAsync($"/api/ticket-drafts/{draft.Id}")).StatusCode);
+
+        var lookups = await factory.GetTicketLookupIdsAsync();
+        var update = await client.PutAsJsonAsync(
+            $"/api/ticket-drafts/{draft.Id}", new
+            {
+                title = "Completed admin draft",
+                description = "Administrator draft ready for submission.",
+                ticketCategoryId = lookups.CategoryId,
+                ticketPriorityId = lookups.PriorityId
+            });
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+
+        var submit = await client.PostAsync(
+            $"/api/ticket-drafts/{draft.Id}/submit", null);
+        var ticket = await submit.Content.ReadFromJsonAsync<TicketDetailsDto>();
+        Assert.Equal(HttpStatusCode.OK, submit.StatusCode);
+        Assert.NotNull(ticket);
+        var snapshot = await factory.GetDraftSubmissionSnapshotAsync(
+            ticket.Id, draft.Id);
+        Assert.Equal(administrator.Id, snapshot.CreatorId);
+        Assert.False(snapshot.DraftExists);
+        Assert.Equal(TicketStatusNames.Open, snapshot.StatusName);
     }
 
     [Fact]
