@@ -327,6 +327,7 @@ builder.Services.AddScoped<ITicketAttachmentService, TicketAttachmentService>();
 builder.Services.AddScoped<ITicketDraftService, TicketDraftService>();
 builder.Services.AddScoped<IAgentTicketService, AgentTicketService>();
 builder.Services.AddScoped<IAdminTicketService, AdminTicketService>();
+builder.Services.AddScoped<IAdminUserService, AdminUserService>();
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
@@ -356,6 +357,7 @@ app.UseHttpsRedirection();
 app.UseCors(SecurityPolicyNames.FrontendCors);
 app.UseRateLimiter();
 app.UseAuthentication();
+app.UseMiddleware<ActiveUserMiddleware>();
 app.UseAuthorization();
 app.MapControllers();
 

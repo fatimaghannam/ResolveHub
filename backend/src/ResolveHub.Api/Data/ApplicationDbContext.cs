@@ -31,6 +31,7 @@ public sealed class ApplicationDbContext
     public DbSet<TicketDraft> TicketDrafts => Set<TicketDraft>();
     public DbSet<TicketComment> TicketComments => Set<TicketComment>();
     public DbSet<TicketHistory> TicketHistory => Set<TicketHistory>();
+    public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -48,7 +49,31 @@ public sealed class ApplicationDbContext
         ConfigureTicketDraft(builder);
         ConfigureTicketComment(builder);
         ConfigureTicketHistory(builder);
+        ConfigureActivityLog(builder);
         ConfigureIdentitySupportTables(builder);
+    }
+
+    private static void ConfigureActivityLog(ModelBuilder builder)
+    {
+        builder.Entity<ActivityLog>(entity =>
+        {
+            entity.ToTable("ActivityLog");
+            entity.HasKey(item => item.ID);
+            entity.Property(item => item.ID).UseIdentityColumn();
+            entity.Property(item => item.ActionType).HasMaxLength(100).IsRequired();
+            entity.Property(item => item.EntityType).HasMaxLength(100).IsRequired();
+            entity.Property(item => item.EntityID).HasMaxLength(100).IsRequired();
+            entity.Property(item => item.Description).HasMaxLength(1000).IsRequired();
+            entity.Property(item => item.OldValue).HasMaxLength(500);
+            entity.Property(item => item.NewValue).HasMaxLength(500);
+            entity.Property(item => item.CreatedDate).HasColumnType("datetime2");
+            entity.HasIndex(item => item.CreatedDate);
+            entity.HasIndex(item => new { item.EntityType, item.EntityID });
+            entity.HasOne(item => item.PerformedByUserAccount)
+                .WithMany(user => user.ActivityLogs)
+                .HasForeignKey(item => item.PerformedByUserAccountID)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
     }
 
     private static void ConfigureTicketCategory(ModelBuilder builder)

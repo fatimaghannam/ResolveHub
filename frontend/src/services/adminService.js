@@ -24,3 +24,12 @@ export const updateAdminTicketAssignment = (ticketReference, agentUserId) =>
     method: 'PUT',
     body: JSON.stringify({ agentUserId }),
   })
+
+export const getAdminUsers = (signal) =>
+  apiRequest('/api/admin/users', { signal })
+
+export const updateAdminUserStatus = (userId, isActive) =>
+  apiRequest(`/api/admin/users/${userId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ isActive }),
+  })

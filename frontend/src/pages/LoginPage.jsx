@@ -21,7 +21,7 @@ function getLoginError(error) {
   }
 
   if (error.status === 403) {
-    return 'This account is inactive. Please contact IT Support.'
+    return 'This account has been deactivated. Please contact your system administrator.'
   }
 
   if (error.status === 423) {

@@ -6,8 +6,11 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using ResolveHub.Api.Constants;
+using ResolveHub.Api.Data;
 using ResolveHub.Api.DTOs.Auth;
 using Xunit;
 
@@ -168,12 +171,68 @@ public sealed class AuthFlowTests
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal(
-            "This account is inactive. Please contact IT Support.",
+            "This account has been deactivated. Please contact your system administrator.",
             await ReadMessageAsync(response));
         Assert.DoesNotContain(
             "accessToken",
             await response.Content.ReadAsStringAsync(),
             StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AdministratorDeactivation_RevokesExistingJwt_AndReactivationRestoresLogin()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        var administrator = await factory.CreateUserAsync(
+            "status-admin@resolvehub.test", ValidPassword, RoleNames.Admin);
+        var employee = await factory.CreateUserAsync(
+            "status-employee@resolvehub.test", ValidPassword);
+        using var client = factory.CreateHttpsClient();
+
+        var adminLogin = await LoginAsync(client, administrator.Email!, ValidPassword);
+        var employeeLogin = await LoginAsync(client, employee.Email!, ValidPassword);
+        var adminAuth = await adminLogin.Content.ReadFromJsonAsync<LoginResponse>();
+        var employeeAuth = await employeeLogin.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(adminAuth);
+        Assert.NotNull(employeeAuth);
+
+        using var adminClient = factory.CreateHttpsClient();
+        adminClient.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", adminAuth.AccessToken);
+        var deactivate = await adminClient.PatchAsJsonAsync(
+            $"/api/admin/users/{employee.Id}/status", new { isActive = false });
+        Assert.Equal(HttpStatusCode.NoContent, deactivate.StatusCode);
+
+        using var employeeClient = factory.CreateHttpsClient();
+        employeeClient.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", employeeAuth.AccessToken);
+        var existingSession = await employeeClient.GetAsync(
+            "/api/authorization-test/employee");
+        Assert.Equal(HttpStatusCode.Forbidden, existingSession.StatusCode);
+        Assert.Equal(
+            "This account has been deactivated. Please contact your system administrator.",
+            await ReadMessageAsync(existingSession));
+
+        var inactiveLogin = await LoginAsync(client, employee.Email!, ValidPassword);
+        Assert.Equal(HttpStatusCode.Forbidden, inactiveLogin.StatusCode);
+        Assert.DoesNotContain("accessToken",
+            await inactiveLogin.Content.ReadAsStringAsync(),
+            StringComparison.OrdinalIgnoreCase);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            Assert.True(await db.ActivityLogs.AnyAsync(log =>
+                log.PerformedByUserAccountID == administrator.Id &&
+                log.EntityID == employee.Id.ToString() &&
+                log.ActionType == "User Deactivated"));
+        }
+
+        var reactivate = await adminClient.PatchAsJsonAsync(
+            $"/api/admin/users/{employee.Id}/status", new { isActive = true });
+        Assert.Equal(HttpStatusCode.NoContent, reactivate.StatusCode);
+        var activeLogin = await LoginAsync(client, employee.Email!, ValidPassword);
+        Assert.Equal(HttpStatusCode.OK, activeLogin.StatusCode);
     }
 
     [Fact]

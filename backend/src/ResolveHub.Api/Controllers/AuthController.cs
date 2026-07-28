@@ -67,7 +67,7 @@ public sealed class AuthController : ControllerBase
                     new
                     {
                         message =
-                            "This account is inactive. Please contact IT Support."
+                            "This account has been deactivated. Please contact your system administrator."
                     }),
 
             LoginStatus.MissingRole =>

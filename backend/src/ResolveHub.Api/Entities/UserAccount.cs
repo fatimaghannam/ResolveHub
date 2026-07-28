@@ -43,4 +43,5 @@ public sealed class UserAccount : IdentityUser<int>
     public ICollection<TicketComment> TicketComments { get; set; } = [];
 
     public ICollection<TicketHistory> TicketHistoryEntries { get; set; } = [];
+    public ICollection<ActivityLog> ActivityLogs { get; set; } = [];
 }
