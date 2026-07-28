@@ -30,7 +30,7 @@ public sealed class AuthorizationTestController : ControllerBase
     }
 
     [HttpGet("agent")]
-    [Authorize(Roles = RoleNames.ITAgent)]
+    [Authorize(Roles = RoleNames.ITSupportAgent)]
     public IActionResult GetAgent()
     {
         return Ok(new

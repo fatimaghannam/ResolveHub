@@ -20,9 +20,9 @@ public sealed class AdminAgentDirectoryTests
         var administrator = await factory.CreateUserAsync(
             "directory-admin@resolvehub.test", Password, RoleNames.Admin);
         var alpha = await factory.CreateUserAsync(
-            "alpha-agent@resolvehub.test", Password, RoleNames.ITAgent);
+            "alpha-agent@resolvehub.test", Password, RoleNames.ITSupportAgent);
         var beta = await factory.CreateUserAsync(
-            "beta-agent@resolvehub.test", Password, RoleNames.ITAgent,
+            "beta-agent@resolvehub.test", Password, RoleNames.ITSupportAgent,
             isActive: false);
         var employee = await factory.CreateUserAsync(
             "directory-employee@resolvehub.test", Password, RoleNames.Employee);

@@ -61,7 +61,7 @@ public sealed class EmployeeTicketFlowTests
         await using var factory = new ResolveHubApiFactory();
         await factory.SeedTicketLookupsAsync();
         var agent = await factory.CreateUserAsync(
-            "agent-ticket-creator@resolvehub.test", Password, RoleNames.ITAgent);
+            "agent-ticket-creator@resolvehub.test", Password, RoleNames.ITSupportAgent);
         using var client = await CreateEmployeeClientAsync(factory, agent.Email!);
         var lookups = await factory.GetTicketLookupIdsAsync();
 
@@ -264,7 +264,7 @@ public sealed class EmployeeTicketFlowTests
         await factory.SeedTicketLookupsAsync();
         var employee = await factory.CreateUserAsync("assigned-cancel@resolvehub.test", Password);
         var agent = await factory.CreateUserAsync(
-            "assigned-agent@resolvehub.test", Password, RoleNames.ITAgent);
+            "assigned-agent@resolvehub.test", Password, RoleNames.ITSupportAgent);
         using var client = await CreateEmployeeClientAsync(factory, employee.Email!);
         var ticket = await CreateTicketAsync(factory, client, "Assigned ticket");
         await factory.SetTicketStateAsync(ticket.Id, TicketStatusNames.Assigned, agent.Id);

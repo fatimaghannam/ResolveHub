@@ -27,7 +27,7 @@ public sealed class AgentTicketFlowTests
         var admin = await factory.CreateUserAsync(
             "agent-role-admin@test.local", Password, RoleNames.Admin);
         var agent = await factory.CreateUserAsync(
-            "agent-role-agent@test.local", Password, RoleNames.ITAgent);
+            "agent-role-agent@test.local", Password, RoleNames.ITSupportAgent);
         using var employeeClient = await LoginAsync(factory, employee.Email!);
         using var adminClient = await LoginAsync(factory, admin.Email!);
         using var agentClient = await LoginAsync(factory, agent.Email!);
@@ -49,9 +49,9 @@ public sealed class AgentTicketFlowTests
         await factory.SeedTicketLookupsAsync();
         var employee = await factory.CreateUserAsync("agent-isolation-owner@test.local", Password);
         var firstAgent = await factory.CreateUserAsync(
-            "agent-isolation-first@test.local", Password, RoleNames.ITAgent);
+            "agent-isolation-first@test.local", Password, RoleNames.ITSupportAgent);
         var secondAgent = await factory.CreateUserAsync(
-            "agent-isolation-second@test.local", Password, RoleNames.ITAgent);
+            "agent-isolation-second@test.local", Password, RoleNames.ITSupportAgent);
         using var employeeClient = await LoginAsync(factory, employee.Email!);
         using var firstClient = await LoginAsync(factory, firstAgent.Email!);
         using var secondClient = await LoginAsync(factory, secondAgent.Email!);
@@ -83,7 +83,7 @@ public sealed class AgentTicketFlowTests
         await factory.SeedTicketLookupsAsync();
         var employee = await factory.CreateUserAsync("agent-dashboard-owner@test.local", Password);
         var agent = await factory.CreateUserAsync(
-            "agent-dashboard-agent@test.local", Password, RoleNames.ITAgent);
+            "agent-dashboard-agent@test.local", Password, RoleNames.ITSupportAgent);
         using var employeeClient = await LoginAsync(factory, employee.Email!);
         using var agentClient = await LoginAsync(factory, agent.Email!);
         var assigned = await CreateTicketAsync(factory, employeeClient, "Assigned dashboard ticket");
@@ -115,7 +115,7 @@ public sealed class AgentTicketFlowTests
         await factory.SeedTicketLookupsAsync();
         var employee = await factory.CreateUserAsync("agent-filter-owner@test.local", Password);
         var agent = await factory.CreateUserAsync(
-            "agent-filter-agent@test.local", Password, RoleNames.ITAgent);
+            "agent-filter-agent@test.local", Password, RoleNames.ITSupportAgent);
         using var employeeClient = await LoginAsync(factory, employee.Email!);
         using var agentClient = await LoginAsync(factory, agent.Email!);
         var first = await CreateTicketAsync(factory, employeeClient, "Network adapter failure");
@@ -147,7 +147,7 @@ public sealed class AgentTicketFlowTests
         await factory.SeedTicketLookupsAsync();
         var employee = await factory.CreateUserAsync("agent-workflow-owner@test.local", Password);
         var agent = await factory.CreateUserAsync(
-            "agent-workflow-agent@test.local", Password, RoleNames.ITAgent);
+            "agent-workflow-agent@test.local", Password, RoleNames.ITSupportAgent);
         using var employeeClient = await LoginAsync(factory, employee.Email!);
         using var agentClient = await LoginAsync(factory, agent.Email!);
         var ticket = await CreateTicketAsync(factory, employeeClient, "VPN workflow ticket");
@@ -200,9 +200,9 @@ public sealed class AgentTicketFlowTests
         await factory.SeedTicketLookupsAsync();
         var employee = await factory.CreateUserAsync("agent-file-owner@test.local", Password);
         var assignedAgent = await factory.CreateUserAsync(
-            "agent-file-assigned@test.local", Password, RoleNames.ITAgent);
+            "agent-file-assigned@test.local", Password, RoleNames.ITSupportAgent);
         var otherAgent = await factory.CreateUserAsync(
-            "agent-file-other@test.local", Password, RoleNames.ITAgent);
+            "agent-file-other@test.local", Password, RoleNames.ITSupportAgent);
         using var employeeClient = await LoginAsync(factory, employee.Email!);
         using var assignedClient = await LoginAsync(factory, assignedAgent.Email!);
         using var otherClient = await LoginAsync(factory, otherAgent.Email!);

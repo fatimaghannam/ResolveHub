@@ -214,7 +214,7 @@ public sealed class AdminTicketService(ApplicationDbContext dbContext)
             join role in dbContext.Roles on userRole.RoleId equals role.Id
             where user.Id == agentUserId.Value &&
                   user.IsActive &&
-                  role.Name == RoleNames.ITAgent
+                  role.Name == RoleNames.ITSupportAgent
             select user.Id).AnyAsync(token);
         if (!agentIsEligible)
             return new(TicketOperationStatus.Invalid,
@@ -311,7 +311,7 @@ public sealed class AdminTicketService(ApplicationDbContext dbContext)
             from user in dbContext.Users.AsNoTracking()
             join userRole in dbContext.UserRoles on user.Id equals userRole.UserId
             join role in dbContext.Roles on userRole.RoleId equals role.Id
-            where role.Name == RoleNames.ITAgent && user.IsActive
+            where role.Name == RoleNames.ITSupportAgent && user.IsActive
             select new
             {
                 user.Id,

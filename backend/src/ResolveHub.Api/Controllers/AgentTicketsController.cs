@@ -11,7 +11,7 @@ namespace ResolveHub.Api.Controllers;
 
 [ApiController]
 [Route("api/agent/tickets")]
-[Authorize(Roles = RoleNames.ITAgent)]
+[Authorize(Roles = RoleNames.ITSupportAgent)]
 public sealed class AgentTicketsController(
     IAgentTicketService service,
     ITicketAttachmentService attachmentService) : ControllerBase

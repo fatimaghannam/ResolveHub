@@ -14,16 +14,57 @@ public sealed class AdminUserService(
     UserManager<UserAccount> userManager) : IAdminUserService
 {
     public async Task<IReadOnlyCollection<AdminUserListItemDto>> GetUsersAsync(
-        CancellationToken token) =>
-        await (from user in dbContext.Users.AsNoTracking()
-            join userRole in dbContext.UserRoles on user.Id equals userRole.UserId
-            join role in dbContext.Roles on userRole.RoleId equals role.Id
-            orderby user.FirstName, user.LastName
-            select new AdminUserListItemDto(
-                user.Id, user.FirstName, user.LastName, user.Email!,
-                role.Name!, user.Department == null ? null : user.Department.Name,
-                user.IsActive ? "Active" : "Inactive", user.CreatedDate))
+        CancellationToken token)
+    {
+        var users = await dbContext.Users.AsNoTracking()
+            .OrderBy(user => user.FirstName)
+            .ThenBy(user => user.LastName)
+            .Select(user => new
+            {
+                user.Id,
+                user.FirstName,
+                user.LastName,
+                user.Email,
+                Department = user.Department == null
+                    ? null
+                    : user.Department.Name,
+                user.IsActive,
+                user.CreatedDate
+            })
             .ToListAsync(token);
+        var roleRows = await (
+            from userRole in dbContext.UserRoles.AsNoTracking()
+            join role in dbContext.Roles.AsNoTracking()
+                on userRole.RoleId equals role.Id
+            select new { userRole.UserId, RoleName = role.Name! })
+            .ToListAsync(token);
+        var primaryRoles = roleRows
+            .GroupBy(item => item.UserId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(item => item.RoleName)
+                    .OrderBy(RolePriority)
+                    .ThenBy(name => name)
+                    .First());
+
+        return users.Select(user => new AdminUserListItemDto(
+                user.Id, user.FirstName, user.LastName, user.Email!,
+                primaryRoles.GetValueOrDefault(user.Id, "Unassigned"),
+                user.Department,
+                user.IsActive ? "Active" : "Inactive",
+                user.CreatedDate))
+            .ToList();
+    }
+
+    private static int RolePriority(string roleName) =>
+        roleName switch
+        {
+            RoleNames.Admin => 0,
+            RoleNames.Manager => 1,
+            RoleNames.ITSupportAgent => 2,
+            RoleNames.Employee => 3,
+            _ => 4
+        };
 
     public async Task<TicketServiceResult<bool>> SetActiveAsync(
         int administratorId, int userId, bool isActive, CancellationToken token)

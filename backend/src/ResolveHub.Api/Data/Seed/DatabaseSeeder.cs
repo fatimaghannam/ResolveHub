@@ -21,21 +21,21 @@ public static class DatabaseSeeder
             FirstName: "Natalie",
             LastName: "Hayes",
             JobTitle: "IT Support Agent",
-            RoleName: RoleNames.ITAgent),
+            RoleName: RoleNames.ITSupportAgent),
 
         new(
             Email: "emily.carter@resolvehub.test",
             FirstName: "Emily",
             LastName: "Carter",
             JobTitle: "IT Support Agent",
-            RoleName: RoleNames.ITAgent),
+            RoleName: RoleNames.ITSupportAgent),
 
         new(
             Email: "michael.thompson@resolvehub.test",
             FirstName: "Michael",
             LastName: "Thompson",
             JobTitle: "IT Support Agent",
-            RoleName: RoleNames.ITAgent),
+            RoleName: RoleNames.ITSupportAgent),
 
         new(
             Email: "ryan.whitmore@resolvehub.test",
@@ -101,7 +101,53 @@ public static class DatabaseSeeder
         RoleManager<Role> roleManager)
     {
         await SeedRolesAsync(roleManager);
+        await NormalizeLegacyItSupportAgentRoleAsync(dbContext, roleManager);
         await SeedTicketLookupsAsync(dbContext);
+    }
+
+    private static async Task NormalizeLegacyItSupportAgentRoleAsync(
+        ApplicationDbContext dbContext,
+        RoleManager<Role> roleManager)
+    {
+        const string legacyRoleName = "ITAgent";
+
+        var canonicalRole = await roleManager.FindByNameAsync(
+            RoleNames.ITSupportAgent)
+            ?? throw new InvalidOperationException(
+                "The canonical IT Support Agent role was not found.");
+        var legacyRole = await dbContext.Roles.SingleOrDefaultAsync(
+            role => role.Name == legacyRoleName);
+        if (legacyRole is null || legacyRole.Id == canonicalRole.Id)
+            return;
+
+        var legacyAssignments = await dbContext.UserRoles
+            .Where(assignment => assignment.RoleId == legacyRole.Id)
+            .ToListAsync();
+        var assignedCanonicalUserIds = await dbContext.UserRoles
+            .Where(assignment => assignment.RoleId == canonicalRole.Id)
+            .Select(assignment => assignment.UserId)
+            .ToHashSetAsync();
+
+        foreach (var assignment in legacyAssignments)
+        {
+            if (assignedCanonicalUserIds.Add(assignment.UserId))
+            {
+                dbContext.UserRoles.Add(new UserAccountRole
+                {
+                    UserId = assignment.UserId,
+                    RoleId = canonicalRole.Id,
+                    AssignedByUserAccountID =
+                        assignment.AssignedByUserAccountID,
+                    AssignedDate = assignment.AssignedDate
+                });
+            }
+        }
+
+        dbContext.UserRoles.RemoveRange(legacyAssignments);
+        await dbContext.SaveChangesAsync();
+        EnsureSucceeded(
+            await roleManager.DeleteAsync(legacyRole),
+            "removing the obsolete IT Agent role");
     }
 
     internal static async Task SeedDemoDataAsync(
@@ -507,7 +553,7 @@ public static class DatabaseSeeder
             RoleNames.Employee =>
                 "Creates and tracks IT support tickets.",
 
-            RoleNames.ITAgent =>
+            RoleNames.ITSupportAgent =>
                 "Handles assigned IT support tickets.",
 
             RoleNames.Admin =>

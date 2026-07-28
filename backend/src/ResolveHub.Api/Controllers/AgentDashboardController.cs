@@ -9,7 +9,7 @@ namespace ResolveHub.Api.Controllers;
 
 [ApiController]
 [Route("api/agent/dashboard")]
-[Authorize(Roles = RoleNames.ITAgent)]
+[Authorize(Roles = RoleNames.ITSupportAgent)]
 public sealed class AgentDashboardController(IAgentTicketService service)
     : ControllerBase
 {
