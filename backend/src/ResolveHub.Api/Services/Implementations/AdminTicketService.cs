@@ -312,13 +312,19 @@ public sealed class AdminTicketService(ApplicationDbContext dbContext)
             join userRole in dbContext.UserRoles on user.Id equals userRole.UserId
             join role in dbContext.Roles on userRole.RoleId equals role.Id
             where role.Name == RoleNames.ITAgent && user.IsActive
-            orderby user.FirstName, user.LastName
             select new
             {
                 user.Id,
+                user.FirstName,
+                user.LastName,
                 Name = user.FirstName + " " + user.LastName,
                 user.Email
-            }).ToListAsync(token);
+            })
+            .Distinct()
+            .OrderBy(agent => agent.FirstName)
+            .ThenBy(agent => agent.LastName)
+            .ThenBy(agent => agent.Id)
+            .ToListAsync(token);
         var agentIds = agents.Select(agent => agent.Id).ToArray();
         var counts = await dbContext.Tickets.AsNoTracking()
             .Where(ticket =>
@@ -340,6 +346,8 @@ public sealed class AdminTicketService(ApplicationDbContext dbContext)
             var active = workload?.Active ?? 0;
             return new AdminAgentWorkloadDto(
                 agent.Id,
+                agent.FirstName,
+                agent.LastName,
                 agent.Name,
                 agent.Email!,
                 active,

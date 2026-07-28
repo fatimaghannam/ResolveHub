@@ -14,6 +14,8 @@ public sealed record AdminUnassignedTicketDto(
 
 public sealed record AdminAgentWorkloadDto(
     int UserId,
+    string FirstName,
+    string LastName,
     string Name,
     string Email,
     int ActiveAssigned,
