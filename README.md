@@ -29,9 +29,6 @@ ResolveHub is a full-stack support platform for recording, assigning, tracking, 
 - [Installation](#installation)
 - [Demo Accounts](#demo-accounts)
 - [API](#api)
-- [Screenshots](#screenshots)
-- [Responsive Design](#responsive-design)
-- [Code Quality](#code-quality)
 - [Future Improvements](#future-improvements)
 - [License](#license)
 
@@ -403,60 +400,6 @@ ResolveHub uses controller-based REST endpoints, DTO request/response contracts,
 
 Swagger UI is enabled in Development and supports JWT Bearer authorization. Existing authentication evidence is available in [`docs/api-testing-screenshots`](docs/api-testing-screenshots/).
 
-## Screenshots
-
-The repository currently includes design wireframes and API test evidence. Add final application captures to `docs/screenshots/` using the following checklist:
-
-| Screen | Suggested file |
-|---|---|
-| Login | `docs/screenshots/login.png` |
-| Employee Dashboard | `docs/screenshots/employee-dashboard.png` |
-| Employee Tickets | `docs/screenshots/employee-tickets.png` |
-| Create Ticket | `docs/screenshots/create-ticket.png` |
-| Agent Dashboard | `docs/screenshots/agent-dashboard.png` |
-| Administrator Dashboard | `docs/screenshots/admin-dashboard.png` |
-| Manager Dashboard | `docs/screenshots/manager-dashboard.png` |
-| Ticket Assignments | `docs/screenshots/assignments.png` |
-| Categories | `docs/screenshots/categories.png` |
-| Users | `docs/screenshots/users.png` |
-
-<!-- Replace this comment with Markdown image links after final screenshots are added. -->
-
-UI wireframes can be reviewed in [`docs/ui-wireframes-draft`](docs/ui-wireframes-draft/).
-
-## Responsive Design
-
-ResolveHub uses fluid grids, flexible widths, responsive breakpoints, viewport-aware navigation, and scrollable table containers. The interface is designed and manually reviewed for:
-
-- Desktop monitors
-- Laptop screens
-- Tablet layouts, including iPad-sized viewports
-- Mobile phones
-- Short-height windows and browser zoom
-
-The application preserves readable controls, accessible focus states, touch-friendly actions, and safe overflow behavior across these layouts.
-
-## Code Quality
-
-Verified repository quality controls include:
-
-- Nullable reference types enabled in the backend
-- DTO validation and centralized exception handling
-- Dependency injection and provider-focused service interfaces
-- Role and ownership checks enforced on the server
-- xUnit integration tests for authentication, password reset, ticket workflows, filtering, roles, drafts, assignments, and account status
-- Frontend linting through Oxlint
-- Successful backend and frontend production builds
-
-Current verification commands:
-
-```bash
-dotnet build backend/ResolveHub.sln -c Release
-dotnet test backend/ResolveHub.sln -c Release
-cd frontend
-npm run lint
-npm run build
-```
 
 ## Future Improvements
 
