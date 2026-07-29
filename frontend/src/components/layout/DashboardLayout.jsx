@@ -195,7 +195,7 @@ function DashboardLayout() {
       />
       <aside
         id={sidebarId}
-        className={`sidebar ${admin ? 'sidebar--admin' : ''} ${isMobileSidebarOpen ? 'sidebar--open' : ''}`}
+        className={`sidebar ${isMobileSidebarOpen ? 'sidebar--open' : ''}`}
       >
         <div className="sidebar__brand">
           <img
