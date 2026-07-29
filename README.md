@@ -24,7 +24,6 @@ ResolveHub is a full-stack support platform for recording, assigning, tracking, 
 - [Project Overview](#project-overview)
 - [Assignment 4 Deliverables](#assignment-4-deliverables)
 - [Features](#features)
-- [Ticket Workflow](#ticket-workflow)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Installation](#installation)
@@ -181,20 +180,6 @@ The application supports four roles:
 - Responsive login, forgot-password, and reset-password pages
 - Accessible labels, focus states, semantic headings, and reduced-motion support
 
-## Ticket Workflow
-
-```text
-Draft
-  ↓ submit
-Open
-  ↓ assign
-Assigned
-  ↓ start work
-In Progress
-  ↔ Pending
-  ↓ resolve
-Resolved
-```
 
 `Cancelled` is a terminal status for eligible tickets that are no longer required. The backend seeds all seven lookup statuses: **Open**, **Assigned**, **In Progress**, **Pending**, **Resolved**, **Closed**, and **Cancelled**. `Closed` is available as a system status, but a Resolved-to-Closed action is not currently exposed by the frontend or ticket APIs.
 
