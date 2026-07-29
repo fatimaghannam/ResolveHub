@@ -13,6 +13,8 @@
 .dashboard-shell { min-height: 100dvh; display: grid; grid-template-columns: 250px minmax(0, 1fr); background: var(--canvas); color: var(--ink); transition: grid-template-columns 180ms ease; }
 .dashboard-shell--collapsed { grid-template-columns: 76px minmax(0, 1fr); }
 .sidebar { position: sticky; top: 0; align-self: start; height: 100dvh; display: flex; flex-direction: column; padding: 24px 16px; overflow-y: auto; overscroll-behavior: contain; background: var(--navy); color: white; z-index: 30; }
+.sidebar--admin { box-sizing: border-box; overflow: hidden; }
+.sidebar--admin .sidebar__brand, .sidebar--admin .sidebar__logout { flex-shrink: 0; }
 .sidebar__brand { display: grid; grid-template-columns: 36px minmax(0, 1fr) 34px; align-items: center; gap: 10px; padding: 0 6px 28px; font-size: 1.18rem; font-weight: 750; }
 .sidebar__logo { width: 36px; height: 36px; flex: 0 0 36px; object-fit: contain; border-radius: 9px; }
 .sidebar__wordmark { min-width: 0; line-height: 1; white-space: nowrap; }
@@ -214,6 +216,9 @@
   .topbar { padding-inline: 18px; }.dashboard-content { padding: 22px 18px; }
   .details-grid { grid-template-columns: 1fr; }
   .workload-grid { grid-template-columns: 1fr; }
+}
+@media (max-height: 680px) {
+  .sidebar--admin { overflow-y: auto; }
 }
 @media (max-width: 600px) {
   .topbar__user strong { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
