@@ -436,6 +436,7 @@ public sealed class TicketService(ApplicationDbContext dbContext)
             ticket.ClosedDate,
             ticket.CancelledDate,
             ticket.CancelledReason,
+            ticket.ResolutionSummary,
             ticket.Attachments
                 .Where(attachment => !attachment.IsDeleted)
                 .OrderByDescending(attachment => attachment.UploadedDate)
@@ -447,6 +448,19 @@ public sealed class TicketService(ApplicationDbContext dbContext)
                     attachment.UploadedDate,
                     ticket.TicketStatus.Name == TicketStatusNames.Open &&
                         ticket.AssignedToUserAccountID == null))
+                .ToList(),
+            ticket.History
+                .Where(history => !history.IsInternal)
+                .OrderBy(history => history.CreatedDate)
+                .Select(history => new TicketHistoryDto(
+                    history.ID,
+                    history.ActionType,
+                    history.PerformedByUserAccount.FirstName + " " +
+                        history.PerformedByUserAccount.LastName,
+                    history.OldValue,
+                    history.NewValue,
+                    history.Description,
+                    history.CreatedDate))
                 .ToList(),
             ticket.TicketStatus.Name == TicketStatusNames.Open &&
                 ticket.AssignedToUserAccountID == null,

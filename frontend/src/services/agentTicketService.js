@@ -21,6 +21,12 @@ export const resolveAgentTicket = (ticketReference, request) =>
     body: JSON.stringify(request),
   })
 
+export const closeAgentTicket = (ticketReference, request = {}) =>
+  apiRequest(`/api/agent/tickets/${encodeURIComponent(ticketReference)}/close`, {
+    method: 'POST',
+    body: JSON.stringify(request),
+  })
+
 export const getAgentTicketComments = (ticketReference, signal) =>
   apiRequest(`/api/agent/tickets/${encodeURIComponent(ticketReference)}/comments`, { signal })
 
@@ -41,3 +47,12 @@ export const addAgentInternalNote = (ticketReference, request) =>
 
 export const getAgentTicketHistory = (ticketReference, signal) =>
   apiRequest(`/api/agent/tickets/${encodeURIComponent(ticketReference)}/history`, { signal })
+
+export const downloadAgentTicketAttachment = (
+  ticketReference,
+  attachmentId,
+) =>
+  apiRequest(
+    `/api/agent/tickets/${encodeURIComponent(ticketReference)}/attachments/${attachmentId}/download`,
+    { responseType: 'blob' },
+  )

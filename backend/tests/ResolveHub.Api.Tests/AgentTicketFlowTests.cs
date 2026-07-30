@@ -194,6 +194,159 @@ public sealed class AgentTicketFlowTests
     }
 
     [Fact]
+    public async Task AssignedAgent_CompletesResolvedAndClosedWorkflow_WithAuditAndVisibility()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        await factory.SeedTicketLookupsAsync();
+        var employee = await factory.CreateUserAsync(
+            "close-workflow-owner@test.local", Password);
+        var agent = await factory.CreateUserAsync(
+            "close-workflow-agent@test.local", Password,
+            RoleNames.ITSupportAgent);
+        var manager = await factory.CreateUserAsync(
+            "close-workflow-manager@test.local", Password, RoleNames.Manager);
+        var admin = await factory.CreateUserAsync(
+            "close-workflow-admin@test.local", Password, RoleNames.Admin);
+        using var employeeClient = await LoginAsync(factory, employee.Email!);
+        using var agentClient = await LoginAsync(factory, agent.Email!);
+        using var managerClient = await LoginAsync(factory, manager.Email!);
+        using var adminClient = await LoginAsync(factory, admin.Email!);
+        var ticket = await CreateTicketAsync(
+            factory, employeeClient, "Close lifecycle ticket");
+        using var upload = new MultipartFormDataContent();
+        var fileContent =
+            new ByteArrayContent(Encoding.UTF8.GetBytes("preserved file"));
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("text/plain");
+        upload.Add(fileContent, "file", "preserved.txt");
+        var attachmentResponse = await employeeClient.PostAsync(
+            $"/api/tickets/{ticket.Id}/attachments", upload);
+        attachmentResponse.EnsureSuccessStatusCode();
+        await factory.SetTicketStateAsync(
+            ticket.Id, TicketStatusNames.Assigned, agent.Id);
+
+        var assignedClose = await agentClient.PostAsJsonAsync(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/close",
+            new { closingNote = "Too early." });
+        var assignedResolve = await agentClient.PostAsJsonAsync(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/resolve",
+            new { resolutionSummary = "Cannot resolve before work begins." });
+        var progress = await agentClient.PatchAsJsonAsync(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/status",
+            new
+            {
+                statusId = await LookupIdAsync(
+                    factory, "status", TicketStatusNames.InProgress)
+            });
+        var inProgressClose = await agentClient.PostAsJsonAsync(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/close",
+            new { });
+        var comment = await agentClient.PostAsJsonAsync(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/comments",
+            new { content = "The corrected configuration is ready for verification." });
+        var note = await agentClient.PostAsJsonAsync(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/internal-notes",
+            new { content = "Configuration backup retained for audit purposes." });
+        var resolve = await agentClient.PostAsJsonAsync(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/resolve",
+            new { resolutionSummary = "Corrected the configuration and verified connectivity." });
+        var afterResolution = await agentClient.GetFromJsonAsync<AgentDashboardDto>(
+            "/api/agent/dashboard");
+        var close = await agentClient.PostAsJsonAsync(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/close",
+            new { closingNote = "Employee confirmed that service is restored." });
+        var closed = await close.Content.ReadFromJsonAsync<AgentTicketDetailsDto>();
+        var afterClose = await agentClient.GetFromJsonAsync<AgentDashboardDto>(
+            "/api/agent/dashboard");
+        var closeAgain = await agentClient.PostAsJsonAsync(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/close",
+            new { });
+        var employeeDetails = await employeeClient.GetFromJsonAsync<TicketDetailsDto>(
+            $"/api/tickets/{ticket.Id}");
+        var managerDetails = await managerClient.GetFromJsonAsync<AdminTicketDetailsDto>(
+            $"/api/manager/tickets/{ticket.TicketReferenceNumber}");
+        var adminDetails = await adminClient.GetFromJsonAsync<AdminTicketDetailsDto>(
+            $"/api/admin/tickets/{ticket.TicketReferenceNumber}");
+
+        Assert.Equal(HttpStatusCode.Conflict, assignedClose.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, assignedResolve.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, progress.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, inProgressClose.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, comment.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, note.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, resolve.StatusCode);
+        Assert.Equal(0, afterResolution!.ActiveAssignedTickets);
+        Assert.Equal(HttpStatusCode.OK, close.StatusCode);
+        Assert.Equal(TicketStatusNames.Closed, closed!.StatusName);
+        Assert.NotNull(closed.ClosedDate);
+        Assert.False(closed.CanClose);
+        Assert.False(closed.CanResolve);
+        Assert.False(closed.CanComment);
+        Assert.Single(closed.Comments);
+        Assert.Single(closed.InternalNotes);
+        Assert.Single(closed.Attachments);
+        Assert.Contains(closed.History,
+            item => item.ActionType == TicketHistoryActionNames.TicketWorkStarted);
+        Assert.Contains(closed.History,
+            item => item.ActionType == TicketHistoryActionNames.TicketResolved);
+        Assert.Contains(closed.History,
+            item => item.ActionType == TicketHistoryActionNames.TicketClosed);
+        Assert.Equal(0, afterClose!.ActiveAssignedTickets);
+        Assert.Equal(HttpStatusCode.Conflict, closeAgain.StatusCode);
+        Assert.Equal(TicketStatusNames.Closed, employeeDetails!.StatusName);
+        Assert.Equal(TicketStatusNames.Closed, managerDetails!.StatusName);
+        Assert.Equal(TicketStatusNames.Closed, adminDetails!.StatusName);
+        Assert.Contains(employeeDetails.History,
+            item => item.ActionType == TicketHistoryActionNames.TicketClosed);
+        Assert.Contains(managerDetails.History,
+            item => item.ActionType == TicketHistoryActionNames.TicketClosed);
+        Assert.Contains(adminDetails.History,
+            item => item.ActionType == TicketHistoryActionNames.TicketClosed);
+        Assert.NotNull(managerDetails.ResolvedDate);
+        Assert.NotNull(adminDetails.ClosedDate);
+
+        using var scope = factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Assert.True(await context.ActivityLogs.AnyAsync(item =>
+            item.EntityID == ticket.TicketReferenceNumber &&
+            item.ActionType == TicketHistoryActionNames.TicketClosed));
+    }
+
+    [Fact]
+    public async Task CloseEndpoint_RejectsOtherAgentEmployeeAndManager()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        await factory.SeedTicketLookupsAsync();
+        var employee = await factory.CreateUserAsync(
+            "close-auth-owner@test.local", Password);
+        var assignedAgent = await factory.CreateUserAsync(
+            "close-auth-assigned@test.local", Password,
+            RoleNames.ITSupportAgent);
+        var otherAgent = await factory.CreateUserAsync(
+            "close-auth-other@test.local", Password,
+            RoleNames.ITSupportAgent);
+        var manager = await factory.CreateUserAsync(
+            "close-auth-manager@test.local", Password, RoleNames.Manager);
+        using var employeeClient = await LoginAsync(factory, employee.Email!);
+        using var assignedClient = await LoginAsync(factory, assignedAgent.Email!);
+        using var otherClient = await LoginAsync(factory, otherAgent.Email!);
+        using var managerClient = await LoginAsync(factory, manager.Email!);
+        var ticket = await CreateTicketAsync(
+            factory, employeeClient, "Close authorization ticket");
+        await factory.SetTicketStateAsync(
+            ticket.Id, TicketStatusNames.Resolved, assignedAgent.Id);
+        var endpoint =
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/close";
+
+        var other = await otherClient.PostAsJsonAsync(endpoint, new { });
+        var employeeAttempt = await employeeClient.PostAsJsonAsync(endpoint, new { });
+        var managerAttempt = await managerClient.PostAsJsonAsync(endpoint, new { });
+
+        Assert.Equal(HttpStatusCode.NotFound, other.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, employeeAttempt.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, managerAttempt.StatusCode);
+    }
+
+    [Fact]
     public async Task AgentAttachmentDownload_RequiresAssignmentAndMatchingTicket()
     {
         await using var factory = new ResolveHubApiFactory();

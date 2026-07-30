@@ -43,6 +43,12 @@ public sealed class AgentTicketsController(
         CancellationToken token) =>
         Result(await service.ResolveAsync(GetUserId(), ticketReference, request, token));
 
+    [HttpPost("{ticketReference}/close")]
+    public async Task<ActionResult<AgentTicketDetailsDto>> Close(
+        string ticketReference, CloseTicketRequestDto request,
+        CancellationToken token) =>
+        Result(await service.CloseAsync(GetUserId(), ticketReference, request, token));
+
     [HttpGet("{ticketReference}/comments")]
     public async Task<ActionResult<IReadOnlyCollection<TicketCommentDto>>> Comments(
         string ticketReference, CancellationToken token) =>

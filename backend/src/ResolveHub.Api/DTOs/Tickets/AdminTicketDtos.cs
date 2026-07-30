@@ -70,7 +70,7 @@ public sealed record AdminTicketDetailsDto(
     int StatusId, string StatusName,
     int? AssignedAgentId, string? AssignedAgentName,
     DateTime CreatedDate, DateTime UpdatedDate, DateTime? AssignedDate,
-    DateTime? ResolvedDate,
+    DateTime? ResolvedDate, DateTime? ClosedDate,
     IReadOnlyCollection<TicketAttachmentDto> Attachments,
     IReadOnlyCollection<TicketCommentDto> Comments,
     IReadOnlyCollection<TicketHistoryDto> History);

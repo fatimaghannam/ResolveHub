@@ -234,7 +234,8 @@ public sealed class AdminTicketService(ApplicationDbContext dbContext)
                 ticket.AssignedToUserAccountID,
                 ticket.AssignedToUserAccount == null ? null :
                     ticket.AssignedToUserAccount.FirstName + " " + ticket.AssignedToUserAccount.LastName,
-                ticket.CreatedDate, ticket.UpdatedDate, ticket.AssignedDate, ticket.ResolvedDate,
+                ticket.CreatedDate, ticket.UpdatedDate, ticket.AssignedDate,
+                ticket.ResolvedDate, ticket.ClosedDate,
                 ticket.Attachments.Where(item => !item.IsDeleted).Select(item =>
                     new TicketAttachmentDto(item.ID, item.FileName, item.ContentType,
                         item.FileSizeBytes, item.UploadedDate, false)).ToList(),

@@ -108,7 +108,8 @@ public sealed record AgentTicketDetailsDto(
     bool CanComment,
     bool CanAddInternalNote,
     bool CanChangeStatus,
-    bool CanResolve);
+    bool CanResolve,
+    bool CanClose);
 
 public sealed class UpdateAgentTicketStatusRequestDto
 {
@@ -122,6 +123,12 @@ public sealed class ResolveTicketRequestDto
 {
     [Required, StringLength(5000, MinimumLength = 10)]
     public string ResolutionSummary { get; init; } = string.Empty;
+}
+
+public sealed class CloseTicketRequestDto
+{
+    [StringLength(500)]
+    public string? ClosingNote { get; init; }
 }
 
 public sealed class AddTicketCommentRequestDto

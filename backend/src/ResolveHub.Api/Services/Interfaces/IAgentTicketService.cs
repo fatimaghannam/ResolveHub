@@ -17,6 +17,9 @@ public interface IAgentTicketService
     Task<TicketServiceResult<AgentTicketDetailsDto>> ResolveAsync(
         int agentId, string ticketReference,
         ResolveTicketRequestDto request, CancellationToken token);
+    Task<TicketServiceResult<AgentTicketDetailsDto>> CloseAsync(
+        int agentId, string ticketReference,
+        CloseTicketRequestDto request, CancellationToken token);
     Task<IReadOnlyCollection<TicketCommentDto>?> GetCommentsAsync(
         int agentId, string ticketReference, bool isInternal, CancellationToken token);
     Task<TicketServiceResult<TicketCommentDto>> AddCommentAsync(

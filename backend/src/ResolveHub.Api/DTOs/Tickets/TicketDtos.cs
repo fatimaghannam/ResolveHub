@@ -32,7 +32,9 @@ public sealed record TicketDetailsDto(
     DateTime? ClosedDate,
     DateTime? CancelledDate,
     string? CancelledReason,
+    string? ResolutionSummary,
     IReadOnlyCollection<TicketAttachmentDto> Attachments,
+    IReadOnlyCollection<TicketHistoryDto> History,
     bool CanEdit,
     bool CanDelete);
 

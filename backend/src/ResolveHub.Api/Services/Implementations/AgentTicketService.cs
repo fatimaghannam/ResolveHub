@@ -123,7 +123,12 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
         {
             AllowedStatusTransitions = transitions,
             CanChangeStatus = transitions.Count > 0,
-            CanResolve = details.StatusName is TicketStatusNames.InProgress or TicketStatusNames.Pending
+            CanComment = details.StatusName is not
+                (TicketStatusNames.Closed or TicketStatusNames.Cancelled),
+            CanAddInternalNote = details.StatusName is not
+                (TicketStatusNames.Closed or TicketStatusNames.Cancelled),
+            CanResolve = details.StatusName == TicketStatusNames.InProgress,
+            CanClose = details.StatusName == TicketStatusNames.Resolved
         };
     }
 
@@ -149,22 +154,27 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
         ticket.TicketStatusID = target.ID;
         ticket.UpdatedDate = now;
         ticket.AssignedDate ??= now;
-        if (target.Name == TicketStatusNames.Resolved)
-        {
-            ticket.ResolvedDate = now;
-            ticket.ResolvedByUserAccountID = agentId;
-        }
-        else if (oldStatus == TicketStatusNames.Resolved)
-        {
-            ticket.ResolvedDate = null;
-            ticket.ResolvedByUserAccountID = null;
-            ticket.ResolutionSummary = null;
-        }
+        var actorName = await GetAgentNameAsync(agentId, token);
+        var workStarted = oldStatus == TicketStatusNames.Assigned &&
+            target.Name == TicketStatusNames.InProgress;
         AddHistory(ticket.ID, agentId,
-            oldStatus == TicketStatusNames.Resolved
-                ? TicketHistoryActionNames.TicketReopened
+            workStarted
+                ? TicketHistoryActionNames.TicketWorkStarted
                 : TicketHistoryActionNames.StatusChanged,
-            oldStatus, target.Name, NullIfWhiteSpace(request.Reason), false, now);
+            oldStatus, target.Name,
+            workStarted
+                ? $"Ticket work started by {actorName}."
+                : NullIfWhiteSpace(request.Reason),
+            false, now);
+        AddActivity(ticket, agentId,
+            workStarted
+                ? TicketHistoryActionNames.TicketWorkStarted
+                : TicketHistoryActionNames.StatusChanged,
+            oldStatus, target.Name,
+            workStarted
+                ? $"Ticket work started by {actorName}."
+                : $"Ticket status changed from {oldStatus} to {target.Name}.",
+            now);
 
         var result = await SaveWorkflowAsync(token);
         if (result is not null) return result;
@@ -185,8 +195,7 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
                 item.TicketReferenceNumber == ticketReference &&
                 item.AssignedToUserAccountID == agentId && !item.IsDeleted, token);
         if (ticket is null) return new(TicketOperationStatus.NotFound);
-        if (ticket.TicketStatus.Name is not
-            (TicketStatusNames.InProgress or TicketStatusNames.Pending))
+        if (ticket.TicketStatus.Name != TicketStatusNames.InProgress)
             return new(TicketOperationStatus.Conflict,
                 Message: "This ticket cannot be resolved from its current status.");
         var resolvedStatusId = await dbContext.TicketStatuses
@@ -199,9 +208,60 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
         ticket.ResolvedByUserAccountID = agentId;
         ticket.ResolvedDate = now;
         ticket.UpdatedDate = now;
+        var actorName = await GetAgentNameAsync(agentId, token);
         AddHistory(ticket.ID, agentId, TicketHistoryActionNames.TicketResolved,
-            oldStatus, TicketStatusNames.Resolved, "Ticket resolved with a resolution summary.",
+            oldStatus, TicketStatusNames.Resolved, $"Ticket resolved by {actorName}.",
             false, now);
+        AddActivity(ticket, agentId, TicketHistoryActionNames.TicketResolved,
+            oldStatus, TicketStatusNames.Resolved,
+            $"Ticket resolved by {actorName}.", now);
+        var result = await SaveWorkflowAsync(token);
+        if (result is not null) return result;
+        return new(TicketOperationStatus.Success,
+            await GetTicketAsync(agentId, ticketReference, token));
+    }
+
+    public async Task<TicketServiceResult<AgentTicketDetailsDto>> CloseAsync(
+        int agentId, string ticketReference,
+        CloseTicketRequestDto request, CancellationToken token)
+    {
+        var closingNote = NullIfWhiteSpace(request.ClosingNote);
+        if (closingNote?.Length > 500)
+            return new(TicketOperationStatus.Invalid,
+                Message: "The closing note cannot exceed 500 characters.");
+        var ticket = await dbContext.Tickets.Include(item => item.TicketStatus)
+            .SingleOrDefaultAsync(item =>
+                item.TicketReferenceNumber == ticketReference &&
+                item.AssignedToUserAccountID == agentId &&
+                !item.IsDeleted, token);
+        if (ticket is null) return new(TicketOperationStatus.NotFound);
+        if (ticket.TicketStatus.Name == TicketStatusNames.Closed)
+            return new(TicketOperationStatus.Conflict,
+                Message: "This ticket is already closed.");
+        if (ticket.TicketStatus.Name != TicketStatusNames.Resolved)
+            return new(TicketOperationStatus.Conflict,
+                Message: "The ticket must be resolved before it can be closed.");
+
+        var closedStatusId = await dbContext.TicketStatuses
+            .Where(status =>
+                status.Name == TicketStatusNames.Closed &&
+                status.IsActive)
+            .Select(status => status.ID)
+            .SingleAsync(token);
+        var now = DateTime.UtcNow;
+        var actorName = await GetAgentNameAsync(agentId, token);
+        ticket.TicketStatusID = closedStatusId;
+        ticket.ClosedDate = now;
+        ticket.UpdatedDate = now;
+        var description = $"Ticket closed by {actorName}." +
+            (closingNote is null ? string.Empty : $" Note: {closingNote}");
+        AddHistory(ticket.ID, agentId, TicketHistoryActionNames.TicketClosed,
+            TicketStatusNames.Resolved, TicketStatusNames.Closed,
+            description, false, now);
+        AddActivity(ticket, agentId, TicketHistoryActionNames.TicketClosed,
+            TicketStatusNames.Resolved, TicketStatusNames.Closed,
+            description, now);
+
         var result = await SaveWorkflowAsync(token);
         if (result is not null) return result;
         return new(TicketOperationStatus.Success,
@@ -282,9 +342,8 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
         var names = currentStatus switch
         {
             TicketStatusNames.Assigned => new[] { TicketStatusNames.InProgress },
-            TicketStatusNames.InProgress => new[] { TicketStatusNames.Pending, TicketStatusNames.Resolved },
-            TicketStatusNames.Pending => new[] { TicketStatusNames.InProgress, TicketStatusNames.Resolved },
-            TicketStatusNames.Resolved => new[] { TicketStatusNames.InProgress },
+            TicketStatusNames.InProgress => new[] { TicketStatusNames.Pending },
+            TicketStatusNames.Pending => new[] { TicketStatusNames.InProgress },
             _ => []
         };
         return await dbContext.TicketStatuses.AsNoTracking()
@@ -299,10 +358,7 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
         {
             (TicketStatusNames.Assigned, TicketStatusNames.InProgress) => true,
             (TicketStatusNames.InProgress, TicketStatusNames.Pending) => true,
-            (TicketStatusNames.InProgress, TicketStatusNames.Resolved) => true,
             (TicketStatusNames.Pending, TicketStatusNames.InProgress) => true,
-            (TicketStatusNames.Pending, TicketStatusNames.Resolved) => true,
-            (TicketStatusNames.Resolved, TicketStatusNames.InProgress) => true,
             _ => false
         };
 
@@ -330,6 +386,31 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
             ActionType = action, OldValue = oldValue, NewValue = newValue,
             Description = description, IsInternal = isInternal, CreatedDate = createdDate
         });
+
+    private void AddActivity(
+        Ticket ticket,
+        int actorId,
+        string action,
+        string? oldValue,
+        string? newValue,
+        string description,
+        DateTime createdDate) =>
+        dbContext.ActivityLogs.Add(new ActivityLog
+        {
+            PerformedByUserAccountID = actorId,
+            ActionType = action,
+            EntityType = "Ticket",
+            EntityID = ticket.TicketReferenceNumber,
+            Description = description,
+            OldValue = oldValue,
+            NewValue = newValue,
+            CreatedDate = createdDate
+        });
+
+    private Task<string> GetAgentNameAsync(int agentId, CancellationToken token) =>
+        dbContext.Users.Where(user => user.Id == agentId)
+            .Select(user => user.FirstName + " " + user.LastName)
+            .SingleAsync(token);
 
     private static string? NullIfWhiteSpace(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
@@ -401,7 +482,7 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
                         item.PerformedByUserAccount.LastName,
                     item.OldValue, item.NewValue, item.Description, item.CreatedDate)).ToList(),
             ticket.ResolutionSummary, Array.Empty<AllowedStatusTransitionDto>(),
-            false, false, false, false, true, true, false, false));
+            false, false, false, false, true, true, false, false, false));
 
     private IQueryable<TicketCommentDto> ProjectComments(int ticketId, bool isInternal) =>
         dbContext.TicketComments.AsNoTracking()
