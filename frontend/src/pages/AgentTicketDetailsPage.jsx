@@ -10,6 +10,7 @@ import {
   closeAgentTicket,
   downloadAgentTicketAttachment,
   getAgentTicketDetails,
+  requestAgentTicketAssignment,
   resolveAgentTicket,
   updateAgentTicketStatus,
 } from '../services/agentTicketService.js'
@@ -73,6 +74,24 @@ function AgentTicketDetailsPage() {
       notify('success', 'Work Started', `${ticket.ticketReferenceNumber} is now in progress.`)
     } catch (requestError) {
       notify('error', 'Unable to Update Ticket', requestError.message)
+    } finally {
+      setSaving('')
+    }
+  }
+
+  async function requestAssignment() {
+    if (saving) return
+    try {
+      setSaving('request')
+      await requestAgentTicketAssignment(ticket.ticketReferenceNumber)
+      setTicket((current) => ({
+        ...current,
+        canRequestAssignment: false,
+        assignmentRequestStatus: 'Pending',
+      }))
+      notify('success', 'Assignment Requested', 'A Manager will review your request.')
+    } catch (requestError) {
+      notify('error', 'Request Failed', requestError.message)
     } finally {
       setSaving('')
     }
@@ -178,6 +197,8 @@ function AgentTicketDetailsPage() {
           {canStart && <button className="button button--primary" type="button" onClick={startProgress} disabled={Boolean(saving)}>{saving === 'progress' ? 'Starting…' : 'Start Progress'}</button>}
           {ticket.canResolve && <button className="button button--primary" type="button" onClick={() => setDialog('resolve')} disabled={Boolean(saving)}>Mark as Resolved</button>}
           {ticket.canClose && <button className="button button--primary" type="button" onClick={() => setDialog('close')} disabled={Boolean(saving)}>Close Ticket</button>}
+          {ticket.canRequestAssignment && <button className="button button--primary" type="button" onClick={requestAssignment} disabled={Boolean(saving)}>{saving === 'request' ? 'Requesting…' : 'Request Assignment'}</button>}
+          {ticket.assignmentRequestStatus === 'Pending' && <span className="assignment-request-state">Assignment request pending</span>}
         </div>
       </section>
       <div className="details-grid">
@@ -197,7 +218,7 @@ function AgentTicketDetailsPage() {
             <div><dt>Created</dt><dd>{formatLocalDate(ticket.createdDate)}</dd></div>
             <div><dt>Resolved</dt><dd>{ticket.resolvedDate ? formatLocalDate(ticket.resolvedDate) : '—'}</dd></div>
             {ticket.closedDate && <div><dt>Closed</dt><dd>{formatLocalDate(ticket.closedDate)}</dd></div>}
-            <div><dt>Assigned agent</dt><dd>{ticket.assignedAgentName}</dd></div>
+            <div><dt>Assigned agent</dt><dd>{ticket.assignedAgentName ?? 'Unassigned'}</dd></div>
           </dl>
         </aside>
       </div>

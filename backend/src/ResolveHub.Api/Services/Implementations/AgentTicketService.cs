@@ -59,8 +59,27 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
 
     public async Task<PagedResultDto<AgentTicketListItemDto>> GetTicketsAsync(
         int agentId, AgentTicketFilterDto filter, CancellationToken token)
+        => await GetTicketsAsync(agentId, filter, "active", token);
+
+    public async Task<PagedResultDto<AgentTicketListItemDto>> GetOpenTicketsAsync(
+        int agentId, AgentTicketFilterDto filter, CancellationToken token)
+        => await GetTicketsAsync(agentId, filter, "open", token);
+
+    public async Task<PagedResultDto<AgentTicketListItemDto>> GetHistoryTicketsAsync(
+        int agentId, AgentTicketFilterDto filter, CancellationToken token)
+        => await GetTicketsAsync(agentId, filter, "history", token);
+
+    private async Task<PagedResultDto<AgentTicketListItemDto>> GetTicketsAsync(
+        int agentId, AgentTicketFilterDto filter, string scope, CancellationToken token)
     {
-        var query = OwnedTickets(agentId);
+        var query = scope switch
+        {
+            "open" => OpenTickets(),
+            "history" => OwnedTickets(agentId).Where(ticket =>
+                FinishedStatuses.Contains(ticket.TicketStatus.Name)),
+            _ => OwnedTickets(agentId).Where(ticket =>
+                ActiveStatuses.Contains(ticket.TicketStatus.Name))
+        };
         var search = filter.Search?.Trim();
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -114,22 +133,82 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
     public async Task<AgentTicketDetailsDto?> GetTicketAsync(
         int agentId, string ticketReference, CancellationToken token)
     {
-        var details = await ProjectDetails(OwnedTickets(agentId)
+        var details = await ProjectDetails(ReadableTickets(agentId)
                 .Where(ticket => ticket.TicketReferenceNumber == ticketReference))
             .SingleOrDefaultAsync(token);
         if (details is null) return null;
-        var transitions = await GetAllowedTransitionsAsync(details.StatusName, token);
+        var ownsAssignment = await dbContext.Tickets.AsNoTracking().AnyAsync(ticket =>
+            ticket.ID == details.Id && ticket.AssignedToUserAccountID == agentId, token);
+        var transitions = ownsAssignment
+            ? await GetAllowedTransitionsAsync(details.StatusName, token)
+            : [];
+        var requestStatus = !ownsAssignment
+            ? await dbContext.TicketAssignmentRequests.AsNoTracking()
+                .Where(item => item.TicketID == details.Id &&
+                    item.RequestedByUserAccountID == agentId)
+                .OrderByDescending(item => item.RequestedDate)
+                .Select(item => item.Status)
+                .FirstOrDefaultAsync(token)
+            : null;
         return details with
         {
             AllowedStatusTransitions = transitions,
             CanChangeStatus = transitions.Count > 0,
-            CanComment = details.StatusName is not
+            CanComment = ownsAssignment && details.StatusName is not
                 (TicketStatusNames.Closed or TicketStatusNames.Cancelled),
-            CanAddInternalNote = details.StatusName is not
+            CanAddInternalNote = ownsAssignment && details.StatusName is not
                 (TicketStatusNames.Closed or TicketStatusNames.Cancelled),
-            CanResolve = details.StatusName == TicketStatusNames.InProgress,
-            CanClose = details.StatusName == TicketStatusNames.Resolved
+            CanResolve = ownsAssignment && details.StatusName == TicketStatusNames.InProgress,
+            CanClose = ownsAssignment && details.StatusName == TicketStatusNames.Resolved,
+            CanRequestAssignment = !ownsAssignment &&
+                details.StatusName == TicketStatusNames.Open &&
+                requestStatus != AssignmentRequestStatusNames.Pending,
+            AssignmentRequestStatus = requestStatus
         };
+    }
+
+    public async Task<TicketServiceResult<TicketAssignmentRequestDto>>
+        RequestAssignmentAsync(
+            int agentId, string ticketReference, CancellationToken token)
+    {
+        var ticket = await dbContext.Tickets
+            .Include(item => item.TicketStatus)
+            .SingleOrDefaultAsync(item =>
+                item.TicketReferenceNumber == ticketReference &&
+                !item.IsDeleted, token);
+        if (ticket is null) return new(TicketOperationStatus.NotFound);
+        if (ticket.AssignedToUserAccountID.HasValue ||
+            ticket.TicketStatus.Name != TicketStatusNames.Open)
+            return new(TicketOperationStatus.Conflict,
+                Message: "This ticket is no longer open for assignment.");
+        var pending = await dbContext.TicketAssignmentRequests.AnyAsync(item =>
+            item.TicketID == ticket.ID &&
+            item.RequestedByUserAccountID == agentId &&
+            item.Status == AssignmentRequestStatusNames.Pending, token);
+        if (pending)
+            return new(TicketOperationStatus.Conflict,
+                Message: "You already requested assignment to this ticket.");
+
+        var now = DateTime.UtcNow;
+        var agentName = await GetAgentNameAsync(agentId, token);
+        var request = new TicketAssignmentRequest
+        {
+            TicketID = ticket.ID,
+            RequestedByUserAccountID = agentId,
+            Status = AssignmentRequestStatusNames.Pending,
+            RequestedDate = now
+        };
+        dbContext.TicketAssignmentRequests.Add(request);
+        AddHistory(ticket.ID, agentId, TicketHistoryActionNames.AssignmentRequested,
+            null, AssignmentRequestStatusNames.Pending,
+            $"Assignment requested by {agentName}.", false, now);
+        AddActivity(ticket, agentId, TicketHistoryActionNames.AssignmentRequested,
+            null, AssignmentRequestStatusNames.Pending,
+            $"Assignment requested by {agentName}.", now);
+        await dbContext.SaveChangesAsync(token);
+        return new(TicketOperationStatus.Success,
+            new(request.ID, ticket.ID, ticket.TicketReferenceNumber, ticket.Title,
+                agentId, agentName, request.Status, now, null, null, null));
     }
 
     public async Task<TicketServiceResult<AgentTicketDetailsDto>> UpdateStatusAsync(
@@ -336,6 +415,19 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
         dbContext.Tickets.AsNoTracking().Where(ticket =>
             ticket.AssignedToUserAccountID == agentId && !ticket.IsDeleted);
 
+    private IQueryable<Ticket> OpenTickets() =>
+        dbContext.Tickets.AsNoTracking().Where(ticket =>
+            ticket.AssignedToUserAccountID == null &&
+            ticket.TicketStatus.Name == TicketStatusNames.Open &&
+            !ticket.IsDeleted);
+
+    private IQueryable<Ticket> ReadableTickets(int agentId) =>
+        dbContext.Tickets.AsNoTracking().Where(ticket =>
+            !ticket.IsDeleted &&
+            (ticket.AssignedToUserAccountID == agentId ||
+             (ticket.AssignedToUserAccountID == null &&
+              ticket.TicketStatus.Name == TicketStatusNames.Open)));
+
     private async Task<IReadOnlyCollection<AllowedStatusTransitionDto>>
         GetAllowedTransitionsAsync(string currentStatus, CancellationToken token)
     {
@@ -440,7 +532,8 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
             ticket.TicketCategoryID, ticket.TicketCategory.Name,
             ticket.TicketPriorityID, ticket.TicketPriority.Name,
             ticket.TicketStatusID, ticket.TicketStatus.Name,
-            ticket.AssignedToUserAccount!.FirstName + " " +
+            ticket.AssignedToUserAccount == null ? null :
+                ticket.AssignedToUserAccount.FirstName + " " +
                 ticket.AssignedToUserAccount.LastName,
             ticket.CreatedDate, ticket.UpdatedDate, ticket.AssignedDate, ticket.ResolvedDate));
 
@@ -456,7 +549,8 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
             ticket.TicketStatusID, ticket.TicketStatus.Name,
             ticket.CreatedDate, ticket.UpdatedDate, ticket.AssignedDate,
             ticket.ResolvedDate, ticket.ClosedDate,
-            ticket.AssignedToUserAccount!.FirstName + " " +
+            ticket.AssignedToUserAccount == null ? null :
+                ticket.AssignedToUserAccount.FirstName + " " +
                 ticket.AssignedToUserAccount.LastName,
             ticket.Attachments.Where(item => !item.IsDeleted)
                 .OrderByDescending(item => item.UploadedDate)
@@ -482,7 +576,8 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
                         item.PerformedByUserAccount.LastName,
                     item.OldValue, item.NewValue, item.Description, item.CreatedDate)).ToList(),
             ticket.ResolutionSummary, Array.Empty<AllowedStatusTransitionDto>(),
-            false, false, false, false, true, true, false, false, false));
+            false, false, false, false, true, true, false, false, false,
+            false, null));
 
     private IQueryable<TicketCommentDto> ProjectComments(int ticketId, bool isInternal) =>
         dbContext.TicketComments.AsNoTracking()

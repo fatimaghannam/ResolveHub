@@ -5,7 +5,12 @@ import Toast from '../components/common/Toast.jsx'
 import { TicketPriorityBadge } from '../components/tickets/TicketBadges.jsx'
 import { AgentWorkloadCard } from '../components/tickets/AgentWorkload.jsx'
 import { assignAdminTicket, getAdminAssignments } from '../services/adminService.js'
-import { assignManagerTicket, getManagerAssignments } from '../services/managerService.js'
+import {
+  assignManagerTicket,
+  getManagerAssignmentRequests,
+  getManagerAssignments,
+  reviewManagerAssignmentRequest,
+} from '../services/managerService.js'
 import { getCategories, getPriorities } from '../services/ticketService.js'
 import { formatLocalDate } from '../utils/dateTime.js'
 import {
@@ -45,6 +50,8 @@ function AdminAssignmentsPage({ roleArea = 'admin' }) {
   const [lookups, setLookups] = useState({ categories: [], priorities: [] })
   const [dateError, setDateError] = useState('')
   const [workloadFilters, setWorkloadFilters] = useState(initialWorkloadFilters)
+  const [assignmentRequests, setAssignmentRequests] = useState([])
+  const [reviewingRequest, setReviewingRequest] = useState('')
   const dismissToast = useCallback(() => setToast(null), [])
 
   useEffect(() => {
@@ -83,6 +90,43 @@ function AdminAssignmentsPage({ roleArea = 'admin' }) {
       })
     return () => controller.abort()
   }, [reload, roleArea, filters])
+
+  useEffect(() => {
+    if (roleArea !== 'manager') return undefined
+    const controller = new AbortController()
+    getManagerAssignmentRequests(controller.signal)
+      .then((items) => {
+        if (!controller.signal.aborted) setAssignmentRequests(items)
+      })
+      .catch((requestError) => {
+        if (requestError.name !== 'AbortError') setError(requestError.message)
+      })
+    return () => controller.abort()
+  }, [reload, roleArea])
+
+  async function reviewRequest(request, decision) {
+    if (reviewingRequest) return
+    try {
+      setReviewingRequest(`${request.id}-${decision}`)
+      await reviewManagerAssignmentRequest(request.id, decision)
+      setReload((value) => value + 1)
+      setToast({
+        id: Date.now(),
+        type: 'success',
+        title: decision === 'approve' ? 'Request Approved' : 'Request Rejected',
+        message: `${request.ticketReferenceNumber} request from ${request.requestedByName} was ${decision === 'approve' ? 'approved' : 'rejected'}.`,
+      })
+    } catch (requestError) {
+      setToast({
+        id: Date.now(),
+        type: 'error',
+        title: 'Review Failed',
+        message: requestError.message,
+      })
+    } finally {
+      setReviewingRequest('')
+    }
+  }
 
   function applyFilters(event) {
     event.preventDefault()
@@ -217,6 +261,12 @@ function AdminAssignmentsPage({ roleArea = 'admin' }) {
       {error && <ErrorState message={error} onRetry={() => setReload((value) => value + 1)} />}
       {!error && !data && <LoadingState message="Loading ticket assignments…" />}
       {data && <>
+      {roleArea === 'manager' && <section className="panel dashboard-section">
+        <div className="panel__heading"><div><h2>Assignment Requests</h2><p>Approve or reject requests submitted by IT Support Agents.</p></div></div>
+        {assignmentRequests.length === 0
+          ? <EmptyState title="No pending requests" message="Agent assignment requests will appear here." />
+          : <div className="table-scroll"><table className="ticket-table"><thead><tr><th>Ticket</th><th>Title</th><th>Requested By</th><th>Requested</th><th>Action</th></tr></thead><tbody>{assignmentRequests.map((request) => <tr key={request.id}><td><strong>{request.ticketReferenceNumber}</strong></td><td>{request.ticketTitle}</td><td>{request.requestedByName}</td><td>{formatLocalDate(request.requestedDate)}</td><td><div className="table-actions"><button className="table-action" type="button" disabled={Boolean(reviewingRequest)} onClick={() => reviewRequest(request, 'approve')}>Approve</button><button className="table-action table-action--danger" type="button" disabled={Boolean(reviewingRequest)} onClick={() => reviewRequest(request, 'reject')}>Reject</button></div></td></tr>)}</tbody></table></div>}
+      </section>}
       <section className="panel dashboard-section">
         <div className="panel__heading"><div><h2>Unassigned Tickets</h2><p>Select an available IT Support Agent for each unassigned ticket.</p></div></div>
         {unassignedTickets.length === 0 ? <EmptyState title="No unassigned tickets" message="All current tickets have an assigned agent." /> : <div className="table-scroll"><table className="ticket-table admin-assignment-table admin-assignments-page-table">

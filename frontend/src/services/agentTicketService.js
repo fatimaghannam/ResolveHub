@@ -6,6 +6,17 @@ export const getAgentDashboard = (signal) =>
 export const getAssignedTickets = (filters, signal) =>
   apiRequest(`/api/agent/tickets${toQueryString(filters)}`, { signal })
 
+export const getOpenTickets = (filters, signal) =>
+  apiRequest(`/api/agent/tickets/open${toQueryString(filters)}`, { signal })
+
+export const getAgentTicketHistoryList = (filters, signal) =>
+  apiRequest(`/api/agent/tickets/history${toQueryString(filters)}`, { signal })
+
+export const requestAgentTicketAssignment = (ticketReference) =>
+  apiRequest(`/api/agent/tickets/${encodeURIComponent(ticketReference)}/assignment-requests`, {
+    method: 'POST',
+  })
+
 export const getAgentTicketDetails = (ticketReference, signal) =>
   apiRequest(`/api/agent/tickets/${encodeURIComponent(ticketReference)}`, { signal })
 

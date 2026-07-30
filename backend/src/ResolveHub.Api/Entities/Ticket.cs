@@ -32,4 +32,5 @@ public sealed class Ticket
     public ICollection<TicketAttachment> Attachments { get; set; } = [];
     public ICollection<TicketComment> Comments { get; set; } = [];
     public ICollection<TicketHistory> History { get; set; } = [];
+    public ICollection<TicketAssignmentRequest> AssignmentRequests { get; set; } = [];
 }

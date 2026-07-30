@@ -3,7 +3,11 @@ import { Link, useSearchParams } from 'react-router-dom'
 import Pagination from '../components/common/Pagination.jsx'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
 import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
-import { getAssignedTickets } from '../services/agentTicketService.js'
+import {
+  getAgentTicketHistoryList,
+  getAssignedTickets,
+  getOpenTickets,
+} from '../services/agentTicketService.js'
 import { getCategories, getPriorities, getStatuses } from '../services/ticketService.js'
 import { formatLocalDate } from '../utils/dateTime.js'
 import {
@@ -63,7 +67,14 @@ function getApiFilters(filters) {
   }
 }
 
-function AgentTicketsPage() {
+const viewContent = {
+  assigned: ['Assigned Tickets', 'Review and manage the support requests assigned to you.', 'assigned'],
+  open: ['Open Tickets', 'Review unassigned requests and ask a Manager for assignment.', 'open'],
+  history: ['Ticket History', 'Review tickets you previously completed.', 'completed'],
+}
+
+function AgentTicketsPage({ view = 'assigned' }) {
+  const [title, subtitle, noun] = viewContent[view] ?? viewContent.assigned
   const [searchParams, setSearchParams] = useSearchParams()
   const initial = initialFilters(searchParams)
   const [draft, setDraft] = useState({
@@ -116,7 +127,12 @@ function AgentTicketsPage() {
     const controller = new AbortController()
     setData(null)
     setError('')
-    getAssignedTickets(getApiFilters(filters), controller.signal)
+    const loadTickets = view === 'open'
+      ? getOpenTickets
+      : view === 'history'
+        ? getAgentTicketHistoryList
+        : getAssignedTickets
+    loadTickets(getApiFilters(filters), controller.signal)
       .then((result) => {
         if (!controller.signal.aborted) setData(result)
       })
@@ -126,7 +142,7 @@ function AgentTicketsPage() {
         }
       })
     return () => controller.abort()
-  }, [filters, reload])
+  }, [filters, reload, view])
 
   function applyFilters(event) {
     event.preventDefault()
@@ -191,8 +207,8 @@ function AgentTicketsPage() {
   return (
     <>
       <section className="page-heading">
-        <h2>Assigned Tickets</h2>
-        <p>Review and manage the support requests assigned to you.</p>
+        <h2>{title}</h2>
+        <p>{subtitle}</p>
       </section>
 
       <form className="filter-panel ticket-filters" onSubmit={applyFilters}>
@@ -238,11 +254,11 @@ function AgentTicketsPage() {
         {!error && !data && <LoadingState message="Loading assigned tickets…" />}
         {data && (
           <>
-            <div className="results-count">{data.totalItems} assigned ticket{data.totalItems === 1 ? '' : 's'}</div>
+            <div className="results-count">{data.totalItems} {noun} ticket{data.totalItems === 1 ? '' : 's'}</div>
             {data.items.length === 0 ? (
               <EmptyState
-                title={hasActiveFilters ? 'No tickets match the selected filters' : 'No assigned tickets found'}
-                message={hasActiveFilters ? 'Try changing or clearing the current filters.' : 'Tickets assigned to you will appear here.'}
+                title={hasActiveFilters ? 'No tickets match the selected filters' : `No ${noun} tickets found`}
+                message={hasActiveFilters ? 'Try changing or clearing the current filters.' : `${title} will appear here.`}
               />
             ) : (
               <div className="table-scroll agent-ticket-table-wrap">

@@ -257,7 +257,8 @@ public sealed class AdminTicketService(ApplicationDbContext dbContext)
         CancellationToken token)
     {
         IDbContextTransaction? transaction = null;
-        if (dbContext.Database.IsRelational())
+        if (dbContext.Database.IsRelational() &&
+            dbContext.Database.CurrentTransaction is null)
         {
             transaction = await dbContext.Database.BeginTransactionAsync(
                 IsolationLevel.Serializable,

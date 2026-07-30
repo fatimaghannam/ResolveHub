@@ -51,6 +51,39 @@ public sealed class ManagerTicketsController(IManagerTicketService service) : Co
         };
     }
 
+    [HttpGet("assignment-requests")]
+    public async Task<ActionResult<IReadOnlyCollection<TicketAssignmentRequestDto>>>
+        AssignmentRequests(CancellationToken token) =>
+        Ok(await service.GetAssignmentRequestsAsync(token));
+
+    [HttpPost("assignment-requests/{requestId:int}/approve")]
+    public async Task<IActionResult> ApproveAssignmentRequest(
+        int requestId, CancellationToken token) =>
+        ReviewResult(await service.ReviewAssignmentRequestAsync(
+            UserId, requestId, true, token));
+
+    [HttpPost("assignment-requests/{requestId:int}/reject")]
+    public async Task<IActionResult> RejectAssignmentRequest(
+        int requestId, CancellationToken token) =>
+        ReviewResult(await service.ReviewAssignmentRequestAsync(
+            UserId, requestId, false, token));
+
+    [HttpPost("tickets/{ticketReference}/comments")]
+    public async Task<ActionResult<TicketCommentDto>> AddComment(
+        string ticketReference, AddTicketCommentRequestDto request,
+        CancellationToken token)
+    {
+        var result = await service.AddCommentAsync(
+            UserId, ticketReference, request, token);
+        return result.Status switch
+        {
+            TicketOperationStatus.Success => Created(
+                $"/api/manager/tickets/{ticketReference}/comments", result.Value),
+            TicketOperationStatus.NotFound => NotFound(),
+            _ => BadRequest(new { message = result.Message })
+        };
+    }
+
     [HttpGet("workload")]
     public async Task<ActionResult<IReadOnlyCollection<ManagerAgentWorkloadDto>>> Workload(
         CancellationToken token) =>
@@ -72,4 +105,13 @@ public sealed class ManagerTicketsController(IManagerTicketService service) : Co
                     "The authenticated user identifier is invalid.");
         }
     }
+
+    private IActionResult ReviewResult(TicketServiceResult<bool> result) =>
+        result.Status switch
+        {
+            TicketOperationStatus.Success => NoContent(),
+            TicketOperationStatus.NotFound => NotFound(),
+            TicketOperationStatus.Conflict => Conflict(new { message = result.Message }),
+            _ => BadRequest(new { message = result.Message })
+        };
 }

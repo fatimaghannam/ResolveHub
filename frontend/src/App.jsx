@@ -71,6 +71,8 @@ function App() {
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<AgentDashboardPage />} />
           <Route path="tickets" element={<AgentTicketsPage />} />
+          <Route path="tickets/open" element={<AgentTicketsPage view="open" />} />
+          <Route path="tickets/history" element={<AgentTicketsPage view="history" />} />
           <Route path="tickets/:id" element={<AgentTicketDetailsPage />} />
           <Route path="notifications" element={<AgentNotificationsPage />} />
           <Route path="profile" element={<AgentProfilePage />} />

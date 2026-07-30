@@ -49,7 +49,7 @@ public sealed record AgentTicketListItemDto(
     string PriorityName,
     int StatusId,
     string StatusName,
-    string AssignedAgentName,
+    string? AssignedAgentName,
     DateTime CreatedDate,
     DateTime UpdatedDate,
     DateTime? AssignedDate,
@@ -94,7 +94,7 @@ public sealed record AgentTicketDetailsDto(
     DateTime? AssignedDate,
     DateTime? ResolvedDate,
     DateTime? ClosedDate,
-    string AssignedAgentName,
+    string? AssignedAgentName,
     IReadOnlyCollection<TicketAttachmentDto> Attachments,
     IReadOnlyCollection<TicketCommentDto> Comments,
     IReadOnlyCollection<TicketCommentDto> InternalNotes,
@@ -109,7 +109,22 @@ public sealed record AgentTicketDetailsDto(
     bool CanAddInternalNote,
     bool CanChangeStatus,
     bool CanResolve,
-    bool CanClose);
+    bool CanClose,
+    bool CanRequestAssignment,
+    string? AssignmentRequestStatus);
+
+public sealed record TicketAssignmentRequestDto(
+    int Id,
+    int TicketId,
+    string TicketReferenceNumber,
+    string TicketTitle,
+    int RequestedByUserAccountId,
+    string RequestedByName,
+    string Status,
+    DateTime RequestedDate,
+    int? ReviewedByUserAccountId,
+    string? ReviewedByName,
+    DateTime? ReviewedDate);
 
 public sealed class UpdateAgentTicketStatusRequestDto
 {

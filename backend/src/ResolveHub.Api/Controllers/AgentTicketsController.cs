@@ -22,12 +22,39 @@ public sealed class AgentTicketsController(
         [FromQuery] AgentTicketFilterDto filter, CancellationToken token) =>
         Ok(await service.GetTicketsAsync(GetUserId(), filter, token));
 
+    [HttpGet("open")]
+    public async Task<ActionResult<PagedResultDto<AgentTicketListItemDto>>> Open(
+        [FromQuery] AgentTicketFilterDto filter, CancellationToken token) =>
+        Ok(await service.GetOpenTicketsAsync(GetUserId(), filter, token));
+
+    [HttpGet("history")]
+    public async Task<ActionResult<PagedResultDto<AgentTicketListItemDto>>> TicketHistory(
+        [FromQuery] AgentTicketFilterDto filter, CancellationToken token) =>
+        Ok(await service.GetHistoryTicketsAsync(GetUserId(), filter, token));
+
     [HttpGet("{ticketReference}")]
     public async Task<ActionResult<AgentTicketDetailsDto>> Get(
         string ticketReference, CancellationToken token)
     {
         var ticket = await service.GetTicketAsync(GetUserId(), ticketReference, token);
         return ticket is null ? NotFound() : Ok(ticket);
+    }
+
+    [HttpPost("{ticketReference}/assignment-requests")]
+    public async Task<ActionResult<TicketAssignmentRequestDto>> RequestAssignment(
+        string ticketReference, CancellationToken token)
+    {
+        var result = await service.RequestAssignmentAsync(
+            GetUserId(), ticketReference, token);
+        return result.Status switch
+        {
+            TicketOperationStatus.Success => Created(
+                $"/api/agent/tickets/{ticketReference}/assignment-requests",
+                result.Value),
+            TicketOperationStatus.NotFound => NotFound(),
+            TicketOperationStatus.Conflict => Conflict(new { message = result.Message }),
+            _ => BadRequest(new { message = result.Message })
+        };
     }
 
     [HttpPatch("{ticketReference}/status")]

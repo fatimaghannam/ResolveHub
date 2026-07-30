@@ -32,6 +32,8 @@ public sealed class ApplicationDbContext
     public DbSet<TicketComment> TicketComments => Set<TicketComment>();
     public DbSet<TicketHistory> TicketHistory => Set<TicketHistory>();
     public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
+    public DbSet<TicketAssignmentRequest> TicketAssignmentRequests =>
+        Set<TicketAssignmentRequest>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -50,7 +52,40 @@ public sealed class ApplicationDbContext
         ConfigureTicketComment(builder);
         ConfigureTicketHistory(builder);
         ConfigureActivityLog(builder);
+        ConfigureTicketAssignmentRequest(builder);
         ConfigureIdentitySupportTables(builder);
+    }
+
+    private static void ConfigureTicketAssignmentRequest(ModelBuilder builder)
+    {
+        builder.Entity<TicketAssignmentRequest>(entity =>
+        {
+            entity.ToTable("TicketAssignmentRequest");
+            entity.HasKey(item => item.ID);
+            entity.Property(item => item.ID).UseIdentityColumn();
+            entity.Property(item => item.Status).HasMaxLength(20).IsRequired();
+            entity.Property(item => item.RequestedDate).HasColumnType("datetime2");
+            entity.Property(item => item.ReviewedDate).HasColumnType("datetime2");
+            entity.HasIndex(item => new
+            {
+                item.TicketID,
+                item.RequestedByUserAccountID,
+                item.Status
+            });
+            entity.HasIndex(item => new { item.Status, item.RequestedDate });
+            entity.HasOne(item => item.Ticket)
+                .WithMany(ticket => ticket.AssignmentRequests)
+                .HasForeignKey(item => item.TicketID)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.RequestedByUserAccount)
+                .WithMany(user => user.AssignmentRequestsMade)
+                .HasForeignKey(item => item.RequestedByUserAccountID)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.ReviewedByUserAccount)
+                .WithMany(user => user.AssignmentRequestsReviewed)
+                .HasForeignKey(item => item.ReviewedByUserAccountID)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
     }
 
     private static void ConfigureActivityLog(ModelBuilder builder)

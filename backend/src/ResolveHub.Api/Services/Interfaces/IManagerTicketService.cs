@@ -19,4 +19,11 @@ public interface IManagerTicketService
     Task<TicketServiceResult<bool>> AssignAsync(
         int managerId, string ticketReference, int agentUserId,
         CancellationToken token);
+    Task<IReadOnlyCollection<TicketAssignmentRequestDto>> GetAssignmentRequestsAsync(
+        CancellationToken token);
+    Task<TicketServiceResult<bool>> ReviewAssignmentRequestAsync(
+        int managerId, int requestId, bool approve, CancellationToken token);
+    Task<TicketServiceResult<TicketCommentDto>> AddCommentAsync(
+        int managerId, string ticketReference,
+        AddTicketCommentRequestDto request, CancellationToken token);
 }

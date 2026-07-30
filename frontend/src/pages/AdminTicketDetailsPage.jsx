@@ -7,7 +7,7 @@ import {
   getAdminTicket,
   removeAdminDuplicateTicket,
 } from '../services/adminService.js'
-import { getManagerTicket } from '../services/managerService.js'
+import { addManagerTicketComment, getManagerTicket } from '../services/managerService.js'
 import { formatLocalDate } from '../utils/dateTime.js'
 
 function AdminTicketDetailsPage({ roleArea = 'admin' }) {
@@ -20,6 +20,9 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
   const [originalReference, setOriginalReference] = useState('')
   const [removingDuplicate, setRemovingDuplicate] = useState(false)
   const [duplicateError, setDuplicateError] = useState('')
+  const [comment, setComment] = useState('')
+  const [addingComment, setAddingComment] = useState(false)
+  const [commentError, setCommentError] = useState('')
 
   useEffect(() => {
     const controller = new AbortController()
@@ -78,6 +81,35 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
     }
   }
 
+  async function addComment(event) {
+    event.preventDefault()
+    if (!comment.trim() || addingComment) return
+    try {
+      setAddingComment(true)
+      setCommentError('')
+      const created = await addManagerTicketComment(
+        ticket.ticketReferenceNumber,
+        comment.trim(),
+      )
+      setTicket((current) => ({
+        ...current,
+        comments: [...current.comments, created],
+        history: [...current.history, {
+          id: `comment-${created.id}`,
+          actionType: 'Manager Comment Added',
+          performedByName: created.authorName,
+          description: 'A Manager comment was added.',
+          createdDate: created.createdDate,
+        }],
+      }))
+      setComment('')
+    } catch (requestError) {
+      setCommentError(requestError.message)
+    } finally {
+      setAddingComment(false)
+    }
+  }
+
   return (
     <>
       <Link className="back-link back-link--top" to={`/${roleArea}/tickets`}><ArrowLeft size={18} />Back to All Tickets</Link>
@@ -86,6 +118,16 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
         {roleArea === 'admin' && <button className="button button--danger-outline" type="button" onClick={() => { setDuplicateError(''); setDuplicateDialogOpen(true) }}>Remove Duplicate</button>}
       </section>
       <div className="details-grid"><section className="panel"><h2>Ticket Summary</h2><p className="ticket-description">{ticket.description}</p></section><aside className="panel details-side"><h2>Ticket Information</h2><dl><div><dt>Requester</dt><dd>{ticket.requesterName}</dd></div><div><dt>Category</dt><dd>{ticket.categoryName}</dd></div><div><dt>Priority</dt><dd><TicketPriorityBadge value={ticket.priorityName} /></dd></div><div><dt>Status</dt><dd><TicketStatusBadge value={ticket.statusName} /></dd></div><div><dt>Assigned agent</dt><dd>{ticket.assignedAgentName ?? 'Unassigned'}</dd></div>{ticket.resolvedDate && <div><dt>Resolved</dt><dd>{formatLocalDate(ticket.resolvedDate)}</dd></div>}{ticket.closedDate && <div><dt>Closed</dt><dd>{formatLocalDate(ticket.closedDate)}</dd></div>}</dl></aside></div>
+      {roleArea === 'manager' && <section className="panel dashboard-section">
+        <div className="panel__heading"><div><h2>Comments</h2><p>Public updates visible to the requester and assigned IT Agent.</p></div></div>
+        <div className="agent-message-list">{ticket.comments.map((item) => <article key={item.id}><strong>{item.authorName}</strong><p>{item.content}</p><small>{formatLocalDate(item.createdDate)}</small></article>)}</div>
+        <form className="agent-message-form" onSubmit={addComment}>
+          <label htmlFor="manager-comment">Add comment</label>
+          <textarea id="manager-comment" value={comment} onChange={(event) => setComment(event.target.value)} maxLength="5000" disabled={addingComment} />
+          {commentError && <p className="filter-validation" role="alert">{commentError}</p>}
+          <button className="button button--secondary" type="submit" disabled={!comment.trim() || addingComment}>{addingComment ? 'Adding…' : 'Add Comment'}</button>
+        </form>
+      </section>}
       <section className="panel dashboard-section">
         <div className="panel__heading"><div><h2>Ticket History</h2><p>Read-only record of important ticket actions.</p></div></div>
         {ticket.history.length === 0

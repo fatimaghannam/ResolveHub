@@ -6,6 +6,8 @@ import {
   FileClock,
   FilePlus2,
   Files,
+  History,
+  Inbox,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -40,6 +42,8 @@ const employeeNavigation = [
 const agentNavigation = [
   { id: 'dashboard', to: '/agent/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'tickets', to: '/agent/tickets', label: 'Assigned Tickets', icon: Ticket },
+  { id: 'open-tickets', to: '/agent/tickets/open', label: 'Open Tickets', icon: Inbox },
+  { id: 'ticket-history', to: '/agent/tickets/history', label: 'Ticket History', icon: History },
   { id: 'notifications', to: '/agent/notifications', label: 'Notifications', icon: Bell },
   { id: 'profile', to: '/agent/profile', label: 'Profile', icon: CircleUserRound },
 ]
@@ -73,7 +77,9 @@ function isNavigationActive(id, pathname, roleArea) {
   if (id === 'create') return pathname === `${base}/tickets/create`
   if (id === 'drafts') return pathname.startsWith(`${base}/tickets/drafts`)
   if (id === 'my-tickets') return pathname.startsWith(`${base}/my-tickets`)
-  if (id === 'tickets' && roleArea === 'agent') return pathname.startsWith(`${base}/tickets`)
+  if (id === 'tickets' && roleArea === 'agent') return pathname === `${base}/tickets`
+  if (id === 'open-tickets') return pathname === `${base}/tickets/open`
+  if (id === 'ticket-history') return pathname === `${base}/tickets/history`
   if (id === 'tickets' && roleArea === 'admin') {
     return pathname.startsWith('/admin/tickets') &&
       pathname !== '/admin/tickets/create' &&

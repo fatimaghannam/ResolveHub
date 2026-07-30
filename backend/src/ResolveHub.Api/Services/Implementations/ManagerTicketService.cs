@@ -1,8 +1,11 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using ResolveHub.Api.Constants;
 using ResolveHub.Api.Data;
 using ResolveHub.Api.DTOs.Common;
 using ResolveHub.Api.DTOs.Tickets;
+using ResolveHub.Api.Entities;
 using ResolveHub.Api.Services.Interfaces;
 using ResolveHub.Api.Services.Models;
 
@@ -28,6 +31,179 @@ public sealed class ManagerTicketService(
         int managerId, string ticketReference, int agentUserId,
         CancellationToken token) =>
         adminTicketService.AssignAsync(managerId, ticketReference, agentUserId, token);
+
+    public async Task<IReadOnlyCollection<TicketAssignmentRequestDto>>
+        GetAssignmentRequestsAsync(CancellationToken token) =>
+        await dbContext.TicketAssignmentRequests.AsNoTracking()
+            .Where(item => item.Status == AssignmentRequestStatusNames.Pending &&
+                !item.Ticket.IsDeleted &&
+                item.Ticket.AssignedToUserAccountID == null &&
+                item.Ticket.TicketStatus.Name == TicketStatusNames.Open)
+            .OrderBy(item => item.RequestedDate)
+            .Select(item => new TicketAssignmentRequestDto(
+                item.ID, item.TicketID, item.Ticket.TicketReferenceNumber,
+                item.Ticket.Title, item.RequestedByUserAccountID,
+                item.RequestedByUserAccount.FirstName + " " +
+                    item.RequestedByUserAccount.LastName,
+                item.Status, item.RequestedDate,
+                item.ReviewedByUserAccountID,
+                item.ReviewedByUserAccount == null ? null :
+                    item.ReviewedByUserAccount.FirstName + " " +
+                    item.ReviewedByUserAccount.LastName,
+                item.ReviewedDate))
+            .ToListAsync(token);
+
+    public async Task<TicketServiceResult<bool>> ReviewAssignmentRequestAsync(
+        int managerId, int requestId, bool approve, CancellationToken token)
+    {
+        var request = await dbContext.TicketAssignmentRequests
+            .Include(item => item.Ticket)
+            .SingleOrDefaultAsync(item => item.ID == requestId, token);
+        if (request is null) return new(TicketOperationStatus.NotFound);
+        if (request.Status != AssignmentRequestStatusNames.Pending)
+            return new(TicketOperationStatus.Conflict,
+                Message: "This assignment request has already been reviewed.");
+        if (request.Ticket.IsDeleted ||
+            request.Ticket.AssignedToUserAccountID.HasValue)
+            return new(TicketOperationStatus.Conflict,
+                Message: "This ticket is no longer available for assignment.");
+
+        if (approve)
+        {
+            IDbContextTransaction? transaction = null;
+            try
+            {
+                if (dbContext.Database.IsRelational())
+                {
+                    transaction = await dbContext.Database.BeginTransactionAsync(
+                        IsolationLevel.Serializable, token);
+                }
+                var assignment = await adminTicketService.AssignAsync(
+                    managerId, request.Ticket.TicketReferenceNumber,
+                    request.RequestedByUserAccountID, token);
+                if (assignment.Status != TicketOperationStatus.Success)
+                {
+                    if (transaction is not null)
+                        await transaction.RollbackAsync(token);
+                    return assignment;
+                }
+                await CompleteReviewAsync(
+                    request, managerId, true, token);
+                if (transaction is not null)
+                    await transaction.CommitAsync(token);
+                return new(TicketOperationStatus.Success, true);
+            }
+            catch
+            {
+                if (transaction is not null)
+                    await transaction.RollbackAsync(token);
+                throw;
+            }
+            finally
+            {
+                if (transaction is not null)
+                    await transaction.DisposeAsync();
+            }
+        }
+
+        await CompleteReviewAsync(request, managerId, false, token);
+        return new(TicketOperationStatus.Success, true);
+    }
+
+    private async Task CompleteReviewAsync(
+        TicketAssignmentRequest request, int managerId,
+        bool approve, CancellationToken token)
+    {
+        var now = DateTime.UtcNow;
+        if (approve)
+        {
+            var competingRequests = await dbContext.TicketAssignmentRequests
+                .Where(item => item.TicketID == request.TicketID &&
+                    item.ID != request.ID &&
+                    item.Status == AssignmentRequestStatusNames.Pending)
+                .ToListAsync(token);
+            foreach (var competing in competingRequests)
+            {
+                competing.Status = AssignmentRequestStatusNames.Rejected;
+                competing.ReviewedByUserAccountID = managerId;
+                competing.ReviewedDate = now;
+            }
+        }
+        request.Status = approve
+            ? AssignmentRequestStatusNames.Approved
+            : AssignmentRequestStatusNames.Rejected;
+        request.ReviewedByUserAccountID = managerId;
+        request.ReviewedDate = now;
+        dbContext.TicketHistory.Add(new TicketHistory
+        {
+            TicketID = request.TicketID,
+            PerformedByUserAccountID = managerId,
+            ActionType = approve
+                ? TicketHistoryActionNames.AssignmentRequestApproved
+                : TicketHistoryActionNames.AssignmentRequestRejected,
+            OldValue = AssignmentRequestStatusNames.Pending,
+            NewValue = request.Status,
+            Description = approve
+                ? "Manager approved the assignment request."
+                : "Manager rejected the assignment request.",
+            CreatedDate = now
+        });
+        dbContext.ActivityLogs.Add(new ActivityLog
+        {
+            PerformedByUserAccountID = managerId,
+            ActionType = approve
+                ? TicketHistoryActionNames.AssignmentRequestApproved
+                : TicketHistoryActionNames.AssignmentRequestRejected,
+            EntityType = "Ticket",
+            EntityID = request.Ticket.TicketReferenceNumber,
+            Description = approve
+                ? "Manager approved an agent assignment request."
+                : "Manager rejected an agent assignment request.",
+            OldValue = AssignmentRequestStatusNames.Pending,
+            NewValue = request.Status,
+            CreatedDate = now
+        });
+        await dbContext.SaveChangesAsync(token);
+    }
+
+    public async Task<TicketServiceResult<TicketCommentDto>> AddCommentAsync(
+        int managerId, string ticketReference,
+        AddTicketCommentRequestDto request, CancellationToken token)
+    {
+        var content = request.Content?.Trim();
+        if (string.IsNullOrWhiteSpace(content) || content.Length > 5000)
+            return new(TicketOperationStatus.Invalid,
+                Message: "Comment content is required and cannot exceed 5000 characters.");
+        var ticket = await dbContext.Tickets.SingleOrDefaultAsync(item =>
+            item.TicketReferenceNumber == ticketReference && !item.IsDeleted, token);
+        if (ticket is null) return new(TicketOperationStatus.NotFound);
+        var now = DateTime.UtcNow;
+        var comment = new TicketComment
+        {
+            TicketID = ticket.ID,
+            AuthorUserAccountID = managerId,
+            Content = content,
+            IsInternal = false,
+            CreatedDate = now
+        };
+        dbContext.TicketComments.Add(comment);
+        dbContext.TicketHistory.Add(new TicketHistory
+        {
+            TicketID = ticket.ID,
+            PerformedByUserAccountID = managerId,
+            ActionType = TicketHistoryActionNames.ManagerCommentAdded,
+            Description = "A Manager comment was added.",
+            CreatedDate = now
+        });
+        ticket.UpdatedDate = now;
+        await dbContext.SaveChangesAsync(token);
+        var author = await dbContext.Users.AsNoTracking()
+            .Where(user => user.Id == managerId)
+            .Select(user => user.FirstName + " " + user.LastName)
+            .SingleAsync(token);
+        return new(TicketOperationStatus.Success,
+            new(comment.ID, author, comment.Content, now, null, false));
+    }
 
     public async Task<ManagerDashboardDto> GetDashboardAsync(CancellationToken token)
     {
