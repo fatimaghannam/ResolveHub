@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Paperclip, Save, Send, Upload } from 'lucide-react'
 import { getCategories, getPriorities } from '../../services/ticketService.js'
 import { ErrorState, LoadingState } from '../common/States.jsx'
+import Toast from '../common/Toast.jsx'
 
 const emptyValues = {
   title: '',
@@ -37,7 +38,8 @@ function TicketForm({
   const [lookupRequest, setLookupRequest] = useState(0)
   const [saving, setSaving] = useState(false)
   const [savingDraft, setSavingDraft] = useState(false)
-  const [draftNotice, setDraftNotice] = useState('')
+  const [toast, setToast] = useState(null)
+  const dismissToast = useCallback(() => setToast(null), [])
   const fileInput = useRef(null)
 
   useEffect(() => {
@@ -120,9 +122,13 @@ function TicketForm({
     try {
       setSavingDraft(true)
       setErrors({})
-      setDraftNotice('')
       await onSaveDraft(payload())
-      setDraftNotice('Draft saved. Attachments will be uploaded when the draft is submitted.')
+      setToast({
+        id: Date.now(),
+        type: 'success',
+        title: 'Draft Saved',
+        message: 'Your ticket draft was saved successfully.',
+      })
     } catch (error) {
       setErrors({ form: error.message })
     } finally {
@@ -137,8 +143,8 @@ function TicketForm({
 
   return (
     <form className="ticket-form panel" onSubmit={submit} noValidate>
+      {toast && <div className="app-toast-region"><Toast key={toast.id} type={toast.type} title={toast.title} message={toast.message} onDismiss={dismissToast} /></div>}
       {errors.form && <div className="inline-alert inline-alert--error" role="alert">{errors.form}</div>}
-      {draftNotice && <div className="inline-alert inline-alert--success" role="status">{draftNotice}</div>}
 
       <label>
         <span>Title <b aria-hidden="true">*</b></span>

@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
 import { MoreHorizontal, Plus } from 'lucide-react'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
+import Toast from '../components/common/Toast.jsx'
 import { getAdminUsers, updateAdminUserStatus } from '../services/adminService.js'
 import { formatLocalDate } from '../utils/dateTime.js'
 
@@ -13,6 +14,8 @@ function AdminUsersPage() {
   const [role, setRole] = useState('')
   const [status, setStatus] = useState('')
   const [showAdd, setShowAdd] = useState(false)
+  const [toast, setToast] = useState(null)
+  const dismissToast = useCallback(() => setToast(null), [])
   const filtered = useMemo(() => (users ?? []).filter((user) => {
     const query = search.trim().toLowerCase()
     return (!query || `${user.firstName} ${user.lastName} ${user.email}`.toLowerCase().includes(query)) &&
@@ -46,13 +49,25 @@ function AdminUsersPage() {
       setUsers((current) => current.map((item) => item.id === user.id
         ? { ...item, status: isActive ? 'Active' : 'Inactive' }
         : item))
+      setToast({
+        id: Date.now(),
+        type: 'success',
+        title: isActive ? 'User Activated' : 'User Deactivated',
+        message: `${user.firstName} ${user.lastName} was ${isActive ? 'activated' : 'deactivated'} successfully.`,
+      })
     } catch (requestError) {
-      setError(requestError.message)
+      setToast({
+        id: Date.now(),
+        type: 'error',
+        title: 'Unable to Update User',
+        message: requestError.message,
+      })
     }
   }
 
   return (
     <>
+      {toast && <div className="app-toast-region"><Toast key={toast.id} type={toast.type} title={toast.title} message={toast.message} onDismiss={dismissToast} /></div>}
       <section className="page-heading page-heading--action"><div><h2>Users</h2><p>View and manage ResolveHub user accounts and roles.</p></div><button className="button button--primary" type="button" onClick={() => setShowAdd(true)}><Plus size={18} />Add User</button></section>
       <section className="filter-panel admin-user-filters">
         <label className="filter-search"><span>Search</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name or email" /></label>

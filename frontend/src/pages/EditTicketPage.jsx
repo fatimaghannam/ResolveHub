@@ -69,8 +69,17 @@ function EditTicketPage({ roleArea = 'employee' }) {
           }
           const notice = failed.length
             ? `Ticket updated. These attachments could not be uploaded: ${failed.join(', ')}.`
-            : 'Ticket updated successfully.'
-          navigate(ticketPath, { replace: true, state: { notice } })
+            : `${formatTicketReference(ticket)} was updated successfully.`
+          navigate(ticketPath, {
+            replace: true,
+            state: {
+              toast: {
+                type: failed.length ? 'warning' : 'success',
+                title: 'Ticket Updated',
+                message: notice,
+              },
+            },
+          })
         }}
       />
     </>

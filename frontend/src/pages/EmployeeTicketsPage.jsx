@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import Pagination from '../components/common/Pagination.jsx'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
+import Toast from '../components/common/Toast.jsx'
 import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
 import { cancelTicket, getCategories, getPriorities, getStatuses, getTickets } from '../services/ticketService.js'
 import { formatLocalDate } from '../utils/dateTime.js'
@@ -59,6 +60,8 @@ function getApiFilters(values) {
 }
 
 function EmployeeTicketsPage({ roleArea = 'employee' }) {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const initial = getInitialFilters(searchParams)
   const [draft, setDraft] = useState(initial)
@@ -71,6 +74,21 @@ function EmployeeTicketsPage({ roleArea = 'employee' }) {
   const [reason, setReason] = useState('')
   const [cancelling, setCancelling] = useState(false)
   const [reload, setReload] = useState(0)
+  const [toast, setToast] = useState(() => {
+    const notification = location.state?.toast
+    return notification ? { id: Date.now(), ...notification } : null
+  })
+  const dismissToast = useCallback(() => setToast(null), [])
+
+  useEffect(() => {
+    if (!location.state?.toast) return
+    const nextState = { ...location.state }
+    delete nextState.toast
+    navigate(location.pathname, {
+      replace: true,
+      state: Object.keys(nextState).length ? nextState : null,
+    })
+  }, [location.pathname, location.state, navigate])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -159,8 +177,21 @@ function EmployeeTicketsPage({ roleArea = 'employee' }) {
       setCancelling(true)
       await cancelTicket(cancelTarget.id, reason)
       setCancelTarget(null); setReason(''); setReload((value) => value + 1)
+      setToast({
+        id: Date.now(),
+        type: 'success',
+        title: 'Ticket Cancelled',
+        message: `${formatTicketReference(cancelTarget)} was cancelled.`,
+      })
     } catch (requestError) {
-      setError(requestError.status === 409 ? 'This ticket can no longer be deleted because it has already been assigned or work has started.' : requestError.message)
+      setToast({
+        id: Date.now(),
+        type: 'error',
+        title: 'Unable to Cancel Ticket',
+        message: requestError.status === 409
+          ? 'This ticket can no longer be cancelled because it has already been assigned or work has started.'
+          : requestError.message,
+      })
       setCancelTarget(null)
     } finally { setCancelling(false) }
   }
@@ -179,6 +210,7 @@ function EmployeeTicketsPage({ roleArea = 'employee' }) {
 
   return (
     <>
+      {toast && <div className="app-toast-region"><Toast key={toast.id} type={toast.type} title={toast.title} message={toast.message} onDismiss={dismissToast} /></div>}
       <section className="page-heading page-heading--action"><div><h2>My Tickets</h2><p>Search, filter, and manage your support requests.</p></div><div className="heading-actions"><Link className="button button--secondary" to={`/${roleArea}/tickets/drafts`}>Drafts</Link><Link className="button button--primary" to={`/${roleArea}/tickets/create`}>Create Ticket</Link></div></section>
       <form className="filter-panel ticket-filters" onSubmit={applyFilters}>
         <div className="ticket-filters__grid">

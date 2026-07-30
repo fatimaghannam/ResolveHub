@@ -1,7 +1,8 @@
 import { ArrowLeft } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
+import Toast from '../components/common/Toast.jsx'
 import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
 import {
   getAdminTicket,
@@ -22,7 +23,22 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
   const [duplicateError, setDuplicateError] = useState('')
   const [comment, setComment] = useState('')
   const [addingComment, setAddingComment] = useState(false)
-  const [commentError, setCommentError] = useState('')
+  const location = useLocation()
+  const [toast, setToast] = useState(() => {
+    const notification = location.state?.toast
+    return notification ? { id: Date.now(), ...notification } : null
+  })
+  const dismissToast = useCallback(() => setToast(null), [])
+
+  useEffect(() => {
+    if (!location.state?.toast) return
+    const nextState = { ...location.state }
+    delete nextState.toast
+    navigate(location.pathname, {
+      replace: true,
+      state: Object.keys(nextState).length ? nextState : null,
+    })
+  }, [location.pathname, location.state, navigate])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -71,7 +87,11 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
       navigate('/admin/tickets', {
         replace: true,
         state: {
-          notice: `${ticket.ticketReferenceNumber} was removed as a duplicate of ${originalReference.trim()}.`,
+          toast: {
+            type: 'success',
+            title: 'Duplicate Removed',
+            message: `${ticket.ticketReferenceNumber} was removed as a duplicate of ${originalReference.trim()}.`,
+          },
         },
       })
     } catch (requestError) {
@@ -86,7 +106,6 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
     if (!comment.trim() || addingComment) return
     try {
       setAddingComment(true)
-      setCommentError('')
       const created = await addManagerTicketComment(
         ticket.ticketReferenceNumber,
         comment.trim(),
@@ -103,8 +122,19 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
         }],
       }))
       setComment('')
+      setToast({
+        id: Date.now(),
+        type: 'success',
+        title: 'Comment Added',
+        message: 'Your comment was added successfully.',
+      })
     } catch (requestError) {
-      setCommentError(requestError.message)
+      setToast({
+        id: Date.now(),
+        type: 'error',
+        title: 'Unable to Add Comment',
+        message: requestError.message,
+      })
     } finally {
       setAddingComment(false)
     }
@@ -112,6 +142,7 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
 
   return (
     <>
+      {toast && <div className="app-toast-region"><Toast key={toast.id} type={toast.type} title={toast.title} message={toast.message} onDismiss={dismissToast} /></div>}
       <Link className="back-link back-link--top" to={`/${roleArea}/tickets`}><ArrowLeft size={18} />Back to All Tickets</Link>
       <section className="page-heading page-heading--action">
         <div><span className="eyebrow">{ticket.ticketReferenceNumber}</span><h2>{ticket.title}</h2><p>Created {formatLocalDate(ticket.createdDate)}</p></div>
@@ -124,7 +155,6 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
         <form className="agent-message-form" onSubmit={addComment}>
           <label htmlFor="manager-comment">Add comment</label>
           <textarea id="manager-comment" value={comment} onChange={(event) => setComment(event.target.value)} maxLength="5000" disabled={addingComment} />
-          {commentError && <p className="filter-validation" role="alert">{commentError}</p>}
           <button className="button button--secondary" type="submit" disabled={!comment.trim() || addingComment}>{addingComment ? 'Adding…' : 'Add Comment'}</button>
         </form>
       </section>}

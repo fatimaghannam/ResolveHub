@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { FilePlus2 } from 'lucide-react'
-import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import Pagination from '../components/common/Pagination.jsx'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
+import Toast from '../components/common/Toast.jsx'
 import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
 import { getAdminTickets } from '../services/adminService.js'
 import { getManagerTickets } from '../services/managerService.js'
@@ -53,6 +54,7 @@ function urlValues(filters, page) {
 
 function AdminTicketsPage({ roleArea = 'admin' }) {
   const location = useLocation()
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const initial = initialFilters(searchParams)
   const [draft, setDraft] = useState(initial)
@@ -62,6 +64,21 @@ function AdminTicketsPage({ roleArea = 'admin' }) {
   const [data, setData] = useState(null)
   const [lookups, setLookups] = useState({ statuses: [], categories: [], priorities: [] })
   const [error, setError] = useState('')
+  const [toast, setToast] = useState(() => {
+    const notification = location.state?.toast
+    return notification ? { id: Date.now(), ...notification } : null
+  })
+  const dismissToast = useCallback(() => setToast(null), [])
+
+  useEffect(() => {
+    if (!location.state?.toast) return
+    const nextState = { ...location.state }
+    delete nextState.toast
+    navigate(location.pathname, {
+      replace: true,
+      state: Object.keys(nextState).length ? nextState : null,
+    })
+  }, [location.pathname, location.state, navigate])
 
   useEffect(() => {
     const next = initialFilters(searchParams)
@@ -121,11 +138,11 @@ function AdminTicketsPage({ roleArea = 'admin' }) {
 
   return (
     <>
+      {toast && <div className="app-toast-region"><Toast key={toast.id} type={toast.type} title={toast.title} message={toast.message} onDismiss={dismissToast} /></div>}
       <section className="page-heading page-heading--action">
         <div><h2>All Tickets</h2><p>Review, filter, and manage tickets across the organization.</p></div>
         {roleArea === 'admin' && <Link className="button button--primary" to="/admin/tickets/create"><FilePlus2 size={17} />Create Ticket</Link>}
       </section>
-      {location.state?.notice && <div className="inline-alert inline-alert--success" role="status">{location.state.notice}</div>}
       <form className="filter-panel ticket-filters" onSubmit={applyFilters}>
         <div className="ticket-filters__grid admin-ticket-filters">
           <label className="filter-search"><span>Search</span><input value={draft.search} onChange={(event) => setDraft({ ...draft, search: event.target.value })} placeholder={roleArea === 'manager' ? 'Ticket number or title' : 'Ticket number, title, or requester'} /></label>

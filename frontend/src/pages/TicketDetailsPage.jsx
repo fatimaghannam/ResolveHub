@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ErrorState, LoadingState } from '../components/common/States.jsx'
+import Toast from '../components/common/Toast.jsx'
 import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
 import { cancelTicket, downloadAttachment, getTicket } from '../services/ticketService.js'
 import { formatLocalDateTime } from '../utils/dateTime.js'
@@ -16,6 +17,24 @@ function TicketDetailsPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [saving, setSaving] = useState(false)
+  const [toast, setToast] = useState(() => {
+    const notification = location.state?.toast
+    return notification ? { id: Date.now(), ...notification } : null
+  })
+  const dismissToast = useCallback(() => setToast(null), [])
+  const notify = useCallback((type, title, message) => {
+    setToast({ id: Date.now(), type, title, message })
+  }, [])
+
+  useEffect(() => {
+    if (!location.state?.toast) return
+    const nextState = { ...location.state }
+    delete nextState.toast
+    navigate(location.pathname, {
+      replace: true,
+      state: Object.keys(nextState).length ? nextState : null,
+    })
+  }, [location.pathname, location.state, navigate])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -46,9 +65,24 @@ function TicketDetailsPage() {
     try {
       setSaving(true)
       await cancelTicket(id, reason)
-      navigate('/employee/tickets', { replace: true })
+      navigate('/employee/tickets', {
+        replace: true,
+        state: {
+          toast: {
+            type: 'success',
+            title: 'Ticket Cancelled',
+            message: `${formatTicketReference(ticket)} was cancelled.`,
+          },
+        },
+      })
     } catch (requestError) {
-      setError(requestError.status === 409 ? 'This ticket can no longer be deleted because it has already been assigned or work has started.' : requestError.message)
+      notify(
+        'error',
+        'Unable to Cancel Ticket',
+        requestError.status === 409
+          ? 'This ticket can no longer be cancelled because it has already been assigned or work has started.'
+          : requestError.message,
+      )
       setDialogOpen(false)
     } finally { setSaving(false) }
   }
@@ -63,7 +97,7 @@ function TicketDetailsPage() {
       anchor.click()
       URL.revokeObjectURL(url)
     } catch (requestError) {
-      setError(requestError.message)
+      notify('error', 'Unable to Download Attachment', requestError.message)
     }
   }
 
@@ -71,12 +105,24 @@ function TicketDetailsPage() {
     navigate('/employee/tickets')
   }
 
-  if (error) return <ErrorState message={error} />
-  if (!ticket) return <LoadingState message="Loading ticket details…" />
+  const toastRegion = toast && (
+    <div className="app-toast-region">
+      <Toast
+        key={toast.id}
+        type={toast.type}
+        title={toast.title}
+        message={toast.message}
+        onDismiss={dismissToast}
+      />
+    </div>
+  )
+
+  if (error) return <>{toastRegion}<ErrorState message={error} /></>
+  if (!ticket) return <>{toastRegion}<LoadingState message="Loading ticket details…" /></>
 
   return (
     <>
-      {location.state?.notice && <div className="inline-alert inline-alert--success" role="status">{location.state.notice}</div>}
+      {toastRegion}
       <button type="button" className="back-link back-link--top" onClick={goBackToTickets} aria-label="Back to My Tickets">
         <ArrowLeft size={17} aria-hidden="true" />
         <span>Back to My Tickets</span>

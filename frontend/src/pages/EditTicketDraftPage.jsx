@@ -55,9 +55,13 @@ function EditTicketDraftPage({ roleArea = 'employee' }) {
           navigate(destination, {
             replace: true,
             state: {
-              notice: failed.length
-                ? `Ticket created. These attachments could not be uploaded: ${failed.join(', ')}.`
-                : 'Draft submitted successfully.',
+              toast: {
+                type: failed.length ? 'warning' : 'success',
+                title: 'Ticket Created',
+                message: failed.length
+                  ? `${formatTicketReference(ticket)} was created. These attachments could not be uploaded: ${failed.join(', ')}.`
+                  : `${formatTicketReference(ticket)} was created successfully.`,
+              },
             },
           })
         }}

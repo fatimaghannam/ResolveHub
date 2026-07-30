@@ -46,7 +46,16 @@ function CreateTicketPage({ roleArea = 'employee' }) {
         const destination = isManagement
           ? `/${roleArea}/tickets`
           : `/employee/tickets/${ticket.id}`
-        navigate(destination, { replace: true, state: { notice } })
+        navigate(destination, {
+          replace: true,
+          state: {
+            toast: {
+              type: failed.length ? 'warning' : 'success',
+              title: 'Ticket Created',
+              message: notice,
+            },
+          },
+        })
       }} />
     </>
   )
