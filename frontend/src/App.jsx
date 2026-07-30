@@ -86,11 +86,6 @@ function App() {
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<ManagerDashboardPage />} />
           <Route path="tickets" element={<AdminTicketsPage roleArea="manager" />} />
-          <Route path="my-tickets" element={<EmployeeTicketsPage roleArea="manager" />} />
-          <Route path="my-tickets/:id/edit" element={<EditTicketPage roleArea="manager" />} />
-          <Route path="tickets/create" element={<CreateTicketPage roleArea="manager" />} />
-          <Route path="tickets/drafts" element={<TicketDraftsPage roleArea="manager" />} />
-          <Route path="tickets/drafts/:id" element={<EditTicketDraftPage roleArea="manager" />} />
           <Route path="tickets/:ticketReference" element={<AdminTicketDetailsPage roleArea="manager" />} />
           <Route path="assignments" element={<AdminAssignmentsPage roleArea="manager" />} />
           <Route path="workload" element={<ManagerWorkloadPage />} />

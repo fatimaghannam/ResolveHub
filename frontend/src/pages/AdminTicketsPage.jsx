@@ -123,7 +123,7 @@ function AdminTicketsPage({ roleArea = 'admin' }) {
     <>
       <section className="page-heading page-heading--action">
         <div><h2>All Tickets</h2><p>Review, filter, and manage tickets across the organization.</p></div>
-        <Link className="button button--primary" to={`/${roleArea}/tickets/create`}><FilePlus2 size={17} />Create Ticket</Link>
+        {roleArea === 'admin' && <Link className="button button--primary" to="/admin/tickets/create"><FilePlus2 size={17} />Create Ticket</Link>}
       </section>
       {location.state?.notice && <div className="inline-alert inline-alert--success" role="status">{location.state.notice}</div>}
       <form className="filter-panel ticket-filters" onSubmit={applyFilters}>

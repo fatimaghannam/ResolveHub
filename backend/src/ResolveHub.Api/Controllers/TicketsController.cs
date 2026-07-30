@@ -18,7 +18,7 @@ public sealed class TicketsController(
     : ControllerBase
 {
     [HttpGet]
-    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin + "," + RoleNames.Manager)]
+    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin)]
     [ProducesResponseType(typeof(PagedResultDto<TicketListItemDto>), 200)]
     public async Task<ActionResult<PagedResultDto<TicketListItemDto>>> GetTickets(
         [FromQuery] TicketFilterDto filter,
@@ -29,7 +29,7 @@ public sealed class TicketsController(
     }
 
     [HttpGet("{id:int}")]
-    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin + "," + RoleNames.Manager)]
+    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin)]
     [ProducesResponseType(typeof(TicketDetailsDto), 200)]
     [ProducesResponseType(404)]
     public async Task<ActionResult<TicketDetailsDto>> GetTicket(
@@ -42,7 +42,7 @@ public sealed class TicketsController(
     }
 
     [HttpPost]
-    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin + "," + RoleNames.Manager)]
+    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin)]
     [ProducesResponseType(typeof(TicketDetailsDto), 201)]
     [ProducesResponseType(400)]
     public async Task<ActionResult<TicketDetailsDto>> CreateTicket(
@@ -61,7 +61,7 @@ public sealed class TicketsController(
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin + "," + RoleNames.Manager)]
+    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin)]
     [ProducesResponseType(typeof(TicketDetailsDto), 200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(404)]
@@ -84,7 +84,7 @@ public sealed class TicketsController(
     }
 
     [HttpPost("{id:int}/cancel")]
-    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin + "," + RoleNames.Manager)]
+    [Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin)]
     [ProducesResponseType(204)]
     [ProducesResponseType(400)]
     [ProducesResponseType(404)]

@@ -42,7 +42,7 @@ The application supports four roles:
 |---|---|
 | **Employee** | Creates and manages personal tickets and drafts, uploads attachments, tracks progress, and reviews ticket details. |
 | **IT Support Agent** | Works with tickets assigned to their account and uses protected APIs for status transitions, resolution summaries, comments, internal notes, history, and attachment downloads. |
-| **Manager** | Monitors the wider ticket queue, manages personal tickets and drafts, assigns tickets, and reviews dashboards, workload, and activity. |
+| **Manager** | Monitors the organization ticket queue, assigns and reassigns tickets, and reviews dashboards, workload, and activity. Managers do not create or manage personal tickets or drafts. |
 | **Administrator** | Monitors the system, manages assignments and account status, views users and activity, and accesses administrative ticket and dashboard tools. |
 
 ## Assignment 4 Deliverables
@@ -73,8 +73,6 @@ The application supports four roles:
 ### Manager
 
 - Dashboard
-- Personal **My Tickets** workflow
-- Create tickets and manage personal drafts
 - View the authorized organization ticket list and ticket details
 - Assign tickets to active IT Support Agents
 - Ticket Assignments page
@@ -144,7 +142,7 @@ The application supports four roles:
 - Assignment to active IT Support Agents
 - Agent workload/capacity overview
 - Ticket activity feed
-- Personal ticket and draft workflows shared with Employee and Administrator roles
+- Read-only organization ticket visibility outside assignment and reassignment actions
 
 ### IT Agent Features
 

@@ -131,7 +131,7 @@ public sealed class TicketAttachmentsAndDraftsTests
     }
 
     [Fact]
-    public async Task DraftEndpoints_RequireAuthentication_AndAllowManager()
+    public async Task DraftEndpoints_RequireAuthentication_AndRejectManager()
     {
         await using var factory = new ResolveHubApiFactory();
         using var anonymousClient = factory.CreateHttpsClient();
@@ -145,7 +145,7 @@ public sealed class TicketAttachmentsAndDraftsTests
             "/api/ticket-drafts");
 
         Assert.Equal(HttpStatusCode.Unauthorized, anonymousResponse.StatusCode);
-        Assert.Equal(HttpStatusCode.OK, managerResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, managerResponse.StatusCode);
     }
 
     [Fact]

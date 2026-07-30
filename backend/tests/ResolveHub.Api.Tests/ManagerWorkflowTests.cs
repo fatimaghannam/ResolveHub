@@ -13,7 +13,7 @@ public sealed class ManagerWorkflowTests
     private const string Password = "ValidPassword1!";
 
     [Fact]
-    public async Task Manager_CanCreateDraftAndTicket_WhileEmployeeCannotUseManagerApis()
+    public async Task Manager_PersonalTicketDraftAndWriteEndpoints_ReturnForbidden()
     {
         await using var factory = new ResolveHubApiFactory();
         await factory.SeedTicketLookupsAsync();
@@ -23,78 +23,82 @@ public sealed class ManagerWorkflowTests
             "workflow-employee@resolvehub.test", Password, RoleNames.Employee);
         using var managerClient = await LoginAsync(factory, manager.Email!);
         using var employeeClient = await LoginAsync(factory, employee.Email!);
-
-        var draftResponse = await managerClient.PostAsJsonAsync(
-            "/api/ticket-drafts", new { title = "Manager-owned draft" });
-        var draft = await draftResponse.Content.ReadFromJsonAsync<TicketDraftDto>();
-        var employeeDraftRead = await employeeClient.GetAsync(
-            $"/api/ticket-drafts/{draft!.Id}");
-        var employeeDashboard = await employeeClient.GetAsync("/api/manager/dashboard");
+        var ticket = await CreateTicketAsync(factory, employeeClient);
         var lookups = await factory.GetTicketLookupIdsAsync();
+
+        var personalList = await managerClient.GetAsync("/api/tickets");
+        var personalDetails = await managerClient.GetAsync(
+            $"/api/tickets/{ticket.Id}");
         var create = await managerClient.PostAsJsonAsync("/api/tickets", new
         {
             title = "Manager-created support request",
-            description = "A real ticket submitted by an authenticated Manager.",
+            description = "Managers must not create personal support requests.",
             ticketCategoryId = lookups.CategoryId,
             ticketPriorityId = lookups.PriorityId
         });
+        var update = await managerClient.PutAsJsonAsync(
+            $"/api/tickets/{ticket.Id}", new
+            {
+                title = "Manager update",
+                description = "Managers must not update personal tickets.",
+                ticketCategoryId = lookups.CategoryId,
+                ticketPriorityId = lookups.PriorityId
+            });
+        var cancel = await managerClient.PostAsJsonAsync(
+            $"/api/tickets/{ticket.Id}/cancel",
+            new { reason = "Managers must not cancel tickets." });
+        var draftList = await managerClient.GetAsync("/api/ticket-drafts");
+        var draftRead = await managerClient.GetAsync("/api/ticket-drafts/1");
+        var draftCreate = await managerClient.PostAsJsonAsync(
+            "/api/ticket-drafts", new { title = "Forbidden Manager draft" });
+        var draftUpdate = await managerClient.PutAsJsonAsync(
+            "/api/ticket-drafts/1", new { title = "Forbidden update" });
+        var draftDelete = await managerClient.DeleteAsync("/api/ticket-drafts/1");
+        var draftSubmit = await managerClient.PostAsync(
+            "/api/ticket-drafts/1/submit", null);
+        using var upload = new MultipartFormDataContent();
+        upload.Add(new ByteArrayContent([1, 2, 3]), "file", "manager.txt");
+        var attachmentUpload = await managerClient.PostAsync(
+            $"/api/tickets/{ticket.Id}/attachments", upload);
+        var attachmentDelete = await managerClient.DeleteAsync(
+            $"/api/tickets/{ticket.Id}/attachments/1");
+        var employeeDashboard = await employeeClient.GetAsync("/api/manager/dashboard");
 
-        Assert.Equal(HttpStatusCode.Created, draftResponse.StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, employeeDraftRead.StatusCode);
+        foreach (var response in new[]
+        {
+            personalList, personalDetails, create, update, cancel,
+            draftList, draftRead, draftCreate, draftUpdate, draftDelete,
+            draftSubmit, attachmentUpload, attachmentDelete
+        })
+        {
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        }
         Assert.Equal(HttpStatusCode.Forbidden, employeeDashboard.StatusCode);
-        Assert.Equal(HttpStatusCode.Created, create.StatusCode);
     }
 
     [Fact]
-    public async Task Manager_SharedTicketLookupsAndCompleteDraftWorkflow_AreAuthorized()
+    public async Task Manager_SharedLookupsAndOrganizationTicketDetails_AreAuthorized()
     {
         await using var factory = new ResolveHubApiFactory();
         await factory.SeedTicketLookupsAsync();
         var manager = await factory.CreateUserAsync(
             "shared-options-manager@resolvehub.test", Password, RoleNames.Manager);
-        using var client = await LoginAsync(factory, manager.Email!);
+        var employee = await factory.CreateUserAsync(
+            "shared-options-employee@resolvehub.test", Password, RoleNames.Employee);
+        using var managerClient = await LoginAsync(factory, manager.Email!);
+        using var employeeClient = await LoginAsync(factory, employee.Email!);
+        var ticket = await CreateTicketAsync(factory, employeeClient);
 
-        var categories = await client.GetAsync("/api/ticket-categories");
-        var priorities = await client.GetAsync("/api/ticket-priorities");
-        var statuses = await client.GetAsync("/api/ticket-statuses");
-        var lookups = await factory.GetTicketLookupIdsAsync();
-        var save = await client.PostAsJsonAsync("/api/ticket-drafts", new
-        {
-            title = "Manager draft",
-            description = "Manager-owned draft ready for submission.",
-            ticketCategoryId = lookups.CategoryId,
-            ticketPriorityId = lookups.PriorityId
-        });
-        var draft = await save.Content.ReadFromJsonAsync<TicketDraftDto>();
-        var list = await client.GetAsync("/api/ticket-drafts");
-        var read = await client.GetAsync($"/api/ticket-drafts/{draft!.Id}");
-        var update = await client.PutAsJsonAsync(
-            $"/api/ticket-drafts/{draft.Id}", new
-            {
-                title = "Updated manager draft",
-                description = "Manager-owned draft ready for submission.",
-                ticketCategoryId = lookups.CategoryId,
-                ticketPriorityId = lookups.PriorityId
-            });
-        var submit = await client.PostAsync(
-            $"/api/ticket-drafts/{draft.Id}/submit", null);
-        var ticket = await submit.Content.ReadFromJsonAsync<TicketDetailsDto>();
-        var details = await client.GetAsync(
-            $"/api/manager/tickets/{ticket!.TicketReferenceNumber}");
+        var categories = await managerClient.GetAsync("/api/ticket-categories");
+        var priorities = await managerClient.GetAsync("/api/ticket-priorities");
+        var statuses = await managerClient.GetAsync("/api/ticket-statuses");
+        var details = await managerClient.GetAsync(
+            $"/api/manager/tickets/{ticket.TicketReferenceNumber}");
 
         Assert.Equal(HttpStatusCode.OK, categories.StatusCode);
         Assert.Equal(HttpStatusCode.OK, priorities.StatusCode);
         Assert.Equal(HttpStatusCode.OK, statuses.StatusCode);
-        Assert.Equal(HttpStatusCode.Created, save.StatusCode);
-        Assert.Equal(HttpStatusCode.OK, list.StatusCode);
-        Assert.Equal(HttpStatusCode.OK, read.StatusCode);
-        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
-        Assert.Equal(HttpStatusCode.OK, submit.StatusCode);
         Assert.Equal(HttpStatusCode.OK, details.StatusCode);
-        var snapshot = await factory.GetDraftSubmissionSnapshotAsync(
-            ticket.Id, draft.Id);
-        Assert.False(snapshot.DraftExists);
-        Assert.Equal(manager.Id, snapshot.CreatorId);
     }
 
     [Fact]

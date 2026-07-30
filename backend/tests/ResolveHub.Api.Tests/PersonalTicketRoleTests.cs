@@ -14,64 +14,41 @@ public sealed class PersonalTicketRoleTests
     private const string Password = "ValidPassword1!";
 
     [Fact]
-    public async Task AdministratorAndManager_SeeOnlyOwnTickets_AndCannotModifyAssignedTickets()
+    public async Task Administrator_SeesOnlyOwnTickets_AndCannotModifyAssignedTickets()
     {
         await using var factory = new ResolveHubApiFactory();
         await factory.SeedTicketLookupsAsync();
         var administrator = await factory.CreateUserAsync(
             "personal-admin@resolvehub.test", Password, RoleNames.Admin);
-        var manager = await factory.CreateUserAsync(
-            "personal-manager@resolvehub.test", Password, RoleNames.Manager);
         var agent = await factory.CreateUserAsync(
             "personal-agent@resolvehub.test", Password, RoleNames.ITSupportAgent);
         using var adminClient = await LoginAsync(factory, administrator.Email!);
-        using var managerClient = await LoginAsync(factory, manager.Email!);
         var adminTicket = await CreateTicketAsync(factory, adminClient, "Administrator ticket");
-        var managerTicket = await CreateTicketAsync(factory, managerClient, "Manager ticket");
 
         var adminMine = await adminClient.GetFromJsonAsync<
-            PagedResultDto<TicketListItemDto>>("/api/tickets");
-        var managerMine = await managerClient.GetFromJsonAsync<
             PagedResultDto<TicketListItemDto>>("/api/tickets");
 
         Assert.Single(adminMine!.Items);
         Assert.Equal(adminTicket.Id, adminMine.Items.Single().Id);
         Assert.True(adminMine.Items.Single().CanEdit);
         Assert.True(adminMine.Items.Single().CanDelete);
-        Assert.Single(managerMine!.Items);
-        Assert.Equal(managerTicket.Id, managerMine.Items.Single().Id);
-        Assert.DoesNotContain(adminMine.Items, item => item.Id == managerTicket.Id);
-        Assert.DoesNotContain(managerMine.Items, item => item.Id == adminTicket.Id);
 
-        foreach (var ticket in new[] { adminTicket, managerTicket })
-        {
-            var assigned = await adminClient.PostAsJsonAsync(
-                $"/api/admin/tickets/{ticket.TicketReferenceNumber}/assign",
-                new { agentUserId = agent.Id });
-            Assert.Equal(HttpStatusCode.NoContent, assigned.StatusCode);
-        }
+        var assigned = await adminClient.PostAsJsonAsync(
+            $"/api/admin/tickets/{adminTicket.TicketReferenceNumber}/assign",
+            new { agentUserId = agent.Id });
+        Assert.Equal(HttpStatusCode.NoContent, assigned.StatusCode);
 
         var adminUpdate = await adminClient.PutAsJsonAsync(
             $"/api/tickets/{adminTicket.Id}", UpdatePayload("Blocked admin update"));
         var adminDelete = await adminClient.PostAsJsonAsync(
             $"/api/tickets/{adminTicket.Id}/cancel", new { reason = "Not allowed" });
-        var managerUpdate = await managerClient.PutAsJsonAsync(
-            $"/api/tickets/{managerTicket.Id}", UpdatePayload("Blocked manager update"));
-        var managerDelete = await managerClient.PostAsJsonAsync(
-            $"/api/tickets/{managerTicket.Id}/cancel", new { reason = "Not allowed" });
         var adminAfterAssignment = await adminClient.GetFromJsonAsync<
-            PagedResultDto<TicketListItemDto>>("/api/tickets");
-        var managerAfterAssignment = await managerClient.GetFromJsonAsync<
             PagedResultDto<TicketListItemDto>>("/api/tickets");
 
         Assert.Equal(HttpStatusCode.Forbidden, adminUpdate.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, adminDelete.StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, managerUpdate.StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, managerDelete.StatusCode);
         Assert.False(adminAfterAssignment!.Items.Single().CanEdit);
         Assert.False(adminAfterAssignment.Items.Single().CanDelete);
-        Assert.False(managerAfterAssignment!.Items.Single().CanEdit);
-        Assert.False(managerAfterAssignment.Items.Single().CanDelete);
     }
 
     private static object UpdatePayload(string title) => new

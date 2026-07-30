@@ -10,7 +10,7 @@ namespace ResolveHub.Api.Controllers;
 
 [ApiController]
 [Route("api/ticket-drafts")]
-[Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin + "," + RoleNames.Manager)]
+[Authorize(Roles = RoleNames.Employee + "," + RoleNames.Admin)]
 public sealed class TicketDraftsController(ITicketDraftService service) : ControllerBase
 {
     [HttpGet]

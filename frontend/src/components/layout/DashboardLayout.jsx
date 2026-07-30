@@ -60,8 +60,6 @@ const adminNavigation = [
 const managerNavigation = [
   { id: 'dashboard', to: '/manager/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'tickets', to: '/manager/tickets', label: 'All Tickets', icon: Ticket },
-  { id: 'my-tickets', to: '/manager/my-tickets', label: 'My Tickets', icon: Files },
-  { id: 'create', to: '/manager/tickets/create', label: 'Create Ticket', icon: FilePlus2 },
   { id: 'assignments', to: '/manager/assignments', label: 'Ticket Assignments', icon: ClipboardCheck },
   { id: 'workload', to: '/manager/workload', label: 'Team Workload', icon: BarChart3 },
   { id: 'activity', to: '/manager/activity', label: 'Activity', icon: Activity },
@@ -82,9 +80,7 @@ function isNavigationActive(id, pathname, roleArea) {
       !pathname.startsWith('/admin/tickets/drafts')
   }
   if (id === 'tickets' && roleArea === 'manager') {
-    return pathname.startsWith('/manager/tickets') &&
-      pathname !== '/manager/tickets/create' &&
-      !pathname.startsWith('/manager/tickets/drafts')
+    return pathname.startsWith('/manager/tickets')
   }
   if (id === 'users' && roleArea === 'admin') return pathname.startsWith('/admin/users')
   if (id === 'tickets') {
@@ -99,9 +95,6 @@ function isNavigationActive(id, pathname, roleArea) {
 
 function getPageTitle(pathname, roleArea) {
   if (roleArea === 'manager') {
-    if (pathname.startsWith('/manager/my-tickets')) return 'My Tickets'
-    if (pathname === '/manager/tickets/create') return 'Create Ticket'
-    if (pathname.startsWith('/manager/tickets/drafts')) return 'Ticket Drafts'
     if (/\/manager\/tickets\/[^/]+$/.test(pathname)) return 'Ticket Details'
     const titles = {
       '/manager/tickets': 'All Tickets',

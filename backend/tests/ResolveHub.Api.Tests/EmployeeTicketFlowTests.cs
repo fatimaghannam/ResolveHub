@@ -322,7 +322,7 @@ public sealed class EmployeeTicketFlowTests
     }
 
     [Fact]
-    public async Task PersonalTicketEndpoints_RequireAuthentication_AndAllowManager()
+    public async Task PersonalTicketEndpoints_RequireAuthentication_AndRejectManager()
     {
         await using var factory = new ResolveHubApiFactory();
         await factory.SeedTicketLookupsAsync();
@@ -336,7 +336,7 @@ public sealed class EmployeeTicketFlowTests
         var managerResponse = await managerClient.GetAsync("/api/tickets");
 
         Assert.Equal(HttpStatusCode.Unauthorized, unauthenticated.StatusCode);
-        Assert.Equal(HttpStatusCode.OK, managerResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, managerResponse.StatusCode);
     }
 
     private static async Task<HttpClient> CreateEmployeeClientAsync(
