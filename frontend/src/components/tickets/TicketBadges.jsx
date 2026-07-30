@@ -6,3 +6,11 @@ export function TicketStatusBadge({ value }) {
 export function TicketPriorityBadge({ value }) {
   return <span className={`badge priority-${value.toLowerCase()}`}>{value}</span>
 }
+
+export function PendingApprovalBadge() {
+  return (
+    <span className="badge badge--pending-approval">
+      Waiting for Manager Approval
+    </span>
+  )
+}

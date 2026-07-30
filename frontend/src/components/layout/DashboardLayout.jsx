@@ -130,8 +130,11 @@ function getPageTitle(pathname, roleArea) {
     return titles[pathname] ?? 'Dashboard'
   }
   if (roleArea === 'agent') {
+    if (pathname === '/agent/dashboard') return 'Dashboard'
+    if (pathname === '/agent/tickets') return 'Assigned Tickets'
+    if (pathname === '/agent/tickets/open') return 'Open Tickets'
+    if (pathname === '/agent/tickets/history') return 'Ticket History'
     if (/\/agent\/tickets\/[^/]+$/.test(pathname)) return 'Ticket Details'
-    if (pathname.endsWith('/tickets')) return 'Assigned Tickets'
     if (pathname.endsWith('/notifications')) return 'Notifications'
     if (pathname.endsWith('/profile')) return 'Profile'
     return 'Dashboard'

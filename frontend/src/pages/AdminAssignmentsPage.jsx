@@ -264,11 +264,11 @@ function AdminAssignmentsPage({ roleArea = 'admin' }) {
       {roleArea === 'manager' && <section className="panel dashboard-section">
         <div className="panel__heading"><div><h2>Assignment Requests</h2><p>Approve or reject requests submitted by IT Support Agents.</p></div></div>
         {assignmentRequests.length === 0
-          ? <EmptyState title="No pending requests" message="Agent assignment requests will appear here." />
+          ? <EmptyState title="No assignment requests pending" message="There are currently no assignment requests awaiting manager review." />
           : <div className="table-scroll"><table className="ticket-table"><thead><tr><th>Ticket</th><th>Title</th><th>Requested By</th><th>Requested</th><th>Action</th></tr></thead><tbody>{assignmentRequests.map((request) => <tr key={request.id}><td><strong>{request.ticketReferenceNumber}</strong></td><td>{request.ticketTitle}</td><td>{request.requestedByName}</td><td>{formatLocalDate(request.requestedDate)}</td><td><div className="table-actions"><button className="table-action" type="button" disabled={Boolean(reviewingRequest)} onClick={() => reviewRequest(request, 'approve')}>Approve</button><button className="table-action table-action--danger" type="button" disabled={Boolean(reviewingRequest)} onClick={() => reviewRequest(request, 'reject')}>Reject</button></div></td></tr>)}</tbody></table></div>}
       </section>}
       <section className="panel dashboard-section">
-        <div className="panel__heading"><div><h2>Unassigned Tickets</h2><p>Select an available IT Support Agent for each unassigned ticket.</p></div></div>
+        <div className="panel__heading"><div><h2>Unassigned Tickets</h2></div></div>
         {unassignedTickets.length === 0 ? <EmptyState title="No unassigned tickets" message="All current tickets have an assigned agent." /> : <div className="table-scroll"><table className="ticket-table admin-assignment-table admin-assignments-page-table">
           <colgroup>
             <col className="assignments-col--number" />

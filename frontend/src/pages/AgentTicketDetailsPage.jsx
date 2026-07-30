@@ -3,7 +3,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
 import Toast from '../components/common/Toast.jsx'
-import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
+import {
+  PendingApprovalBadge,
+  TicketPriorityBadge,
+  TicketStatusBadge,
+} from '../components/tickets/TicketBadges.jsx'
 import {
   addAgentInternalNote,
   addAgentTicketComment,
@@ -198,7 +202,7 @@ function AgentTicketDetailsPage() {
           {ticket.canResolve && <button className="button button--primary" type="button" onClick={() => setDialog('resolve')} disabled={Boolean(saving)}>Mark as Resolved</button>}
           {ticket.canClose && <button className="button button--primary" type="button" onClick={() => setDialog('close')} disabled={Boolean(saving)}>Close Ticket</button>}
           {ticket.canRequestAssignment && <button className="button button--primary" type="button" onClick={requestAssignment} disabled={Boolean(saving)}>{saving === 'request' ? 'Requesting…' : 'Request Assignment'}</button>}
-          {ticket.assignmentRequestStatus === 'Pending' && <span className="assignment-request-state">Assignment request pending</span>}
+          {ticket.assignmentRequestStatus === 'Pending' && <PendingApprovalBadge />}
         </div>
       </section>
       <div className="details-grid">
