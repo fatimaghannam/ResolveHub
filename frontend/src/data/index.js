@@ -18,7 +18,6 @@ export const {
   adminActivity,
   adminNotifications,
   adminStatistics,
-  agentWorkloads,
   categoryData,
   monthlyTicketTrend,
   ticketsByCategory,

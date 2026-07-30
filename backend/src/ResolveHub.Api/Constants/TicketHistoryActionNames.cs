@@ -9,4 +9,6 @@ public static class TicketHistoryActionNames
     public const string InternalNoteAdded = "Internal Note Added";
     public const string TicketResolved = "Ticket Resolved";
     public const string TicketReopened = "Ticket Reopened";
+    public const string TicketCancelled = "Ticket Cancelled";
+    public const string DuplicateRemoved = "Duplicate Ticket Removed";
 }

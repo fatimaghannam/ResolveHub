@@ -11,6 +11,7 @@ import { Link, useOutletContext } from 'react-router-dom'
 import { TicketStatusChart } from '../components/admin/AdminDashboardCharts.jsx'
 import { ErrorState, LoadingState } from '../components/common/States.jsx'
 import { TicketPriorityBadge } from '../components/tickets/TicketBadges.jsx'
+import { AgentWorkloadSummary } from '../components/tickets/AgentWorkload.jsx'
 import { getManagerDashboard } from '../services/managerService.js'
 import { formatLocalDate } from '../utils/dateTime.js'
 
@@ -79,7 +80,7 @@ function ManagerDashboardPage() {
         <div className="admin-chart-grid">
           <section className="panel">
             <div className="panel__heading"><div><h2>Agent Workload</h2><p>Current active assignments by agent.</p></div><Link to="/manager/workload">View team</Link></div>
-            <div className="dashboard-workload-list">{data.agentWorkloads.map((agent) => <article className="dashboard-workload-item" key={agent.userId}><div><strong>{agent.name}</strong><small>{agent.activeAssigned} active · {agent.inProgress} in progress</small></div><span className={`capacity-badge capacity-badge--${agent.capacity.toLowerCase().replace(' ', '-')}`}>{agent.capacity}</span></article>)}</div>
+            <div className="dashboard-workload-list">{data.agentWorkloads.map((agent) => <AgentWorkloadSummary agent={agent} key={agent.userId} />)}</div>
           </section>
           <section className="panel">
             <div className="panel__heading"><div><h2>Recent Ticket Activity</h2><p>Latest operational changes.</p></div><Link to="/manager/activity">View activity</Link></div>

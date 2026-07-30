@@ -6,7 +6,6 @@ export const usersMockData = []
 export const ticketMockData = []
 export const adminActivity = []
 export const adminNotifications = []
-export const agentWorkloads = []
 export const unassignedTickets = []
 
 export const adminStatistics = {

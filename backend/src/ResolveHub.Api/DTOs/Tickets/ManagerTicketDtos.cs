@@ -15,12 +15,16 @@ public sealed record ManagerAgentWorkloadDto(
     int UserId,
     string Name,
     string Email,
-    int ActiveAssigned,
-    int Open,
+    int ActiveTicketCount,
+    int Assigned,
     int InProgress,
+    int Pending,
     int ResolvedThisMonth,
     int CriticalAssigned,
-    string Capacity);
+    int MaxActiveTickets,
+    int RemainingCapacity,
+    string CapacityState,
+    bool IsAtCapacity);
 
 public sealed record ManagerDashboardDto(
     int TotalTickets,

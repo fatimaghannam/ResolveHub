@@ -12,9 +12,6 @@ public sealed class ManagerTicketService(
     ApplicationDbContext dbContext,
     IAdminTicketService adminTicketService) : IManagerTicketService
 {
-    private static readonly string[] ActiveStatuses =
-        [TicketStatusNames.Assigned, TicketStatusNames.InProgress, TicketStatusNames.Pending];
-
     public Task<PagedResultDto<AdminTicketListItemDto>> GetTicketsAsync(
         AdminTicketFilterDto filter, CancellationToken token) =>
         adminTicketService.GetTicketsAsync(filter, token);
@@ -148,9 +145,14 @@ public sealed class ManagerTicketService(
             .Select(group => new
             {
                 AgentId = group.Key,
-                Active = group.Count(ticket => ActiveStatuses.Contains(ticket.TicketStatus.Name)),
-                Open = group.Count(ticket => ticket.TicketStatus.Name == TicketStatusNames.Open),
+                Active = group.Count(ticket =>
+                    TicketWorkloadRules.ActiveStatuses.Contains(
+                        ticket.TicketStatus.Name)),
+                Assigned = group.Count(ticket =>
+                    ticket.TicketStatus.Name == TicketStatusNames.Assigned),
                 InProgress = group.Count(ticket => ticket.TicketStatus.Name == TicketStatusNames.InProgress),
+                Pending = group.Count(ticket =>
+                    ticket.TicketStatus.Name == TicketStatusNames.Pending),
                 Resolved = group.Count(ticket => ticket.ResolvedDate >= monthStart),
                 Critical = group.Count(ticket =>
                     ticket.TicketPriority.Name == "Critical" &&
@@ -167,11 +169,15 @@ public sealed class ManagerTicketService(
                 $"{agent.FirstName} {agent.LastName}",
                 agent.Email ?? string.Empty,
                 active,
-                row?.Open ?? 0,
+                row?.Assigned ?? 0,
                 row?.InProgress ?? 0,
+                row?.Pending ?? 0,
                 row?.Resolved ?? 0,
                 row?.Critical ?? 0,
-                active >= 8 ? "High Workload" : active >= 4 ? "Balanced" : "Available");
+                TicketWorkloadRules.MaxActiveTicketsPerAgent,
+                TicketWorkloadRules.GetRemainingCapacity(active),
+                TicketWorkloadRules.GetCapacityState(active),
+                TicketWorkloadRules.IsAtCapacity(active));
         }).ToList();
     }
 

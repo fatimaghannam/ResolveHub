@@ -275,10 +275,40 @@ public sealed class TicketService(ApplicationDbContext dbContext)
             return new(TicketOperationStatus.Invalid, Message: "The cancellation reason cannot exceed 500 characters.");
 
         var now = DateTime.UtcNow;
+        var previousStatus = ticket.TicketStatus.Name;
+        ticket.TicketStatusID = await dbContext.TicketStatuses
+            .Where(status =>
+                status.IsActive &&
+                status.Name == TicketStatusNames.Cancelled)
+            .Select(status => status.ID)
+            .SingleAsync(cancellationToken);
         ticket.IsDeleted = true;
         ticket.CancelledDate = now;
         ticket.CancelledReason = string.IsNullOrWhiteSpace(reason) ? null : reason;
         ticket.UpdatedDate = now;
+        dbContext.TicketHistory.Add(new TicketHistory
+        {
+            TicketID = ticket.ID,
+            PerformedByUserAccountID = userId,
+            ActionType = TicketHistoryActionNames.TicketCancelled,
+            OldValue = previousStatus,
+            NewValue = TicketStatusNames.Cancelled,
+            Description = string.IsNullOrWhiteSpace(reason)
+                ? "Ticket cancelled by its creator."
+                : $"Ticket cancelled by its creator. Reason: {reason}",
+            CreatedDate = now
+        });
+        dbContext.ActivityLogs.Add(new ActivityLog
+        {
+            PerformedByUserAccountID = userId,
+            ActionType = TicketHistoryActionNames.TicketCancelled,
+            EntityType = "Ticket",
+            EntityID = ticket.TicketReferenceNumber,
+            Description = "Ticket cancelled by its creator.",
+            OldValue = previousStatus,
+            NewValue = TicketStatusNames.Cancelled,
+            CreatedDate = now
+        });
         await dbContext.SaveChangesAsync(cancellationToken);
         return new(TicketOperationStatus.Success, true);
     }

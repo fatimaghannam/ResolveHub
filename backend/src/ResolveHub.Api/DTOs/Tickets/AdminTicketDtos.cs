@@ -18,10 +18,14 @@ public sealed record AdminAgentWorkloadDto(
     string LastName,
     string Name,
     string Email,
-    int ActiveAssigned,
+    int ActiveTicketCount,
+    int Assigned,
     int InProgress,
     int Pending,
-    string Capacity);
+    int MaxActiveTickets,
+    int RemainingCapacity,
+    string CapacityState,
+    bool IsAtCapacity);
 
 public sealed record AdminAssignmentOverviewDto(
     IReadOnlyCollection<AdminUnassignedTicketDto> UnassignedTickets,
@@ -72,6 +76,14 @@ public sealed record AdminTicketDetailsDto(
     IReadOnlyCollection<TicketHistoryDto> History);
 
 public sealed record UpdateTicketAssignmentDto(int? AgentUserId);
+
+public sealed class RemoveDuplicateTicketRequestDto
+{
+    [Required, StringLength(32)]
+    public string OriginalTicketReference { get; init; } = string.Empty;
+
+    public bool Confirmed { get; init; }
+}
 
 public sealed record AdminChartItemDto(string Name, int Value);
 public sealed record AdminMonthlyTrendDto(string Month, int Created, int Resolved);

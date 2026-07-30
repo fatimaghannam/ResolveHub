@@ -318,6 +318,32 @@ public sealed class ResolveHubApiFactory
             .SingleAsync();
     }
 
+    public async Task<TicketGovernanceSnapshot> GetTicketGovernanceSnapshotAsync(
+        int ticketId,
+        string historyAction)
+    {
+        using var scope = Services.CreateScope();
+        var context = scope.ServiceProvider
+            .GetRequiredService<ApplicationDbContext>();
+        var ticket = await context.Tickets
+            .Where(item => item.ID == ticketId)
+            .Select(item => new
+            {
+                item.IsDeleted,
+                StatusName = item.TicketStatus.Name
+            })
+            .SingleAsync();
+        return new TicketGovernanceSnapshot(
+            ticket.IsDeleted,
+            ticket.StatusName,
+            await context.TicketHistory.AnyAsync(item =>
+                item.TicketID == ticketId &&
+                item.ActionType == historyAction),
+            await context.ActivityLogs.AnyAsync(item =>
+                item.EntityType == "Ticket" &&
+                item.ActionType == historyAction));
+    }
+
     public async Task<DraftSubmissionTestSnapshot> GetDraftSubmissionSnapshotAsync(
         int ticketId,
         int draftId)
@@ -378,6 +404,12 @@ public sealed record TicketTestSnapshot(
     bool IsDeleted,
     DateTime? CancelledDate,
     string? CancelledReason);
+
+public sealed record TicketGovernanceSnapshot(
+    bool IsDeleted,
+    string StatusName,
+    bool HasHistory,
+    bool HasActivity);
 
 public sealed record DraftSubmissionTestSnapshot(
     string Title,

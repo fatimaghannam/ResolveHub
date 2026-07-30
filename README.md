@@ -40,10 +40,10 @@ The application supports four roles:
 
 | Role | Responsibility |
 |---|---|
-| **Employee** | Creates and manages personal tickets and drafts, uploads attachments, tracks progress, and reviews ticket details. |
-| **IT Support Agent** | Works with tickets assigned to their account and uses protected APIs for status transitions, resolution summaries, comments, internal notes, history, and attachment downloads. |
+| **Employee** | Creates and tracks personal tickets and drafts, and may cancel an owned ticket only while it remains unassigned. |
+| **IT Support Agent** | Works only with tickets assigned to their account. An agent may hold at most five active tickets across Assigned, In Progress, and Pending statuses. |
 | **Manager** | Monitors the organization ticket queue, assigns and reassigns tickets, and reviews dashboards, workload, and activity. Managers do not create or manage personal tickets or drafts. |
-| **Administrator** | Monitors the system, manages assignments and account status, views users and activity, and accesses administrative ticket and dashboard tools. |
+| **Administrator** | Has full system visibility, manages assignments and account status, and may remove a confirmed duplicate ticket while preserving its audit trail. |
 
 ## Assignment 4 Deliverables
 
@@ -53,7 +53,7 @@ The application supports four roles:
 - Create and submit tickets
 - Save, list, reopen, update, submit, and delete personal drafts
 - View and edit eligible tickets
-- Cancel tickets through the existing delete action
+- Cancel an owned, unassigned ticket through the existing delete action
 - Upload and manage ticket attachments
 - Search and filter by status, category, priority, and date range
 - Server-side pagination
@@ -88,6 +88,7 @@ The application supports four roles:
 - Create tickets and manage personal drafts
 - View all authorized tickets and ticket details
 - Assign and reassign tickets
+- Remove confirmed duplicate tickets by referencing the original ticket; removal is soft and audited
 - User listing, user details, and account activation/deactivation
 - Category reference screen
 - Activity Logs and demo notification screens
@@ -115,11 +116,13 @@ The application supports four roles:
 
 - Ticket creation with generated `RH-YYYY-NNNN` references
 - Personal ticket listing and details
-- Editing and cancellation where current status and ownership permit
+- Editing where current status and ownership permit
+- Soft cancellation by the ticket creator while the ticket is unassigned, with history and activity auditing
 - Categories, priorities, and status lookups
 - Draft creation, update, submission, and deletion with server-side ownership checks
 - File upload, download, and deletion with configurable limits
 - Agent assignment and reassignment
+- Central five-active-ticket capacity enforcement for assignment and reassignment
 - Status transitions and resolution summaries
 - Public ticket comments and internal agent notes in the backend
 - Ticket history records
@@ -133,6 +136,7 @@ The application supports four roles:
 - Active-agent assignment dropdown sourced from Identity roles
 - User listing and account activation/deactivation
 - Administrative activity records
+- Administrator-only confirmed duplicate-ticket removal with preserved history and activity records
 - Category and notification presentation screens currently backed by demo data
 
 ### Manager Features
@@ -140,8 +144,10 @@ The application supports four roles:
 - Manager dashboard and ticket overview
 - Organization ticket search and filtering
 - Assignment to active IT Support Agents
-- Agent workload/capacity overview
+- Assignment and reassignment to active IT Support Agents, subject to the five-ticket capacity
+- Agent workload/capacity overview with maximum and remaining capacity
 - Ticket activity feed
+- Read-only ticket history
 - Read-only organization ticket visibility outside assignment and reassignment actions
 
 ### IT Agent Features
@@ -151,6 +157,7 @@ The application supports four roles:
 - Search, filtering, and pagination
 - Secure ticket details and attachment access
 - Status, resolution, comment, internal-note, and history APIs
+- Maximum capacity of five active assigned tickets
 
 ### Notifications and Activity
 
@@ -177,6 +184,15 @@ The application supports four roles:
 
 
 `Cancelled` is a terminal status for eligible tickets that are no longer required. The backend seeds all seven lookup statuses: **Open**, **Assigned**, **In Progress**, **Pending**, **Resolved**, **Closed**, and **Cancelled**. `Closed` is available as a system status, but a Resolved-to-Closed action is not currently exposed by the frontend or ticket APIs.
+
+### Ticket assignment capacity
+
+An IT Support Agent can have at most **five active tickets**. Capacity is calculated from current database state during every assignment or reassignment:
+
+- Counted as active: **Assigned**, **In Progress**, and **Pending**
+- Excluded from active capacity: **Resolved**, **Closed**, and **Cancelled**
+
+The Manager and Administrator workload views show active, maximum, and remaining capacity. Assignment controls mark full agents and the backend returns `409 Conflict` if a direct request attempts to exceed the limit.
 
 ## Tech Stack
 

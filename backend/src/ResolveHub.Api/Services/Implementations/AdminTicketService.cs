@@ -1,4 +1,6 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using ResolveHub.Api.Constants;
 using ResolveHub.Api.Data;
 using ResolveHub.Api.DTOs.Tickets;
@@ -12,9 +14,6 @@ namespace ResolveHub.Api.Services.Implementations;
 public sealed class AdminTicketService(ApplicationDbContext dbContext)
     : IAdminTicketService
 {
-    private static readonly string[] ActiveStatuses =
-        [TicketStatusNames.Assigned, TicketStatusNames.InProgress, TicketStatusNames.Pending];
-
     public async Task<AdminAssignmentOverviewDto> GetAssignmentsAsync(
         AdminTicketFilterDto filter, CancellationToken token) =>
         new(
@@ -256,96 +255,221 @@ public sealed class AdminTicketService(ApplicationDbContext dbContext)
         int? agentUserId,
         CancellationToken token)
     {
-        if (agentUserId.HasValue)
+        IDbContextTransaction? transaction = null;
+        if (dbContext.Database.IsRelational())
         {
-        var agentIsEligible = await (
-            from user in dbContext.Users
-            join userRole in dbContext.UserRoles on user.Id equals userRole.UserId
-            join role in dbContext.Roles on userRole.RoleId equals role.Id
-            where user.Id == agentUserId.Value &&
-                  user.IsActive &&
-                  role.Name == RoleNames.ITSupportAgent
-            select user.Id).AnyAsync(token);
-        if (!agentIsEligible)
-            return new(TicketOperationStatus.Invalid,
-                Message: "Select an active IT Support Agent.");
+            transaction = await dbContext.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable,
+                token);
         }
 
-        var ticket = await dbContext.Tickets
-            .Include(item => item.TicketStatus)
-            .SingleOrDefaultAsync(item =>
-                item.TicketReferenceNumber == ticketReference &&
-                !item.IsDeleted,
-                token);
-        if (ticket is null)
-            return new(TicketOperationStatus.NotFound);
-        if (ticket.AssignedToUserAccountID == agentUserId)
-            return new(TicketOperationStatus.Conflict,
-                Message: agentUserId.HasValue
-                    ? "This ticket is already assigned to that agent."
-                    : "This ticket is already unassigned.");
+        async Task<TicketServiceResult<bool>> FailureAsync(
+            TicketOperationStatus status,
+            string? message = null)
+        {
+            if (transaction is not null)
+                await transaction.RollbackAsync(token);
+            return new(status, Message: message);
+        }
 
-        var targetStatusName = agentUserId.HasValue
-            ? TicketStatusNames.Assigned : TicketStatusNames.Open;
-        var targetStatusId = await dbContext.TicketStatuses
+        try
+        {
+            var ticket = await dbContext.Tickets
+                .Include(item => item.TicketStatus)
+                .SingleOrDefaultAsync(item =>
+                    item.TicketReferenceNumber == ticketReference &&
+                    !item.IsDeleted,
+                    token);
+            if (ticket is null)
+                return await FailureAsync(TicketOperationStatus.NotFound);
+            if (ticket.AssignedToUserAccountID == agentUserId)
+            {
+                return await FailureAsync(
+                    TicketOperationStatus.Conflict,
+                    agentUserId.HasValue
+                        ? "This ticket is already assigned to that agent."
+                        : "This ticket is already unassigned.");
+            }
+
+            if (agentUserId.HasValue)
+            {
+                var agentIsEligible = await (
+                    from user in dbContext.Users
+                    join userRole in dbContext.UserRoles on user.Id equals userRole.UserId
+                    join role in dbContext.Roles on userRole.RoleId equals role.Id
+                    where user.Id == agentUserId.Value &&
+                          user.IsActive &&
+                          role.Name == RoleNames.ITSupportAgent
+                    select user.Id).AnyAsync(token);
+                if (!agentIsEligible)
+                {
+                    return await FailureAsync(
+                        TicketOperationStatus.Invalid,
+                        "Select an active IT Support Agent.");
+                }
+
+                var activeTickets = await dbContext.Tickets.CountAsync(
+                    item =>
+                        !item.IsDeleted &&
+                        item.AssignedToUserAccountID == agentUserId.Value &&
+                        TicketWorkloadRules.ActiveStatuses.Contains(
+                            item.TicketStatus.Name),
+                    token);
+                if (activeTickets >=
+                    TicketWorkloadRules.MaxActiveTicketsPerAgent)
+                {
+                    return await FailureAsync(
+                        TicketOperationStatus.Conflict,
+                        $"This IT Agent has reached the maximum workload of {TicketWorkloadRules.MaxActiveTicketsPerAgent} active tickets.");
+                }
+            }
+
+            var targetStatusName = agentUserId.HasValue
+                ? TicketStatusNames.Assigned : TicketStatusNames.Open;
+            var targetStatusId = await dbContext.TicketStatuses
+                .Where(status =>
+                    status.IsActive &&
+                    status.Name == targetStatusName)
+                .Select(status => status.ID)
+                .SingleAsync(token);
+            var now = DateTime.UtcNow;
+            var previousAgentId = ticket.AssignedToUserAccountID;
+            ticket.AssignedToUserAccountID = agentUserId;
+            if (ticket.TicketStatus.Name is
+                TicketStatusNames.Open or TicketStatusNames.Assigned)
+            {
+                ticket.TicketStatusID = targetStatusId;
+            }
+            ticket.AssignedDate = agentUserId.HasValue ? now : null;
+            ticket.UpdatedDate = now;
+            dbContext.TicketHistory.Add(new TicketHistory
+            {
+                TicketID = ticket.ID,
+                PerformedByUserAccountID = administratorId,
+                ActionType = agentUserId.HasValue
+                    ? TicketHistoryActionNames.TicketAssigned
+                    : "Ticket Unassigned",
+                OldValue = previousAgentId?.ToString(),
+                NewValue = agentUserId?.ToString(),
+                Description =
+                    previousAgentId.HasValue && agentUserId.HasValue
+                        ? "Ticket reassigned to another IT Support Agent."
+                        : agentUserId.HasValue
+                            ? "Ticket assigned to an IT Support Agent."
+                            : "Ticket assignment removed.",
+                CreatedDate = now
+            });
+            dbContext.ActivityLogs.Add(new ActivityLog
+            {
+                PerformedByUserAccountID = administratorId,
+                ActionType = previousAgentId.HasValue
+                    ? "Ticket Reassigned"
+                    : "Ticket Assigned",
+                EntityType = "Ticket",
+                EntityID = ticket.TicketReferenceNumber,
+                Description = previousAgentId.HasValue
+                    ? "Ticket assignment changed to another IT Support Agent."
+                    : "Ticket assigned to an IT Support Agent.",
+                OldValue = previousAgentId?.ToString(),
+                NewValue = agentUserId?.ToString(),
+                CreatedDate = now
+            });
+
+            await dbContext.SaveChangesAsync(token);
+            if (transaction is not null)
+                await transaction.CommitAsync(token);
+        }
+        catch
+        {
+            if (transaction is not null)
+                await transaction.RollbackAsync(token);
+            throw;
+        }
+        finally
+        {
+            if (transaction is not null)
+                await transaction.DisposeAsync();
+        }
+        return new(TicketOperationStatus.Success, true);
+    }
+
+    public async Task<TicketServiceResult<bool>> RemoveDuplicateAsync(
+        int administratorId,
+        string duplicateTicketReference,
+        RemoveDuplicateTicketRequestDto request,
+        CancellationToken token)
+    {
+        var originalReference = request.OriginalTicketReference.Trim();
+        if (!request.Confirmed)
+        {
+            return new(
+                TicketOperationStatus.Invalid,
+                Message: "Confirm that this ticket is a duplicate.");
+        }
+        if (string.Equals(
+            duplicateTicketReference,
+            originalReference,
+            StringComparison.OrdinalIgnoreCase))
+        {
+            return new(
+                TicketOperationStatus.Invalid,
+                Message: "A duplicate ticket cannot reference itself.");
+        }
+
+        var tickets = await dbContext.Tickets
+            .Include(ticket => ticket.TicketStatus)
+            .Where(ticket =>
+                !ticket.IsDeleted &&
+                (ticket.TicketReferenceNumber == duplicateTicketReference ||
+                 ticket.TicketReferenceNumber == originalReference))
+            .ToListAsync(token);
+        var duplicate = tickets.SingleOrDefault(ticket =>
+            ticket.TicketReferenceNumber == duplicateTicketReference);
+        var original = tickets.SingleOrDefault(ticket =>
+            ticket.TicketReferenceNumber == originalReference);
+        if (duplicate is null || original is null)
+        {
+            return new(
+                TicketOperationStatus.NotFound,
+                Message: "The duplicate or original ticket could not be found.");
+        }
+
+        var cancelledStatusId = await dbContext.TicketStatuses
             .Where(status =>
                 status.IsActive &&
-                status.Name == targetStatusName)
+                status.Name == TicketStatusNames.Cancelled)
             .Select(status => status.ID)
             .SingleAsync(token);
         var now = DateTime.UtcNow;
-        var previousAgentId = ticket.AssignedToUserAccountID;
-        ticket.AssignedToUserAccountID = agentUserId;
-        if (ticket.TicketStatus.Name is TicketStatusNames.Open or TicketStatusNames.Assigned)
-            ticket.TicketStatusID = targetStatusId;
-        ticket.AssignedDate = agentUserId.HasValue ? now : null;
-        ticket.UpdatedDate = now;
+        duplicate.IsDeleted = true;
+        duplicate.TicketStatusID = cancelledStatusId;
+        duplicate.CancelledDate = now;
+        duplicate.CancelledReason =
+            $"Duplicate ticket. Original: {original.TicketReferenceNumber}.";
+        duplicate.UpdatedDate = now;
         dbContext.TicketHistory.Add(new TicketHistory
         {
-            TicketID = ticket.ID,
+            TicketID = duplicate.ID,
             PerformedByUserAccountID = administratorId,
-            ActionType = agentUserId.HasValue
-                ? TicketHistoryActionNames.TicketAssigned : "Ticket Unassigned",
-            OldValue = previousAgentId?.ToString(),
-            NewValue = agentUserId?.ToString(),
-            Description = previousAgentId.HasValue && agentUserId.HasValue
-                ? "Ticket reassigned to another IT Support Agent."
-                : agentUserId.HasValue
-                    ? "Ticket assigned to an IT Support Agent."
-                    : "Ticket assignment removed.",
+            ActionType = TicketHistoryActionNames.DuplicateRemoved,
+            OldValue = duplicate.TicketReferenceNumber,
+            NewValue = original.TicketReferenceNumber,
+            Description = "Duplicate ticket removed by an Administrator.",
             CreatedDate = now
         });
         dbContext.ActivityLogs.Add(new ActivityLog
         {
             PerformedByUserAccountID = administratorId,
-            ActionType = previousAgentId.HasValue ? "Ticket Reassigned" : "Ticket Assigned",
+            ActionType = TicketHistoryActionNames.DuplicateRemoved,
             EntityType = "Ticket",
-            EntityID = ticket.TicketReferenceNumber,
-            Description = previousAgentId.HasValue
-                ? "Ticket assignment changed to another IT Support Agent."
-                : "Ticket assigned to an IT Support Agent.",
-            OldValue = previousAgentId?.ToString(),
-            NewValue = agentUserId?.ToString(),
+            EntityID = duplicate.TicketReferenceNumber,
+            Description =
+                $"Duplicate ticket removed. Original ticket: {original.TicketReferenceNumber}.",
+            OldValue = duplicate.TicketReferenceNumber,
+            NewValue = original.TicketReferenceNumber,
             CreatedDate = now
         });
-        if (!dbContext.Database.IsRelational())
-        {
-            await dbContext.SaveChangesAsync(token);
-            return new(TicketOperationStatus.Success, true);
-        }
-
-        await using var transaction =
-            await dbContext.Database.BeginTransactionAsync(token);
-        try
-        {
-            await dbContext.SaveChangesAsync(token);
-            await transaction.CommitAsync(token);
-        }
-        catch
-        {
-            await transaction.RollbackAsync(token);
-            throw;
-        }
+        await dbContext.SaveChangesAsync(token);
         return new(TicketOperationStatus.Success, true);
     }
 
@@ -425,7 +549,11 @@ public sealed class AdminTicketService(ApplicationDbContext dbContext)
             .Select(group => new
             {
                 AgentId = group.Key,
-                Active = group.Count(ticket => ActiveStatuses.Contains(ticket.TicketStatus.Name)),
+                Active = group.Count(ticket =>
+                    TicketWorkloadRules.ActiveStatuses.Contains(
+                        ticket.TicketStatus.Name)),
+                Assigned = group.Count(ticket =>
+                    ticket.TicketStatus.Name == TicketStatusNames.Assigned),
                 InProgress = group.Count(ticket => ticket.TicketStatus.Name == TicketStatusNames.InProgress),
                 Pending = group.Count(ticket => ticket.TicketStatus.Name == TicketStatusNames.Pending)
             }).ToDictionaryAsync(item => item.AgentId, token);
@@ -441,10 +569,13 @@ public sealed class AdminTicketService(ApplicationDbContext dbContext)
                 agent.Name,
                 agent.Email!,
                 active,
+                workload?.Assigned ?? 0,
                 workload?.InProgress ?? 0,
                 workload?.Pending ?? 0,
-                active >= 8 ? "High Workload" :
-                    active >= 4 ? "Balanced" : "Available");
+                TicketWorkloadRules.MaxActiveTicketsPerAgent,
+                TicketWorkloadRules.GetRemainingCapacity(active),
+                TicketWorkloadRules.GetCapacityState(active),
+                TicketWorkloadRules.IsAtCapacity(active));
         }).ToList();
     }
 }

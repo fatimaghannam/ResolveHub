@@ -18,6 +18,7 @@ import {
   TicketTrendChart,
 } from '../components/admin/AdminDashboardCharts.jsx'
 import { TicketPriorityBadge } from '../components/tickets/TicketBadges.jsx'
+import { AgentWorkloadSummary } from '../components/tickets/AgentWorkload.jsx'
 import { ErrorState, LoadingState } from '../components/common/States.jsx'
 import { getAdminDashboard } from '../services/adminService.js'
 import { formatLocalDate } from '../utils/dateTime.js'
@@ -89,10 +90,7 @@ function AdminDashboardPage() {
           <div className="chart-heading"><h2>IT Agent Workload</h2><p>Current active workload and capacity status by support agent.</p></div>
           <div className="dashboard-workload-list">
             {data.agentWorkloads.map((agent) => (
-              <article className="dashboard-workload-item" key={agent.name}>
-                <div><strong>{agent.name}</strong><small>{agent.activeAssigned} active ticket{agent.activeAssigned === 1 ? '' : 's'}</small></div>
-                <span className={`capacity-badge capacity-badge--${agent.capacity.toLowerCase().replace(' ', '-')}`}>{agent.capacity}</span>
-              </article>
+              <AgentWorkloadSummary agent={agent} key={agent.userId} />
             ))}
           </div>
         </section>

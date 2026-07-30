@@ -94,11 +94,15 @@ public sealed class ManagerWorkflowTests
         var statuses = await managerClient.GetAsync("/api/ticket-statuses");
         var details = await managerClient.GetAsync(
             $"/api/manager/tickets/{ticket.TicketReferenceNumber}");
+        var ticketDetails =
+            await details.Content.ReadFromJsonAsync<AdminTicketDetailsDto>();
 
         Assert.Equal(HttpStatusCode.OK, categories.StatusCode);
         Assert.Equal(HttpStatusCode.OK, priorities.StatusCode);
         Assert.Equal(HttpStatusCode.OK, statuses.StatusCode);
         Assert.Equal(HttpStatusCode.OK, details.StatusCode);
+        Assert.Contains(ticketDetails!.History,
+            item => item.ActionType == TicketHistoryActionNames.TicketCreated);
     }
 
     [Fact]
@@ -115,6 +119,9 @@ public sealed class ManagerWorkflowTests
         var inactiveAgent = await factory.CreateUserAsync(
             "inactive-manager-agent@resolvehub.test", Password,
             RoleNames.ITSupportAgent, isActive: false);
+        var nonAgent = await factory.CreateUserAsync(
+            "assignment-non-agent@resolvehub.test", Password,
+            RoleNames.Employee);
         using var managerClient = await LoginAsync(factory, manager.Email!);
         using var employeeClient = await LoginAsync(factory, employee.Email!);
         var ticket = await CreateTicketAsync(factory, employeeClient);
@@ -124,6 +131,9 @@ public sealed class ManagerWorkflowTests
         var invalid = await managerClient.PostAsJsonAsync(
             $"/api/manager/tickets/{ticket.TicketReferenceNumber}/assign",
             new { agentUserId = inactiveAgent.Id });
+        var invalidRole = await managerClient.PostAsJsonAsync(
+            $"/api/manager/tickets/{ticket.TicketReferenceNumber}/assign",
+            new { agentUserId = nonAgent.Id });
         var assigned = await managerClient.PostAsJsonAsync(
             $"/api/manager/tickets/{ticket.TicketReferenceNumber}/assign",
             new { agentUserId = activeAgent.Id });
@@ -134,6 +144,7 @@ public sealed class ManagerWorkflowTests
         Assert.Contains(dashboard.Unassigned,
             item => item.TicketReferenceNumber == ticket.TicketReferenceNumber);
         Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, invalidRole.StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, assigned.StatusCode);
         Assert.Equal(activeAgent.Id, snapshot.AssignedToUserAccountID);
     }

@@ -4,7 +4,6 @@ export {
   adminActivity,
   adminNotifications,
   adminStatistics,
-  agentWorkloads,
   categoryData,
   monthlyTicketTrend,
   ticketsByCategory,

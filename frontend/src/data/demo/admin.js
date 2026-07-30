@@ -58,24 +58,6 @@ export const userOverview = {
   'Inactive Users': usersMockData.filter((user) => user.status === 'Inactive').length,
 }
 
-export const agentWorkloads = mockItAgents.map((agent) => {
-  const assigned = ticketMockData.filter((ticket) => ticket.assignedAgentId === agent.id)
-  const activeAssigned = assigned.filter((ticket) => ticket.statusName !== 'Resolved').length
-
-  return {
-    userId: agent.id,
-    name: getMockUserName(agent.id),
-    activeAssigned,
-    inProgress: assigned.filter((ticket) => ticket.statusName === 'In Progress').length,
-    pending: assigned.filter((ticket) => ticket.statusName === 'Pending').length,
-    capacity: activeAssigned >= 3
-      ? 'High Workload'
-      : activeAssigned >= 2
-        ? 'Balanced'
-        : 'Available',
-  }
-})
-
 export const categoryData = ticketCategories.map((name, index) => ({
   id: index + 1,
   name,

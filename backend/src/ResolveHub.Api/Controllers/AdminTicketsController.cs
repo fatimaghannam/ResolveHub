@@ -77,6 +77,28 @@ public sealed class AdminTicketsController(IAdminTicketService service)
         };
     }
 
+    [HttpPost("tickets/{ticketReference}/remove-duplicate")]
+    public async Task<IActionResult> RemoveDuplicate(
+        string ticketReference,
+        [FromBody] RemoveDuplicateTicketRequestDto request,
+        CancellationToken token)
+    {
+        var result = await service.RemoveDuplicateAsync(
+            GetUserId(),
+            ticketReference,
+            request,
+            token);
+        return result.Status switch
+        {
+            TicketOperationStatus.Success => NoContent(),
+            TicketOperationStatus.NotFound =>
+                NotFound(new { message = result.Message }),
+            TicketOperationStatus.Conflict =>
+                Conflict(new { message = result.Message }),
+            _ => BadRequest(new { message = result.Message })
+        };
+    }
+
     private int GetUserId()
     {
         var value = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;

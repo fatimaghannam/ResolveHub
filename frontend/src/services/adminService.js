@@ -25,6 +25,21 @@ export const updateAdminTicketAssignment = (ticketReference, agentUserId) =>
     body: JSON.stringify({ agentUserId }),
   })
 
+export const removeAdminDuplicateTicket = (
+  ticketReference,
+  originalTicketReference,
+) =>
+  apiRequest(
+    `/api/admin/tickets/${encodeURIComponent(ticketReference)}/remove-duplicate`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        originalTicketReference,
+        confirmed: true,
+      }),
+    },
+  )
+
 export const getAdminUsers = (signal) =>
   apiRequest('/api/admin/users', { signal })
 

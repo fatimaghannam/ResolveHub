@@ -20,4 +20,9 @@ public interface IAdminTicketService
         string ticketReference,
         int? agentUserId,
         CancellationToken token);
+    Task<TicketServiceResult<bool>> RemoveDuplicateAsync(
+        int administratorId,
+        string duplicateTicketReference,
+        RemoveDuplicateTicketRequestDto request,
+        CancellationToken token);
 }
