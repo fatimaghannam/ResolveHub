@@ -193,7 +193,7 @@
 .workload-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }.workload-card { padding: 18px; border: 1px solid var(--line); border-radius: 11px; background: #f9fbfd; }.workload-card h3 { margin: 0 0 14px; font-size: 1rem; }.workload-card dl { margin: 0 0 16px; }.workload-card dl div { display: flex; justify-content: space-between; gap: 16px; padding: 6px 0; }.workload-card dt { color: var(--muted); }.workload-card dd { margin: 0; font-weight: 750; }
 .capacity-badge--available, .user-status--active { color: #18794e; background: #e6f6ed; }.capacity-badge--near-capacity { color: #9a5b08; background: #fff3db; }.capacity-badge--full, .user-status--inactive { color: #a92118; background: #fde9e7; }.capacity-badge--over-capacity { color: #8f1710; background: #f8d9d6; }
 .admin-user-filters { grid-template-columns: minmax(240px, 1.5fr) repeat(2, minmax(150px, .7fr)); }.admin-activity-filters { grid-template-columns: minmax(240px, 1.5fr) repeat(3, minmax(150px, 1fr)); }
-.app-toast-region { position: fixed; top: 20px; right: 20px; z-index: 100; width: min(370px, calc(100vw - 32px)); pointer-events: none; }
+.app-toast-region { position: fixed; top: 96px; right: 12px; z-index: 2000; width: min(360px, calc(100vw - 48px)); pointer-events: none; }
 .app-toast { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 11px; box-sizing: border-box; padding: 15px 14px; border: 1px solid #d8e1ea; border-radius: 11px; background: white; box-shadow: 0 12px 32px rgba(20,39,68,.16); pointer-events: auto; animation: toast-enter 240ms ease both; transition: opacity 240ms ease, transform 240ms ease; }
 .app-toast--closing { opacity: 0; transform: translateY(-8px); }
 .app-toast__icon { margin-top: 1px; color: #27845a; }
@@ -304,6 +304,7 @@
   .workload-filter-toolbar .button { width: 100%; }
 }
 @media (max-width: 600px) {
+  .app-toast-region { top: 86px; right: 16px; left: 16px; width: auto; }
   .topbar__user strong { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .page-heading--action { align-items: stretch; flex-direction: column; }.heading-actions { flex-wrap: wrap; }
   .stat-grid { grid-template-columns: 1fr 1fr; gap: 12px; }.stat-card { min-height: 94px; padding: 15px; }.stat-card__icon { width: 40px; height: 40px; }.stat-card strong { font-size: 1.4rem; }
