@@ -15,7 +15,8 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
     private static readonly string[] ActiveStatuses =
         [TicketStatusNames.Assigned, TicketStatusNames.InProgress, TicketStatusNames.Pending];
     private static readonly string[] FinishedStatuses =
-        [TicketStatusNames.Resolved, TicketStatusNames.Closed, TicketStatusNames.Cancelled];
+        [TicketStatusNames.Resolved, TicketStatusNames.Closed,
+            TicketStatusNames.Cancelled, TicketStatusNames.Duplicate];
 
     public async Task<AgentDashboardDto> GetDashboardAsync(
         int agentId, CancellationToken token)
@@ -638,7 +639,9 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
                     item.OldValue, item.NewValue, item.Description, item.CreatedDate)).ToList(),
             ticket.ResolutionSummary, Array.Empty<AllowedStatusTransitionDto>(),
             false, false, false, false, true, false, false, false,
-            false, null));
+            false, null,
+            ticket.OriginalTicket == null ? null :
+                ticket.OriginalTicket.TicketReferenceNumber));
 
     private IQueryable<TicketCommentDto> ProjectComments(int ticketId) =>
         dbContext.TicketComments.AsNoTracking()

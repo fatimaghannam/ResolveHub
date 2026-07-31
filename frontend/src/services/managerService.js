@@ -37,3 +37,12 @@ export const addManagerTicketComment = (ticketReference, message) =>
     method: 'POST',
     body: JSON.stringify({ message }),
   })
+
+export const reportManagerDuplicate = (ticketReference, request) =>
+  apiRequest(`/api/manager/tickets/${encodeURIComponent(ticketReference)}/duplicate-reviews`, {
+    method: 'POST',
+    body: JSON.stringify(request),
+  })
+
+export const getManagerNotifications = (signal) =>
+  apiRequest('/api/manager/notifications', { signal })

@@ -86,6 +86,28 @@ public sealed class ManagerTicketsController(IManagerTicketService service) : Co
         };
     }
 
+    [HttpPost("tickets/{ticketReference}/duplicate-reviews")]
+    public async Task<ActionResult<DuplicateReviewDto>> ReportDuplicate(
+        string ticketReference, CreateDuplicateReviewRequestDto request,
+        CancellationToken token)
+    {
+        var result = await service.ReportDuplicateAsync(
+            UserId, ticketReference, request, token);
+        return result.Status switch
+        {
+            TicketOperationStatus.Success => Created(
+                $"/api/manager/tickets/{ticketReference}/duplicate-reviews/{result.Value!.Id}",
+                result.Value),
+            TicketOperationStatus.NotFound => NotFound(new { message = result.Message }),
+            TicketOperationStatus.Conflict => Conflict(new { message = result.Message }),
+            _ => BadRequest(new { message = result.Message })
+        };
+    }
+
+    [HttpGet("notifications")]
+    public async Task<ActionResult<IReadOnlyCollection<UserNotificationDto>>> Notifications(
+        CancellationToken token) => Ok(await service.GetNotificationsAsync(UserId, token));
+
     [HttpGet("workload")]
     public async Task<ActionResult<IReadOnlyCollection<ManagerAgentWorkloadDto>>> Workload(
         CancellationToken token) =>

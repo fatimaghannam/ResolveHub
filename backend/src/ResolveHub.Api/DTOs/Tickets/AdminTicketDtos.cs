@@ -73,17 +73,34 @@ public sealed record AdminTicketDetailsDto(
     DateTime? ResolvedDate, DateTime? ClosedDate,
     IReadOnlyCollection<TicketAttachmentDto> Attachments,
     IReadOnlyCollection<TicketCommentDto> Comments,
-    IReadOnlyCollection<TicketHistoryDto> History);
+    IReadOnlyCollection<TicketHistoryDto> History,
+    int? OriginalTicketId,
+    string? OriginalTicketReference,
+    DuplicateReviewDto? PendingDuplicateReview);
 
 public sealed record UpdateTicketAssignmentDto(int? AgentUserId);
 
-public sealed class RemoveDuplicateTicketRequestDto
+public sealed class CreateDuplicateReviewRequestDto
 {
     [Required, StringLength(32)]
-    public string OriginalTicketReference { get; init; } = string.Empty;
+    public string SuggestedOriginalTicketReference { get; init; } = string.Empty;
 
-    public bool Confirmed { get; init; }
+    [StringLength(1000)]
+    public string? Reason { get; init; }
 }
+
+public sealed record DuplicateReviewDto(
+    int Id,
+    string ReportedTicketReference,
+    string SuggestedOriginalTicketReference,
+    string ReportedByName,
+    string? Reason,
+    string Status,
+    DateTime CreatedDate);
+
+public sealed record UserNotificationDto(
+    int Id, string Type, string Title, string Message,
+    string? TicketReferenceNumber, bool IsRead, DateTime CreatedDate);
 
 public sealed record AdminChartItemDto(string Name, int Value);
 public sealed record AdminMonthlyTrendDto(string Month, int Created, int Resolved);

@@ -36,6 +36,8 @@ public sealed record TicketDetailsDto(
     IReadOnlyCollection<TicketAttachmentDto> Attachments,
     IReadOnlyCollection<TicketCommentDto> Comments,
     IReadOnlyCollection<TicketHistoryDto> History,
+    int? OriginalTicketId,
+    string? OriginalTicketReference,
     bool CanEdit,
     bool CanDelete);
 

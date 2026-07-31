@@ -478,6 +478,9 @@ public sealed class TicketService(ApplicationDbContext dbContext)
                     history.Description,
                     history.CreatedDate))
                 .ToList(),
+            ticket.OriginalTicketID,
+            ticket.OriginalTicket == null ? null :
+                ticket.OriginalTicket.TicketReferenceNumber,
             ticket.TicketStatus.Name == TicketStatusNames.Open &&
                 ticket.AssignedToUserAccountID == null,
             ticket.TicketStatus.Name == TicketStatusNames.Open &&

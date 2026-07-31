@@ -12,7 +12,8 @@ public static class TicketCommentRules
         Enum.IsDefined(visibility);
 
     public static bool IsReadOnly(string statusName) =>
-        statusName is TicketStatusNames.Closed or TicketStatusNames.Cancelled;
+        statusName is TicketStatusNames.Closed or TicketStatusNames.Cancelled or
+            TicketStatusNames.Duplicate;
 
     public static string HistoryDescription(CommentVisibility visibility) =>
         visibility == CommentVisibility.Private

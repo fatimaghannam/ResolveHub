@@ -20,6 +20,7 @@ public sealed class Ticket
     public string? CancelledReason { get; set; }
     public string? ResolutionSummary { get; set; }
     public int? ResolvedByUserAccountID { get; set; }
+    public int? OriginalTicketID { get; set; }
     public byte[] RowVersion { get; set; } = [];
     public bool IsDeleted { get; set; }
 
@@ -29,8 +30,12 @@ public sealed class Ticket
     public TicketPriority TicketPriority { get; set; } = null!;
     public TicketStatus TicketStatus { get; set; } = null!;
     public UserAccount? ResolvedByUserAccount { get; set; }
+    public Ticket? OriginalTicket { get; set; }
+    public ICollection<Ticket> DuplicateTickets { get; set; } = [];
     public ICollection<TicketAttachment> Attachments { get; set; } = [];
     public ICollection<TicketComment> Comments { get; set; } = [];
     public ICollection<TicketHistory> History { get; set; } = [];
     public ICollection<TicketAssignmentRequest> AssignmentRequests { get; set; } = [];
+    public ICollection<DuplicateReview> DuplicateReviews { get; set; } = [];
+    public ICollection<DuplicateReview> SuggestedDuplicateReviews { get; set; } = [];
 }

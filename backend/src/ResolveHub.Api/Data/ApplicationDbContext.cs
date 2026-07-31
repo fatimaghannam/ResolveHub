@@ -34,6 +34,8 @@ public sealed class ApplicationDbContext
     public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
     public DbSet<TicketAssignmentRequest> TicketAssignmentRequests =>
         Set<TicketAssignmentRequest>();
+    public DbSet<DuplicateReview> DuplicateReviews => Set<DuplicateReview>();
+    public DbSet<UserNotification> UserNotifications => Set<UserNotification>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -53,7 +55,57 @@ public sealed class ApplicationDbContext
         ConfigureTicketHistory(builder);
         ConfigureActivityLog(builder);
         ConfigureTicketAssignmentRequest(builder);
+        ConfigureDuplicateReview(builder);
+        ConfigureUserNotification(builder);
         ConfigureIdentitySupportTables(builder);
+    }
+
+    private static void ConfigureDuplicateReview(ModelBuilder builder)
+    {
+        builder.Entity<DuplicateReview>(entity =>
+        {
+            entity.ToTable("DuplicateReview");
+            entity.HasKey(item => item.ID);
+            entity.Property(item => item.ID).UseIdentityColumn();
+            entity.Property(item => item.Reason).HasMaxLength(1000);
+            entity.Property(item => item.Status).HasMaxLength(20).IsRequired();
+            entity.Property(item => item.CreatedDate).HasColumnType("datetime2");
+            entity.Property(item => item.ReviewedDate).HasColumnType("datetime2");
+            entity.HasIndex(item => new { item.TicketID, item.Status });
+            entity.HasIndex(item => new { item.Status, item.CreatedDate });
+            entity.HasOne(item => item.Ticket).WithMany(ticket => ticket.DuplicateReviews)
+                .HasForeignKey(item => item.TicketID).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.SuggestedOriginalTicket)
+                .WithMany(ticket => ticket.SuggestedDuplicateReviews)
+                .HasForeignKey(item => item.SuggestedOriginalTicketID)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.ReportedByUserAccount)
+                .WithMany(user => user.DuplicateReviewsReported)
+                .HasForeignKey(item => item.ReportedByUserAccountID)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.ReviewedByUserAccount)
+                .WithMany(user => user.DuplicateReviewsReviewed)
+                .HasForeignKey(item => item.ReviewedByUserAccountID)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureUserNotification(ModelBuilder builder)
+    {
+        builder.Entity<UserNotification>(entity =>
+        {
+            entity.ToTable("UserNotification");
+            entity.HasKey(item => item.ID);
+            entity.Property(item => item.ID).UseIdentityColumn();
+            entity.Property(item => item.Type).HasMaxLength(50).IsRequired();
+            entity.Property(item => item.Title).HasMaxLength(150).IsRequired();
+            entity.Property(item => item.Message).HasMaxLength(1000).IsRequired();
+            entity.Property(item => item.TicketReferenceNumber).HasMaxLength(32);
+            entity.Property(item => item.CreatedDate).HasColumnType("datetime2");
+            entity.HasIndex(item => new { item.UserAccountID, item.IsRead, item.CreatedDate });
+            entity.HasOne(item => item.UserAccount).WithMany(user => user.Notifications)
+                .HasForeignKey(item => item.UserAccountID).OnDelete(DeleteBehavior.Cascade);
+        });
     }
 
     private static void ConfigureTicketAssignmentRequest(ModelBuilder builder)
@@ -226,6 +278,10 @@ public sealed class ApplicationDbContext
             entity.HasOne(ticket => ticket.ResolvedByUserAccount)
                 .WithMany(user => user.ResolvedTickets)
                 .HasForeignKey(ticket => ticket.ResolvedByUserAccountID)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(ticket => ticket.OriginalTicket)
+                .WithMany(ticket => ticket.DuplicateTickets)
+                .HasForeignKey(ticket => ticket.OriginalTicketID)
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }

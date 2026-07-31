@@ -9,6 +9,7 @@ public static class TicketStatusNames
     public const string Resolved = "Resolved";
     public const string Closed = "Closed";
     public const string Cancelled = "Cancelled";
+    public const string Duplicate = "Duplicate";
 
     public static readonly string[] All =
     [
@@ -18,6 +19,7 @@ public static class TicketStatusNames
         Pending,
         Resolved,
         Closed,
-        Cancelled
+        Cancelled,
+        Duplicate
     ];
 }

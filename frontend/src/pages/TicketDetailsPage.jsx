@@ -159,6 +159,7 @@ function TicketDetailsPage() {
       </button>
       <section className="page-heading page-heading--action"><div><span className="eyebrow">{formatTicketReference(ticket)}</span><h2>{ticket.title}</h2><p>Created <time dateTime={ticket.createdDate} title="Displayed in your local time">{formatLocalDateTime(ticket.createdDate)}</time></p></div><div className="heading-actions">{ticket.canEdit && <Link className="button button--secondary" to={`/employee/tickets/${id}/edit`}>Edit</Link>}{ticket.canDelete && <button className="button button--danger-outline" onClick={() => setDialogOpen(true)}>Cancel Ticket</button>}</div></section>
       {!ticket.canEdit && <div className="inline-alert">This ticket can no longer be edited because work has already started.</div>}
+      {ticket.statusName === 'Duplicate' && ticket.originalTicketReference && <div className="inline-alert">This ticket was marked as a duplicate of <Link to={`/employee/tickets/${ticket.originalTicketId}`}>{ticket.originalTicketReference}</Link>.</div>}
       <div className="details-grid">
         <section className="panel details-main"><h2>Issue Description</h2><p className="ticket-description">{ticket.description}</p>
           {ticket.resolutionSummary && <div className="resolution-summary"><strong>Resolution summary</strong><p>{ticket.resolutionSummary}</p></div>}
@@ -180,7 +181,7 @@ function TicketDetailsPage() {
         onVisibilityChange={setVisibility}
         onSubmit={submitComment}
         isSubmitting={saving}
-        canComment={!ticket.closedDate && !ticket.cancelledDate}
+        canComment={!ticket.closedDate && !ticket.cancelledDate && ticket.statusName !== 'Duplicate'}
         readOnlyMessage="Comments are read-only because this ticket is completed."
         formatTimestamp={formatLocalDateTime}
       />

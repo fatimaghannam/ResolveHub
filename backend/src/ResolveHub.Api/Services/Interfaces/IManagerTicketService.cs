@@ -26,4 +26,9 @@ public interface IManagerTicketService
     Task<TicketServiceResult<TicketCommentDto>> AddCommentAsync(
         int managerId, string ticketReference,
         AddTicketCommentRequestDto request, CancellationToken token);
+    Task<TicketServiceResult<DuplicateReviewDto>> ReportDuplicateAsync(
+        int managerId, string ticketReference,
+        CreateDuplicateReviewRequestDto request, CancellationToken token);
+    Task<IReadOnlyCollection<UserNotificationDto>> GetNotificationsAsync(
+        int userId, CancellationToken token);
 }

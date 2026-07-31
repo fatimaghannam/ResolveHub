@@ -32,6 +32,94 @@ public sealed class ManagerTicketService(
         CancellationToken token) =>
         adminTicketService.AssignAsync(managerId, ticketReference, agentUserId, token);
 
+    public Task<IReadOnlyCollection<UserNotificationDto>> GetNotificationsAsync(
+        int userId, CancellationToken token) =>
+        adminTicketService.GetNotificationsAsync(userId, token);
+
+    public async Task<TicketServiceResult<DuplicateReviewDto>> ReportDuplicateAsync(
+        int managerId, string ticketReference,
+        CreateDuplicateReviewRequestDto request, CancellationToken token)
+    {
+        var originalReference = request.SuggestedOriginalTicketReference.Trim();
+        if (string.Equals(ticketReference, originalReference,
+                StringComparison.OrdinalIgnoreCase))
+            return new(TicketOperationStatus.Invalid,
+                Message: "A ticket cannot be reported as a duplicate of itself.");
+
+        var tickets = await dbContext.Tickets.Where(ticket => !ticket.IsDeleted &&
+            (ticket.TicketReferenceNumber == ticketReference ||
+             ticket.TicketReferenceNumber == originalReference))
+            .ToListAsync(token);
+        var reported = tickets.SingleOrDefault(ticket =>
+            ticket.TicketReferenceNumber == ticketReference);
+        var original = tickets.SingleOrDefault(ticket =>
+            ticket.TicketReferenceNumber == originalReference);
+        if (reported is null || original is null)
+            return new(TicketOperationStatus.NotFound,
+                Message: "The reported or suggested original ticket could not be found.");
+        if (await dbContext.DuplicateReviews.AnyAsync(review =>
+                review.TicketID == reported.ID &&
+                review.Status == DuplicateReviewStatusNames.Pending, token))
+            return new(TicketOperationStatus.Conflict,
+                Message: "A duplicate review is already pending for this ticket.");
+
+        var reporter = await dbContext.Users.AsNoTracking()
+            .Where(user => user.Id == managerId)
+            .Select(user => user.FirstName + " " + user.LastName)
+            .SingleAsync(token);
+        var now = DateTime.UtcNow;
+        var reason = string.IsNullOrWhiteSpace(request.Reason)
+            ? null : request.Reason.Trim();
+        var review = new DuplicateReview
+        {
+            TicketID = reported.ID,
+            SuggestedOriginalTicketID = original.ID,
+            ReportedByUserAccountID = managerId,
+            Reason = reason,
+            Status = DuplicateReviewStatusNames.Pending,
+            CreatedDate = now
+        };
+        dbContext.DuplicateReviews.Add(review);
+        dbContext.TicketHistory.Add(new TicketHistory
+        {
+            TicketID = reported.ID,
+            PerformedByUserAccountID = managerId,
+            ActionType = TicketHistoryActionNames.DuplicateReviewReported,
+            NewValue = original.TicketReferenceNumber,
+            Description = $"{reporter} reported this ticket as a possible duplicate of {original.TicketReferenceNumber}.",
+            CreatedDate = now
+        });
+        dbContext.ActivityLogs.Add(new ActivityLog
+        {
+            PerformedByUserAccountID = managerId,
+            ActionType = TicketHistoryActionNames.DuplicateReviewReported,
+            EntityType = "Ticket",
+            EntityID = reported.TicketReferenceNumber,
+            Description = $"Manager {reporter} reported {reported.TicketReferenceNumber} as a possible duplicate of {original.TicketReferenceNumber}.",
+            NewValue = original.TicketReferenceNumber,
+            CreatedDate = now
+        });
+        var administratorIds = await dbContext.UserRoles
+            .Where(assignment => assignment.Role.Name == RoleNames.Admin &&
+                assignment.UserAccount.IsActive)
+            .Select(assignment => assignment.UserId).Distinct().ToListAsync(token);
+        foreach (var administratorId in administratorIds)
+            dbContext.UserNotifications.Add(new UserNotification
+            {
+                UserAccountID = administratorId,
+                Type = "DuplicateReview",
+                Title = "Duplicate Review Pending",
+                Message = $"{reporter} reported {reported.TicketReferenceNumber} as a possible duplicate of {original.TicketReferenceNumber}.",
+                TicketReferenceNumber = reported.TicketReferenceNumber,
+                CreatedDate = now
+            });
+        await dbContext.SaveChangesAsync(token);
+        return new(TicketOperationStatus.Success,
+            new DuplicateReviewDto(review.ID, reported.TicketReferenceNumber,
+                original.TicketReferenceNumber, reporter, reason,
+                review.Status, now));
+    }
+
     public async Task<IReadOnlyCollection<TicketAssignmentRequestDto>>
         GetAssignmentRequestsAsync(CancellationToken token) =>
         await dbContext.TicketAssignmentRequests.AsNoTracking()

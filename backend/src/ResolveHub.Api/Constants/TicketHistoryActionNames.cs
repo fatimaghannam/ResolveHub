@@ -11,7 +11,9 @@ public static class TicketHistoryActionNames
     public const string TicketClosed = "Ticket Closed";
     public const string TicketReopened = "Ticket Reopened";
     public const string TicketCancelled = "Ticket Cancelled";
-    public const string DuplicateRemoved = "Duplicate Ticket Removed";
+    public const string DuplicateReviewReported = "Duplicate Review Reported";
+    public const string DuplicateReviewApproved = "Duplicate Review Approved";
+    public const string DuplicateReviewRejected = "Duplicate Review Rejected";
     public const string AssignmentRequested = "Assignment Requested";
     public const string AssignmentRequestApproved = "Assignment Request Approved";
     public const string AssignmentRequestRejected = "Assignment Request Rejected";

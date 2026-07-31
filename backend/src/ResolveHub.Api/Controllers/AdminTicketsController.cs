@@ -97,17 +97,18 @@ public sealed class AdminTicketsController(
         };
     }
 
-    [HttpPost("tickets/{ticketReference}/remove-duplicate")]
-    public async Task<IActionResult> RemoveDuplicate(
-        string ticketReference,
-        [FromBody] RemoveDuplicateTicketRequestDto request,
-        CancellationToken token)
+    [HttpGet("duplicate-reviews")]
+    public async Task<ActionResult<IReadOnlyCollection<DuplicateReviewDto>>>
+        DuplicateReviews(CancellationToken token) =>
+        Ok(await service.GetPendingDuplicateReviewsAsync(token));
+
+    [HttpPost("duplicate-reviews/{reviewId:int}/{decision}")]
+    public async Task<IActionResult> ReviewDuplicate(
+        int reviewId, string decision, CancellationToken token)
     {
-        var result = await service.RemoveDuplicateAsync(
-            GetUserId(),
-            ticketReference,
-            request,
-            token);
+        if (decision is not ("approve" or "reject")) return BadRequest();
+        var result = await service.ReviewDuplicateAsync(
+            GetUserId(), reviewId, decision == "approve", token);
         return result.Status switch
         {
             TicketOperationStatus.Success => NoContent(),
@@ -118,6 +119,11 @@ public sealed class AdminTicketsController(
             _ => BadRequest(new { message = result.Message })
         };
     }
+
+    [HttpGet("notifications")]
+    public async Task<ActionResult<IReadOnlyCollection<UserNotificationDto>>> Notifications(
+        CancellationToken token) =>
+        Ok(await service.GetNotificationsAsync(GetUserId(), token));
 
     private int GetUserId()
     {

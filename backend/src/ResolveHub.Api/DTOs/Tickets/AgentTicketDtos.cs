@@ -110,7 +110,8 @@ public sealed record AgentTicketDetailsDto(
     bool CanResolve,
     bool CanClose,
     bool CanRequestAssignment,
-    string? AssignmentRequestStatus);
+    string? AssignmentRequestStatus,
+    string? OriginalTicketReference);
 
 public sealed record TicketAssignmentRequestDto(
     int Id,

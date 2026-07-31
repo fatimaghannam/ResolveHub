@@ -449,7 +449,8 @@ public static class DatabaseSeeder
                 SortOrder = index + 1,
                 IsFinalStatus =
                     name is TicketStatusNames.Closed or
-                        TicketStatusNames.Cancelled,
+                        TicketStatusNames.Cancelled or
+                        TicketStatusNames.Duplicate,
                 IsActive = true
             });
         }

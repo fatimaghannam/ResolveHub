@@ -201,6 +201,7 @@ function AgentTicketDetailsPage() {
           {ticket.assignmentRequestStatus === 'Pending' && <PendingApprovalBadge />}
         </div>
       </section>
+      {ticket.statusName === 'Duplicate' && ticket.originalTicketReference && <div className="inline-alert">This ticket was marked as a duplicate of <Link to={`/agent/tickets/${ticket.originalTicketReference}`}>{ticket.originalTicketReference}</Link>.</div>}
       <div className="details-grid">
         <section className="panel">
           <h2>Original Ticket Information</h2>

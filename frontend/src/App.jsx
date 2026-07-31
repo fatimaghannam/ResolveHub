@@ -92,7 +92,7 @@ function App() {
           <Route path="assignments" element={<AdminAssignmentsPage roleArea="manager" />} />
           <Route path="workload" element={<ManagerWorkloadPage />} />
           <Route path="activity" element={<ManagerActivityPage />} />
-          <Route path="notifications" element={<ComingSoonPage roleArea="manager" />} />
+          <Route path="notifications" element={<AdminNotificationsPage roleArea="manager" />} />
           <Route path="profile" element={<AdminProfilePage />} />
         </Route>
         <Route

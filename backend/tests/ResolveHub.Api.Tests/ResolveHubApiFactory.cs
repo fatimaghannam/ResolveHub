@@ -248,7 +248,13 @@ public sealed class ResolveHubApiFactory
             new TicketStatus { Name = TicketStatusNames.Pending, SortOrder = 4 },
             new TicketStatus { Name = TicketStatusNames.Resolved, SortOrder = 5 },
             new TicketStatus { Name = TicketStatusNames.Closed, SortOrder = 6 },
-            new TicketStatus { Name = TicketStatusNames.Cancelled, SortOrder = 7 });
+            new TicketStatus { Name = TicketStatusNames.Cancelled, SortOrder = 7 },
+            new TicketStatus
+            {
+                Name = TicketStatusNames.Duplicate,
+                SortOrder = 8,
+                IsFinalStatus = true
+            });
         await context.SaveChangesAsync();
     }
 
