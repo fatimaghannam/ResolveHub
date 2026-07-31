@@ -275,12 +275,15 @@ public sealed class AdminTicketService(ApplicationDbContext dbContext)
                     .Select(review => new DuplicateReviewDto(
                         review.ID, ticket.TicketReferenceNumber,
                         ticket.Title, ticket.TicketStatus.Name,
+                        ticket.TicketPriority.Name, ticket.CreatedDate,
                         ticket.CreatedByUserAccount.FirstName + " " +
                             ticket.CreatedByUserAccount.LastName,
                         ticket.TicketCategory.Name,
                         review.SuggestedOriginalTicket.TicketReferenceNumber,
                         review.SuggestedOriginalTicket.Title,
                         review.SuggestedOriginalTicket.TicketStatus.Name,
+                        review.SuggestedOriginalTicket.TicketPriority.Name,
+                        review.SuggestedOriginalTicket.CreatedDate,
                         review.SuggestedOriginalTicket.CreatedByUserAccount.FirstName + " " +
                             review.SuggestedOriginalTicket.CreatedByUserAccount.LastName,
                         review.SuggestedOriginalTicket.TicketCategory.Name,
@@ -450,12 +453,15 @@ public sealed class AdminTicketService(ApplicationDbContext dbContext)
             .Select(review => new DuplicateReviewDto(
                 review.ID, review.Ticket.TicketReferenceNumber,
                 review.Ticket.Title, review.Ticket.TicketStatus.Name,
+                review.Ticket.TicketPriority.Name, review.Ticket.CreatedDate,
                 review.Ticket.CreatedByUserAccount.FirstName + " " +
                     review.Ticket.CreatedByUserAccount.LastName,
                 review.Ticket.TicketCategory.Name,
                 review.SuggestedOriginalTicket.TicketReferenceNumber,
                 review.SuggestedOriginalTicket.Title,
                 review.SuggestedOriginalTicket.TicketStatus.Name,
+                review.SuggestedOriginalTicket.TicketPriority.Name,
+                review.SuggestedOriginalTicket.CreatedDate,
                 review.SuggestedOriginalTicket.CreatedByUserAccount.FirstName + " " +
                     review.SuggestedOriginalTicket.CreatedByUserAccount.LastName,
                 review.SuggestedOriginalTicket.TicketCategory.Name,
@@ -465,7 +471,8 @@ public sealed class AdminTicketService(ApplicationDbContext dbContext)
             .ToListAsync(token);
 
     public async Task<TicketServiceResult<bool>> ReviewDuplicateAsync(
-        int administratorId, int reviewId, bool approve, CancellationToken token)
+        int administratorId, int reviewId, bool approve,
+        string? internalNote, CancellationToken token)
     {
         var review = await dbContext.DuplicateReviews
             .Include(item => item.Ticket).ThenInclude(ticket => ticket.TicketStatus)
@@ -485,10 +492,24 @@ public sealed class AdminTicketService(ApplicationDbContext dbContext)
             .Where(user => user.Id == administratorId)
             .Select(user => user.FirstName + " " + user.LastName)
             .SingleAsync(token);
+        var reviewNote = string.IsNullOrWhiteSpace(internalNote)
+            ? null : internalNote.Trim();
         if (approve)
         {
             await ApplyDuplicateApprovalAsync(
-                review, administratorId, administratorName, now, false, token);
+                review, administratorId, administratorName, now, token);
+        }
+        if (reviewNote is not null)
+        {
+            dbContext.TicketHistory.Add(new TicketHistory
+            {
+                TicketID = review.TicketID,
+                PerformedByUserAccountID = administratorId,
+                ActionType = "Duplicate Review Note",
+                Description = reviewNote,
+                IsInternal = true,
+                CreatedDate = now
+            });
         }
         else
         {
@@ -532,74 +553,9 @@ public sealed class AdminTicketService(ApplicationDbContext dbContext)
         return new(TicketOperationStatus.Success, true);
     }
 
-    public async Task<TicketServiceResult<bool>> MarkDuplicateAsync(
-        int administratorId, string ticketReference,
-        MarkDuplicateRequestDto request, CancellationToken token)
-    {
-        if (!request.Confirmed)
-            return new(TicketOperationStatus.Invalid,
-                Message: "Confirm that this ticket should be marked as Duplicate.");
-
-        var originalReference = request.OriginalTicketReference.Trim();
-        var reason = request.Reason.Trim();
-        if (string.IsNullOrWhiteSpace(reason))
-            return new(TicketOperationStatus.Invalid,
-                Message: "A reason is required when marking a ticket as Duplicate.");
-        if (string.Equals(ticketReference, originalReference,
-                StringComparison.OrdinalIgnoreCase))
-            return new(TicketOperationStatus.Invalid,
-                Message: "A ticket cannot be reported as a duplicate of itself.");
-
-        var tickets = await dbContext.Tickets
-            .Include(ticket => ticket.TicketStatus)
-            .Where(ticket => !ticket.IsDeleted &&
-                (ticket.TicketReferenceNumber == ticketReference ||
-                 ticket.TicketReferenceNumber == originalReference))
-            .ToListAsync(token);
-        var reported = tickets.SingleOrDefault(ticket =>
-            ticket.TicketReferenceNumber == ticketReference);
-        var original = tickets.SingleOrDefault(ticket =>
-            ticket.TicketReferenceNumber == originalReference);
-        if (reported is null || original is null)
-            return new(TicketOperationStatus.NotFound,
-                Message: "The ticket or original ticket could not be found.");
-        if (DuplicateTicketRules.IsDuplicate(reported.TicketStatus.Name))
-            return new(TicketOperationStatus.Conflict,
-                Message: "This ticket has already been marked as Duplicate.");
-        if (await dbContext.DuplicateReviews.AnyAsync(review =>
-                review.TicketID == reported.ID &&
-                review.Status == DuplicateReviewStatusNames.Pending, token))
-            return new(TicketOperationStatus.Conflict,
-                Message: "A duplicate review is already pending for this ticket.");
-
-        var administratorName = await dbContext.Users.AsNoTracking()
-            .Where(user => user.Id == administratorId)
-            .Select(user => user.FirstName + " " + user.LastName)
-            .SingleAsync(token);
-        var now = DateTime.UtcNow;
-        var review = new DuplicateReview
-        {
-            TicketID = reported.ID,
-            Ticket = reported,
-            SuggestedOriginalTicketID = original.ID,
-            SuggestedOriginalTicket = original,
-            ReportedByUserAccountID = administratorId,
-            Reason = reason,
-            Status = DuplicateReviewStatusNames.Approved,
-            ReviewedByUserAccountID = administratorId,
-            ReviewedDate = now,
-            CreatedDate = now
-        };
-        dbContext.DuplicateReviews.Add(review);
-        await ApplyDuplicateApprovalAsync(
-            review, administratorId, administratorName, now, true, token);
-        await dbContext.SaveChangesAsync(token);
-        return new(TicketOperationStatus.Success, true);
-    }
-
     private async Task ApplyDuplicateApprovalAsync(
         DuplicateReview review, int administratorId, string administratorName,
-        DateTime now, bool direct, CancellationToken token)
+        DateTime now, CancellationToken token)
     {
         review.Status = DuplicateReviewStatusNames.Approved;
         review.ReviewedByUserAccountID = administratorId;
@@ -616,11 +572,9 @@ public sealed class AdminTicketService(ApplicationDbContext dbContext)
             TicketID = review.TicketID,
             PerformedByUserAccountID = administratorId,
             ActionType = TicketHistoryActionNames.DuplicateReviewApproved,
-            OldValue = direct ? null : DuplicateReviewStatusNames.Pending,
+            OldValue = DuplicateReviewStatusNames.Pending,
             NewValue = DuplicateReviewStatusNames.Approved,
-            Description = direct
-                ? $"{administratorName} marked {review.Ticket.TicketReferenceNumber} as a duplicate of {review.SuggestedOriginalTicket.TicketReferenceNumber}."
-                : $"{administratorName} approved the duplicate review. {review.Ticket.TicketReferenceNumber} was marked as a duplicate of {review.SuggestedOriginalTicket.TicketReferenceNumber}.",
+            Description = $"{administratorName} approved the duplicate review. {review.Ticket.TicketReferenceNumber} was marked as a duplicate of {review.SuggestedOriginalTicket.TicketReferenceNumber}.",
             CreatedDate = now
         });
         dbContext.ActivityLogs.Add(new ActivityLog
@@ -629,10 +583,8 @@ public sealed class AdminTicketService(ApplicationDbContext dbContext)
             ActionType = TicketHistoryActionNames.DuplicateReviewApproved,
             EntityType = "Ticket",
             EntityID = review.Ticket.TicketReferenceNumber,
-            Description = direct
-                ? $"Administrator {administratorName} marked {review.Ticket.TicketReferenceNumber} as a duplicate of {review.SuggestedOriginalTicket.TicketReferenceNumber}."
-                : $"Administrator {administratorName} approved {review.Ticket.TicketReferenceNumber} as a duplicate of {review.SuggestedOriginalTicket.TicketReferenceNumber}.",
-            OldValue = direct ? null : DuplicateReviewStatusNames.Pending,
+            Description = $"Administrator {administratorName} approved {review.Ticket.TicketReferenceNumber} as a duplicate of {review.SuggestedOriginalTicket.TicketReferenceNumber}.",
+            OldValue = DuplicateReviewStatusNames.Pending,
             NewValue = DuplicateReviewStatusNames.Approved,
             CreatedDate = now
         });

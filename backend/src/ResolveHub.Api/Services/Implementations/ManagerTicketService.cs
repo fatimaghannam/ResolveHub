@@ -55,6 +55,7 @@ public sealed class ManagerTicketService(
 
         var tickets = await dbContext.Tickets.Include(ticket => ticket.TicketStatus)
             .Include(ticket => ticket.TicketCategory)
+            .Include(ticket => ticket.TicketPriority)
             .Include(ticket => ticket.CreatedByUserAccount)
             .Where(ticket => !ticket.IsDeleted &&
             (ticket.TicketReferenceNumber == ticketReference ||
@@ -130,11 +131,13 @@ public sealed class ManagerTicketService(
         return new(TicketOperationStatus.Success,
             new DuplicateReviewDto(review.ID, reported.TicketReferenceNumber,
                 reported.Title, reported.TicketStatus.Name,
+                reported.TicketPriority.Name, reported.CreatedDate,
                 reported.CreatedByUserAccount.FirstName + " " +
                     reported.CreatedByUserAccount.LastName,
                 reported.TicketCategory.Name,
                 original.TicketReferenceNumber, original.Title,
                 original.TicketStatus.Name,
+                original.TicketPriority.Name, original.CreatedDate,
                 original.CreatedByUserAccount.FirstName + " " +
                     original.CreatedByUserAccount.LastName,
                 original.TicketCategory.Name, reporter, reason,

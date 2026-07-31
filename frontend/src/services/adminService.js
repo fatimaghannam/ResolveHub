@@ -25,13 +25,14 @@ export const updateAdminTicketAssignment = (ticketReference, agentUserId) =>
     body: JSON.stringify({ agentUserId }),
   })
 
-export const reviewAdminDuplicate = (reviewId, decision) =>
+export const reviewAdminDuplicate = (reviewId, decision, internalNote = null) =>
   apiRequest(`/api/admin/duplicate-reviews/${reviewId}/${decision}`, {
     method: 'POST',
+    body: JSON.stringify({ internalNote }),
   })
 
-export const markAdminTicketDuplicate = (ticketReference, request) =>
-  apiRequest(`/api/admin/tickets/${encodeURIComponent(ticketReference)}/mark-duplicate`, {
+export const reportAdminDuplicate = (ticketReference, request) =>
+  apiRequest(`/api/admin/tickets/${encodeURIComponent(ticketReference)}/duplicate-reviews`, {
     method: 'POST',
     body: JSON.stringify(request),
   })

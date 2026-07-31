@@ -104,11 +104,14 @@ public sealed class AdminTicketsController(
 
     [HttpPost("duplicate-reviews/{reviewId:int}/{decision}")]
     public async Task<IActionResult> ReviewDuplicate(
-        int reviewId, string decision, CancellationToken token)
+        int reviewId, string decision,
+        [FromBody] ReviewDuplicateRequestDto? request,
+        CancellationToken token)
     {
         if (decision is not ("approve" or "reject")) return BadRequest();
         var result = await service.ReviewDuplicateAsync(
-            GetUserId(), reviewId, decision == "approve", token);
+            GetUserId(), reviewId, decision == "approve",
+            request?.InternalNote, token);
         return result.Status switch
         {
             TicketOperationStatus.Success => NoContent(),
@@ -120,16 +123,18 @@ public sealed class AdminTicketsController(
         };
     }
 
-    [HttpPost("tickets/{ticketReference}/mark-duplicate")]
-    public async Task<IActionResult> MarkDuplicate(
-        string ticketReference, MarkDuplicateRequestDto request,
+    [HttpPost("tickets/{ticketReference}/duplicate-reviews")]
+    public async Task<ActionResult<DuplicateReviewDto>> ReportDuplicate(
+        string ticketReference, CreateDuplicateReviewRequestDto request,
         CancellationToken token)
     {
-        var result = await service.MarkDuplicateAsync(
+        var result = await managerTicketService.ReportDuplicateAsync(
             GetUserId(), ticketReference, request, token);
         return result.Status switch
         {
-            TicketOperationStatus.Success => NoContent(),
+            TicketOperationStatus.Success => Created(
+                $"/api/admin/tickets/{ticketReference}/duplicate-reviews/{result.Value!.Id}",
+                result.Value),
             TicketOperationStatus.NotFound =>
                 NotFound(new { message = result.Message }),
             TicketOperationStatus.Conflict =>

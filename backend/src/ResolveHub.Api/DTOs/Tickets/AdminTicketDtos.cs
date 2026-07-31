@@ -92,15 +92,10 @@ public sealed class CreateDuplicateReviewRequestDto
     public string? Reason { get; init; }
 }
 
-public sealed class MarkDuplicateRequestDto
+public sealed class ReviewDuplicateRequestDto
 {
-    [Required, StringLength(32)]
-    public string OriginalTicketReference { get; init; } = string.Empty;
-
-    [Required, StringLength(1000, MinimumLength = 1)]
-    public string Reason { get; init; } = string.Empty;
-
-    public bool Confirmed { get; init; }
+    [StringLength(1000)]
+    public string? InternalNote { get; init; }
 }
 
 public sealed record DuplicateReviewDto(
@@ -108,11 +103,15 @@ public sealed record DuplicateReviewDto(
     string ReportedTicketReference,
     string ReportedTicketTitle,
     string ReportedTicketStatus,
+    string ReportedTicketPriority,
+    DateTime ReportedTicketCreatedDate,
     string ReportedRequesterName,
     string ReportedCategoryName,
     string SuggestedOriginalTicketReference,
     string SuggestedOriginalTicketTitle,
     string SuggestedOriginalTicketStatus,
+    string SuggestedOriginalTicketPriority,
+    DateTime SuggestedOriginalTicketCreatedDate,
     string SuggestedOriginalRequesterName,
     string SuggestedOriginalCategoryName,
     string ReportedByName,

@@ -8,11 +8,26 @@ import TicketComments from '../components/tickets/TicketComments.jsx'
 import {
   addAdminTicketComment,
   getAdminTicket,
-  markAdminTicketDuplicate,
+  reportAdminDuplicate,
   reviewAdminDuplicate,
 } from '../services/adminService.js'
 import { addManagerTicketComment, getManagerTicket, reportManagerDuplicate } from '../services/managerService.js'
 import { formatLocalDate } from '../utils/dateTime.js'
+
+function TicketComparison({ reported, original }) {
+  const fields = [
+    ['Ticket Number', 'ticketReferenceNumber'],
+    ['Title', 'title'],
+    ['Requester', 'requesterName'],
+    ['Category', 'categoryName'],
+    ['Priority', 'priorityName'],
+    ['Status', 'statusName'],
+  ]
+  function ComparisonCard({ label, item }) {
+    return <article className="duplicate-comparison-card"><h3>{label}</h3><dl>{fields.map(([name, key]) => <div key={key}><dt>{name}</dt><dd>{key === 'statusName' ? <TicketStatusBadge value={item[key]} /> : key === 'priorityName' ? <TicketPriorityBadge value={item[key]} /> : item[key]}</dd></div>)}<div><dt>Created Date</dt><dd>{formatLocalDate(item.createdDate)}</dd></div></dl></article>
+  }
+  return <div className="duplicate-comparison"><ComparisonCard label="Reported Ticket" item={reported} /><ComparisonCard label="Original Ticket" item={original} /></div>
+}
 
 function AdminTicketDetailsPage({ roleArea = 'admin' }) {
   const { ticketReference } = useParams()
@@ -26,8 +41,8 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
   const [processingDuplicate, setProcessingDuplicate] = useState(false)
   const [duplicateError, setDuplicateError] = useState('')
   const [originalTicketPreview, setOriginalTicketPreview] = useState(null)
-  const [duplicateConfirmed, setDuplicateConfirmed] = useState(false)
   const [loadingOriginal, setLoadingOriginal] = useState(false)
+  const [reviewNote, setReviewNote] = useState('')
   const [comment, setComment] = useState('')
   const [addingComment, setAddingComment] = useState(false)
   const duplicateTriggerRef = useRef(null)
@@ -88,8 +103,8 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
     setDuplicateError('')
     setOriginalReference('')
     setDuplicateReason('')
+    setReviewNote('')
     setOriginalTicketPreview(null)
-    setDuplicateConfirmed(false)
     setDuplicateDialogOpen(true)
   }
 
@@ -107,12 +122,15 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
   if (!ticket) return <EmptyState title="Ticket not found" message="This ticket is not available." action={<Link className="button button--secondary" to={`/${roleArea}/tickets`}>Back to All Tickets</Link>} />
 
   async function reportDuplicate() {
-    if (!originalReference.trim() || processingDuplicate) return
+    if (!originalTicketPreview || processingDuplicate) return
     try {
       setProcessingDuplicate(true)
       setDuplicateError('')
-      const review = await reportManagerDuplicate(ticket.ticketReferenceNumber, {
-        suggestedOriginalTicketReference: originalReference.trim(),
+      const reportRequest = roleArea === 'manager'
+        ? reportManagerDuplicate
+        : reportAdminDuplicate
+      const review = await reportRequest(ticket.ticketReferenceNumber, {
+        suggestedOriginalTicketReference: originalTicketPreview.ticketReferenceNumber,
         reason: duplicateReason.trim() || null,
       })
       setTicket((current) => ({ ...current, pendingDuplicateReview: review }))
@@ -130,7 +148,8 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
     try {
       setProcessingDuplicate(true)
       setDuplicateError('')
-      await reviewAdminDuplicate(ticket.pendingDuplicateReview.id, decision)
+      await reviewAdminDuplicate(
+        ticket.pendingDuplicateReview.id, decision, reviewNote.trim() || null)
       const approved = decision === 'approve'
       const original = ticket.pendingDuplicateReview.suggestedOriginalTicketReference
       const originalTitle = ticket.pendingDuplicateReview.suggestedOriginalTicketTitle
@@ -155,34 +174,13 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
     try {
       setLoadingOriginal(true)
       setDuplicateError('')
-      setOriginalTicketPreview(await getAdminTicket(reference))
-      setDuplicateConfirmed(false)
+      const loadTicket = roleArea === 'manager' ? getManagerTicket : getAdminTicket
+      setOriginalTicketPreview(await loadTicket(reference))
     } catch (requestError) {
       setOriginalTicketPreview(null)
       setDuplicateError(requestError.message)
     } finally {
       setLoadingOriginal(false)
-    }
-  }
-
-  async function markDuplicate() {
-    if (processingDuplicate || !originalTicketPreview ||
-        !duplicateReason.trim() || !duplicateConfirmed) return
-    try {
-      setProcessingDuplicate(true)
-      setDuplicateError('')
-      await markAdminTicketDuplicate(ticket.ticketReferenceNumber, {
-        originalTicketReference: originalTicketPreview.ticketReferenceNumber,
-        reason: duplicateReason.trim(),
-        confirmed: true,
-      })
-      setTicket(await getAdminTicket(ticket.ticketReferenceNumber))
-      closeDuplicateDialog()
-      setToast({ id: Date.now(), type: 'success', title: 'Duplicate Marked', message: `${ticket.ticketReferenceNumber} was marked as a duplicate of ${originalTicketPreview.ticketReferenceNumber}.` })
-    } catch (requestError) {
-      setDuplicateError(requestError.message)
-    } finally {
-      setProcessingDuplicate(false)
     }
   }
 
@@ -219,14 +217,34 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
     }
   }
 
+  const reviewingDuplicate = roleArea === 'admin' && Boolean(ticket.pendingDuplicateReview)
+  const reviewReportedTicket = reviewingDuplicate ? {
+    ticketReferenceNumber: ticket.pendingDuplicateReview.reportedTicketReference,
+    title: ticket.pendingDuplicateReview.reportedTicketTitle,
+    requesterName: ticket.pendingDuplicateReview.reportedRequesterName,
+    categoryName: ticket.pendingDuplicateReview.reportedCategoryName,
+    priorityName: ticket.pendingDuplicateReview.reportedTicketPriority,
+    statusName: ticket.pendingDuplicateReview.reportedTicketStatus,
+    createdDate: ticket.pendingDuplicateReview.reportedTicketCreatedDate,
+  } : null
+  const reviewOriginalTicket = reviewingDuplicate ? {
+    ticketReferenceNumber: ticket.pendingDuplicateReview.suggestedOriginalTicketReference,
+    title: ticket.pendingDuplicateReview.suggestedOriginalTicketTitle,
+    requesterName: ticket.pendingDuplicateReview.suggestedOriginalRequesterName,
+    categoryName: ticket.pendingDuplicateReview.suggestedOriginalCategoryName,
+    priorityName: ticket.pendingDuplicateReview.suggestedOriginalTicketPriority,
+    statusName: ticket.pendingDuplicateReview.suggestedOriginalTicketStatus,
+    createdDate: ticket.pendingDuplicateReview.suggestedOriginalTicketCreatedDate,
+  } : null
+
   return (
     <>
       {toast && <div className="app-toast-region"><Toast key={toast.id} type={toast.type} title={toast.title} message={toast.message} onDismiss={dismissToast} /></div>}
       <Link className="back-link back-link--top" to={`/${roleArea}/tickets`}><ArrowLeft size={18} />Back to All Tickets</Link>
       <section className="page-heading page-heading--action">
         <div><span className="eyebrow">{ticket.ticketReferenceNumber}</span><h2>{ticket.title}</h2><p>Created {formatLocalDate(ticket.createdDate)}</p></div>
-        {roleArea === 'manager' && !ticket.pendingDuplicateReview && ticket.statusName !== 'Duplicate' && <button ref={duplicateTriggerRef} className="button button--secondary" type="button" onClick={openDuplicateDialog}>Mark as Duplicate</button>}
-        {roleArea === 'admin' && ticket.statusName !== 'Duplicate' && <button ref={duplicateTriggerRef} className="button button--secondary" type="button" onClick={openDuplicateDialog}>{ticket.pendingDuplicateReview ? 'Review Duplicate' : 'Mark as Duplicate'}</button>}
+        {!ticket.pendingDuplicateReview && ticket.statusName !== 'Duplicate' && <button ref={duplicateTriggerRef} className="button button--secondary" type="button" onClick={openDuplicateDialog}>Report Possible Duplicate</button>}
+        {roleArea === 'admin' && ticket.pendingDuplicateReview && ticket.statusName !== 'Duplicate' && <button ref={duplicateTriggerRef} className="button button--secondary" type="button" onClick={openDuplicateDialog}>Review Duplicate Report</button>}
       </section>
       {ticket.pendingDuplicateReview && <div className="inline-alert"><span className="badge badge--pending-approval">Duplicate Review Pending</span></div>}
       {ticket.statusName === 'Duplicate' && ticket.originalTicketReference && <section className="duplicate-info-panel" aria-labelledby="duplicate-info-title"><h2 id="duplicate-info-title">Duplicate Ticket</h2><p>This ticket was marked as a duplicate of:</p><Link className="duplicate-info-panel__link" to={`/${roleArea}/tickets/${ticket.originalTicketReference}`}><strong>{ticket.originalTicketReference}</strong><span>{ticket.originalTicketTitle || 'View original ticket'}</span></Link>{(ticket.duplicateApprovedDate || ticket.duplicateApprovedByName) && <p className="duplicate-info-panel__meta">Approved{ticket.duplicateApprovedDate ? ` ${formatLocalDate(ticket.duplicateApprovedDate)}` : ''}{ticket.duplicateApprovedByName ? ` by ${ticket.duplicateApprovedByName}` : ''}</p>}</section>}
@@ -252,23 +270,23 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
       {duplicateDialogOpen && <>
         <button className="dialog-backdrop" type="button" aria-label="Close duplicate dialog" onClick={() => { if (!processingDuplicate) closeDuplicateDialog() }} />
         <section className="dialog dialog--duplicate" role="dialog" aria-modal="true" aria-labelledby="duplicate-title" aria-describedby="duplicate-description">
-          <h2 id="duplicate-title">{roleArea === 'manager' ? 'Report Possible Duplicate' : ticket.pendingDuplicateReview ? 'Review Duplicate' : 'Mark as Duplicate'}</h2>
-          {roleArea === 'manager' ? <>
-            <p id="duplicate-description">Submit this ticket for Administrator review. Its status will not change.</p>
-            <label><span>Possible original ticket</span><input autoFocus value={originalReference} onChange={(event) => setOriginalReference(event.target.value)} placeholder="RH-2026-0003" disabled={processingDuplicate} /></label>
-            <label><span>Reason (optional)</span><textarea value={duplicateReason} onChange={(event) => setDuplicateReason(event.target.value)} maxLength="1000" disabled={processingDuplicate} /></label>
-          </> : ticket.pendingDuplicateReview ? <>
-            <p id="duplicate-description">Review the Manager's report before changing the ticket.</p>
-            <dl className="duplicate-review-details"><div><dt>Reported Ticket</dt><dd><strong>{ticket.pendingDuplicateReview.reportedTicketReference}</strong><span>{ticket.pendingDuplicateReview.reportedTicketTitle}</span></dd></div><div><dt>Current Status</dt><dd>{ticket.pendingDuplicateReview.reportedTicketStatus}</dd></div><div><dt>Requester</dt><dd>{ticket.pendingDuplicateReview.reportedRequesterName}</dd></div><div><dt>Category</dt><dd>{ticket.pendingDuplicateReview.reportedCategoryName}</dd></div><div><dt>Suspected Original</dt><dd><strong>{ticket.pendingDuplicateReview.suggestedOriginalTicketReference}</strong><span>{ticket.pendingDuplicateReview.suggestedOriginalTicketTitle}</span></dd></div><div><dt>Original Status</dt><dd>{ticket.pendingDuplicateReview.suggestedOriginalTicketStatus}</dd></div><div><dt>Original Requester</dt><dd>{ticket.pendingDuplicateReview.suggestedOriginalRequesterName}</dd></div><div><dt>Original Category</dt><dd>{ticket.pendingDuplicateReview.suggestedOriginalCategoryName}</dd></div><div><dt>Reported By</dt><dd>{ticket.pendingDuplicateReview.reportedByName}</dd></div><div><dt>Report Date</dt><dd>{formatLocalDate(ticket.pendingDuplicateReview.createdDate)}</dd></div><div><dt>Reason</dt><dd>{ticket.pendingDuplicateReview.reason || 'No reason provided.'}</dd></div></dl>
+          <h2 id="duplicate-title">{reviewingDuplicate ? 'Review Duplicate Ticket' : 'Report Possible Duplicate'}</h2>
+          {reviewingDuplicate ? <>
+            <p id="duplicate-description">Compare the reported ticket with the proposed original ticket. If they represent the same issue, confirm to mark this ticket as a duplicate. This preserves all ticket history and links the duplicate to the original ticket.</p>
+            <TicketComparison reported={reviewReportedTicket} original={reviewOriginalTicket} />
+            <div className="duplicate-report-meta"><span>Reported by <strong>{ticket.pendingDuplicateReview.reportedByName}</strong></span><span>{formatLocalDate(ticket.pendingDuplicateReview.createdDate)}</span></div>
+            {ticket.pendingDuplicateReview.reason && <section className="duplicate-reason"><h3>Reporter Reason</h3><p>{ticket.pendingDuplicateReview.reason}</p></section>}
+            <label><span>Internal review note (Optional)</span><textarea value={reviewNote} onChange={(event) => setReviewNote(event.target.value)} maxLength="1000" placeholder="Add context for the internal review history..." disabled={processingDuplicate} /></label>
+            <section className="duplicate-next-steps"><h3>What happens after approval?</h3><ul><li>This ticket will become Duplicate.</li><li>All history will be preserved.</li><li>Future work should continue on the original ticket.</li><li>The duplicate ticket becomes read-only.</li><li>The duplicate is linked to the original ticket.</li></ul></section>
           </> : <>
-            <p id="duplicate-description">Choose and compare the original ticket, provide a reason, then confirm this permanent action.</p>
-            <label><span>Original ticket</span><span className="duplicate-reference-field"><input autoFocus value={originalReference} onChange={(event) => { setOriginalReference(event.target.value); setOriginalTicketPreview(null); setDuplicateConfirmed(false) }} placeholder="RH-2026-0003" disabled={processingDuplicate || loadingOriginal} /><button className="button button--secondary" type="button" onClick={loadOriginalTicket} disabled={!originalReference.trim() || loadingOriginal || processingDuplicate}>{loadingOriginal ? 'Loading…' : 'Compare'}</button></span></label>
-            {originalTicketPreview && <dl className="duplicate-review-details"><div><dt>Reported Ticket</dt><dd><strong>{ticket.ticketReferenceNumber}</strong><span>{ticket.title}</span></dd></div><div><dt>Current Status</dt><dd>{ticket.statusName}</dd></div><div><dt>Requester</dt><dd>{ticket.requesterName}</dd></div><div><dt>Category</dt><dd>{ticket.categoryName}</dd></div><div><dt>Original Ticket</dt><dd><strong>{originalTicketPreview.ticketReferenceNumber}</strong><span>{originalTicketPreview.title}</span></dd></div><div><dt>Original Status</dt><dd>{originalTicketPreview.statusName}</dd></div><div><dt>Original Requester</dt><dd>{originalTicketPreview.requesterName}</dd></div><div><dt>Original Category</dt><dd>{originalTicketPreview.categoryName}</dd></div></dl>}
-            <label><span>Reason</span><textarea value={duplicateReason} onChange={(event) => setDuplicateReason(event.target.value)} maxLength="1000" required disabled={processingDuplicate} /></label>
-            <label className="duplicate-confirmation"><input type="checkbox" checked={duplicateConfirmed} onChange={(event) => setDuplicateConfirmed(event.target.checked)} disabled={!originalTicketPreview || processingDuplicate} /><span>I confirm this ticket should be permanently marked as a duplicate.</span></label>
+            <p id="duplicate-description">Report this ticket as a possible duplicate. An Administrator will review this request before any ticket status changes are made.</p>
+            <label><span>Original Ticket</span><span className="duplicate-reference-field"><input autoFocus value={originalReference} onChange={(event) => { setOriginalReference(event.target.value); setOriginalTicketPreview(null) }} placeholder="RH-2026-0034" disabled={processingDuplicate || loadingOriginal} /><button className="button button--secondary" type="button" onClick={loadOriginalTicket} disabled={!originalReference.trim() || loadingOriginal || processingDuplicate}>{loadingOriginal ? 'Loading…' : 'Compare'}</button></span></label>
+            {originalTicketPreview && <TicketComparison reported={ticket} original={originalTicketPreview} />}
+            <label><span>Reason (Optional)</span><textarea value={duplicateReason} onChange={(event) => setDuplicateReason(event.target.value)} maxLength="1000" placeholder="Provide additional context if needed..." disabled={processingDuplicate} /></label>
+            <section className="duplicate-next-steps"><h3>What happens next?</h3><ul><li>No ticket status changes immediately.</li><li>Administrators will review this request.</li><li>The ticket remains editable according to its current status.</li><li>A history record will be created.</li></ul></section>
           </>}
           {duplicateError && <div className="inline-alert inline-alert--error" role="alert">{duplicateError}</div>}
-          <div className="dialog__actions"><button autoFocus={roleArea === 'admin' && Boolean(ticket.pendingDuplicateReview)} className="button button--secondary" type="button" onClick={closeDuplicateDialog} disabled={processingDuplicate}>Cancel</button>{roleArea === 'manager' ? <button className="button button--primary" type="button" onClick={reportDuplicate} disabled={!originalReference.trim() || processingDuplicate}>{processingDuplicate ? 'Submitting…' : 'Submit Report'}</button> : ticket.pendingDuplicateReview ? <><button className="button button--danger-outline" type="button" onClick={() => reviewDuplicate('reject')} disabled={processingDuplicate}>Reject Report</button><button className="button button--primary" type="button" onClick={() => reviewDuplicate('approve')} disabled={processingDuplicate}>{processingDuplicate ? 'Reviewing…' : 'Approve Duplicate'}</button></> : <button className="button button--primary" type="button" onClick={markDuplicate} disabled={!originalTicketPreview || !duplicateReason.trim() || !duplicateConfirmed || processingDuplicate}>{processingDuplicate ? 'Marking…' : 'Mark as Duplicate'}</button>}</div>
+          <div className="dialog__actions"><button autoFocus={reviewingDuplicate} className="button button--secondary" type="button" onClick={closeDuplicateDialog} disabled={processingDuplicate}>Cancel</button>{reviewingDuplicate ? <><button className="button button--danger-outline" type="button" onClick={() => reviewDuplicate('reject')} disabled={processingDuplicate}>Reject Report</button><button className="button button--primary" type="button" onClick={() => reviewDuplicate('approve')} disabled={processingDuplicate}>{processingDuplicate ? 'Reviewing…' : 'Approve Duplicate'}</button></> : <button className="button button--primary" type="button" onClick={reportDuplicate} disabled={!originalTicketPreview || processingDuplicate}>{processingDuplicate ? 'Submitting…' : 'Submit Duplicate Report'}</button>}</div>
         </section>
       </>}
     </>
