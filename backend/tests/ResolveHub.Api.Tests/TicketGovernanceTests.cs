@@ -36,7 +36,7 @@ public sealed class TicketGovernanceTests
             new
             {
                 originalTicketReference = original.TicketReferenceNumber,
-                internalNote = "Both tickets describe the same confirmed incident.",
+                reason = "Both tickets describe the same confirmed incident.",
                 confirmed = true
             });
 
@@ -72,6 +72,67 @@ public sealed class TicketGovernanceTests
         Assert.Equal(HttpStatusCode.Conflict, assign.StatusCode);
         Assert.Contains(DuplicateTicketRules.ReadOnlyMessage,
             await assign.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task AdministratorDirectDuplicateEndpoint_ValidatesInputLifecycleAndRole()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        await factory.SeedTicketLookupsAsync();
+        var admin = await factory.CreateUserAsync(
+            "direct-validation-admin@resolvehub.test", Password, RoleNames.Admin);
+        var manager = await factory.CreateUserAsync(
+            "direct-validation-manager@resolvehub.test", Password, RoleNames.Manager);
+        var employee = await factory.CreateUserAsync(
+            "direct-validation-owner@resolvehub.test", Password, RoleNames.Employee);
+        using var adminClient = await LoginAsync(factory, admin.Email!);
+        using var managerClient = await LoginAsync(factory, manager.Email!);
+        using var employeeClient = await LoginAsync(factory, employee.Email!);
+        var original = await CreateTicketAsync(
+            factory, employeeClient, "Direct validation original");
+        var duplicate = await CreateTicketAsync(
+            factory, employeeClient, "Direct validation duplicate");
+        var endpoint =
+            $"/api/admin/tickets/{duplicate.TicketReferenceNumber.ToLowerInvariant()}/mark-duplicate";
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await adminClient.PostAsJsonAsync(
+            endpoint, new
+            {
+                originalTicketReference = duplicate.TicketReferenceNumber,
+                confirmed = true
+            })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await adminClient.PostAsJsonAsync(
+            endpoint, new
+            {
+                originalTicketReference = original.TicketReferenceNumber,
+                confirmed = false
+            })).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await adminClient.PostAsJsonAsync(
+            endpoint, new
+            {
+                originalTicketReference = "RH-2099-9999",
+                confirmed = true
+            })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await managerClient.PostAsJsonAsync(
+            endpoint, new
+            {
+                originalTicketReference = original.TicketReferenceNumber,
+                confirmed = true
+            })).StatusCode);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await adminClient.PostAsJsonAsync(
+            endpoint, new
+            {
+                originalTicketReference = $" {original.TicketReferenceNumber.ToLowerInvariant()} ",
+                reason = (string?)null,
+                confirmed = true
+            })).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await adminClient.PostAsJsonAsync(
+            endpoint, new
+            {
+                originalTicketReference = original.TicketReferenceNumber,
+                confirmed = true
+            })).StatusCode);
     }
 
     [Fact]

@@ -125,7 +125,7 @@ public sealed class AdminTicketsController(
 
     [HttpPost("tickets/{ticketReference}/mark-duplicate")]
     public async Task<IActionResult> MarkDuplicate(
-        string ticketReference, MarkDuplicateRequestDto request,
+        string ticketReference, [FromBody] MarkDuplicateRequestDto request,
         CancellationToken token)
     {
         var result = await service.MarkDuplicateAsync(

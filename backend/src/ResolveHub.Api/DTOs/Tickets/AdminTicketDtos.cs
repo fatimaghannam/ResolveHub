@@ -105,7 +105,7 @@ public sealed class MarkDuplicateRequestDto
     public string OriginalTicketReference { get; init; } = string.Empty;
 
     [StringLength(1000)]
-    public string? InternalNote { get; init; }
+    public string? Reason { get; init; }
 
     public bool Confirmed { get; init; }
 }

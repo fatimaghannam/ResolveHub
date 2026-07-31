@@ -14,6 +14,16 @@ import {
 import { addManagerTicketComment, getManagerTicket, reportManagerDuplicate } from '../services/managerService.js'
 import { formatLocalDate } from '../utils/dateTime.js'
 
+function getDirectDuplicateError(error) {
+  if (error.status === 404) {
+    return 'Reported or original ticket could not be found.'
+  }
+  if (error.status === 0) {
+    return 'The server could not be reached.'
+  }
+  return error.message
+}
+
 function TicketComparison({ reported, original }) {
   const fields = [
     ['Ticket Number', 'ticketReferenceNumber'],
@@ -191,14 +201,14 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
       setDuplicateError('')
       await markAdminTicketDuplicate(ticket.ticketReferenceNumber, {
         originalTicketReference: originalTicketPreview.ticketReferenceNumber,
-        internalNote: duplicateReason.trim() || null,
+        reason: duplicateReason.trim() || null,
         confirmed: true,
       })
       setTicket(await getAdminTicket(ticket.ticketReferenceNumber))
       closeDuplicateDialog()
-      setToast({ id: Date.now(), type: 'success', title: 'Duplicate Marked', message: `${ticket.ticketReferenceNumber} was marked as a duplicate of ${originalTicketPreview.ticketReferenceNumber}.` })
+      setToast({ id: Date.now(), type: 'success', title: 'Duplicate Marked', message: 'Ticket marked as duplicate.' })
     } catch (requestError) {
-      setDuplicateError(requestError.message)
+      setDuplicateError(getDirectDuplicateError(requestError))
     } finally {
       setProcessingDuplicate(false)
     }

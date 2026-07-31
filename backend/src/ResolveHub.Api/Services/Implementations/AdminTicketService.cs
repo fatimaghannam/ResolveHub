@@ -11,7 +11,9 @@ using ResolveHub.Api.Services.Models;
 
 namespace ResolveHub.Api.Services.Implementations;
 
-public sealed class AdminTicketService(ApplicationDbContext dbContext)
+public sealed class AdminTicketService(
+    ApplicationDbContext dbContext,
+    ILogger<AdminTicketService> logger)
     : IAdminTicketService
 {
     public async Task<AdminAssignmentOverviewDto> GetAssignmentsAsync(
@@ -566,25 +568,47 @@ public sealed class AdminTicketService(ApplicationDbContext dbContext)
         if (!request.Confirmed)
             return new(TicketOperationStatus.Invalid,
                 Message: "Confirm that this ticket should be marked as Duplicate.");
+        var reportedReference = ticketReference.Trim();
         var originalReference = request.OriginalTicketReference.Trim();
-        if (string.Equals(ticketReference, originalReference,
+        logger.LogInformation(
+            "Direct duplicate lookup received reported reference {ReportedTicketReference} and original reference {OriginalTicketReference}; both are queried against Ticket.TicketReferenceNumber.",
+            reportedReference, originalReference);
+        if (string.Equals(reportedReference, originalReference,
                 StringComparison.OrdinalIgnoreCase))
             return new(TicketOperationStatus.Invalid,
                 Message: "A ticket cannot be reported as a duplicate of itself.");
 
-        var tickets = await dbContext.Tickets
+        var normalizedReportedReference = reportedReference.ToUpperInvariant();
+        var duplicate = await dbContext.Tickets
             .Include(ticket => ticket.TicketStatus)
-            .Where(ticket => !ticket.IsDeleted &&
-                (ticket.TicketReferenceNumber == ticketReference ||
-                 ticket.TicketReferenceNumber == originalReference))
-            .ToListAsync(token);
-        var duplicate = tickets.SingleOrDefault(ticket =>
-            ticket.TicketReferenceNumber == ticketReference);
-        var original = tickets.SingleOrDefault(ticket =>
-            ticket.TicketReferenceNumber == originalReference);
-        if (duplicate is null || original is null)
+            .SingleOrDefaultAsync(ticket => !ticket.IsDeleted &&
+                ticket.TicketReferenceNumber.ToUpper() ==
+                    normalizedReportedReference, token);
+        if (duplicate is null)
+        {
+            logger.LogWarning(
+                "Direct duplicate lookup could not find reported ticket {ReportedTicketReference} in Ticket.TicketReferenceNumber.",
+                reportedReference);
             return new(TicketOperationStatus.NotFound,
-                Message: "The ticket or original ticket could not be found.");
+                Message: "The reported ticket could not be found.");
+        }
+
+        var normalizedOriginalReference = originalReference.ToUpperInvariant();
+        var original = await dbContext.Tickets.SingleOrDefaultAsync(ticket =>
+            !ticket.IsDeleted && ticket.TicketReferenceNumber.ToUpper() ==
+                normalizedOriginalReference, token);
+        if (original is null)
+        {
+            logger.LogWarning(
+                "Direct duplicate lookup found reported ticket {ReportedTicketReference}, but could not find original ticket {OriginalTicketReference} in Ticket.TicketReferenceNumber.",
+                duplicate.TicketReferenceNumber, originalReference);
+            return new(TicketOperationStatus.NotFound,
+                Message: "The original ticket could not be found.");
+        }
+        logger.LogInformation(
+            "Direct duplicate lookup resolved reported ticket {ReportedTicketReference} (ID {ReportedTicketId}) and original ticket {OriginalTicketReference} (ID {OriginalTicketId}).",
+            duplicate.TicketReferenceNumber, duplicate.ID,
+            original.TicketReferenceNumber, original.ID);
         if (DuplicateTicketRules.IsDuplicate(duplicate.TicketStatus.Name))
             return new(TicketOperationStatus.Conflict,
                 Message: "This ticket has already been marked as Duplicate.");
@@ -620,16 +644,16 @@ public sealed class AdminTicketService(ApplicationDbContext dbContext)
             Description = $"{administratorName} marked {duplicate.TicketReferenceNumber} as a duplicate of {original.TicketReferenceNumber}.",
             CreatedDate = now
         });
-        var internalNote = string.IsNullOrWhiteSpace(request.InternalNote)
-            ? null : request.InternalNote.Trim();
-        if (internalNote is not null)
+        var reason = string.IsNullOrWhiteSpace(request.Reason)
+            ? null : request.Reason.Trim();
+        if (reason is not null)
         {
             dbContext.TicketHistory.Add(new TicketHistory
             {
                 TicketID = duplicate.ID,
                 PerformedByUserAccountID = administratorId,
                 ActionType = "Duplicate Marking Note",
-                Description = internalNote,
+                Description = reason,
                 IsInternal = true,
                 CreatedDate = now
             });
