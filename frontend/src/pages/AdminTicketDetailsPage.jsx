@@ -225,7 +225,7 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
       <Link className="back-link back-link--top" to={`/${roleArea}/tickets`}><ArrowLeft size={18} />Back to All Tickets</Link>
       <section className="page-heading page-heading--action">
         <div><span className="eyebrow">{ticket.ticketReferenceNumber}</span><h2>{ticket.title}</h2><p>Created {formatLocalDate(ticket.createdDate)}</p></div>
-        {roleArea === 'manager' && !ticket.pendingDuplicateReview && ticket.statusName !== 'Duplicate' && <button ref={duplicateTriggerRef} className="button button--secondary" type="button" onClick={openDuplicateDialog}>Report Possible Duplicate</button>}
+        {roleArea === 'manager' && !ticket.pendingDuplicateReview && ticket.statusName !== 'Duplicate' && <button ref={duplicateTriggerRef} className="button button--secondary" type="button" onClick={openDuplicateDialog}>Mark as Duplicate</button>}
         {roleArea === 'admin' && ticket.statusName !== 'Duplicate' && <button ref={duplicateTriggerRef} className="button button--secondary" type="button" onClick={openDuplicateDialog}>{ticket.pendingDuplicateReview ? 'Review Duplicate' : 'Mark as Duplicate'}</button>}
       </section>
       {ticket.pendingDuplicateReview && <div className="inline-alert"><span className="badge badge--pending-approval">Duplicate Review Pending</span></div>}
