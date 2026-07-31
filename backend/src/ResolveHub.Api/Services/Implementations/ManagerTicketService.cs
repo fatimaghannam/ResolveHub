@@ -170,20 +170,25 @@ public sealed class ManagerTicketService(
         int managerId, string ticketReference,
         AddTicketCommentRequestDto request, CancellationToken token)
     {
-        var content = request.Content?.Trim();
-        if (string.IsNullOrWhiteSpace(content) || content.Length > 5000)
+        var content = request.Message?.Trim();
+        if (string.IsNullOrWhiteSpace(content) ||
+            content.Length > TicketCommentRules.MaximumMessageLength)
             return new(TicketOperationStatus.Invalid,
                 Message: "Comment content is required and cannot exceed 5000 characters.");
-        var ticket = await dbContext.Tickets.SingleOrDefaultAsync(item =>
-            item.TicketReferenceNumber == ticketReference && !item.IsDeleted, token);
+        var ticket = await dbContext.Tickets.Include(item => item.TicketStatus)
+            .SingleOrDefaultAsync(item =>
+                item.TicketReferenceNumber == ticketReference && !item.IsDeleted, token);
         if (ticket is null) return new(TicketOperationStatus.NotFound);
+        if (TicketCommentRules.IsReadOnly(ticket.TicketStatus.Name))
+            return new(TicketOperationStatus.Conflict,
+                Message: "Comments cannot be added to a closed or cancelled ticket.");
         var now = DateTime.UtcNow;
         var comment = new TicketComment
         {
             TicketID = ticket.ID,
             AuthorUserAccountID = managerId,
             Content = content,
-            IsInternal = false,
+            Visibility = CommentVisibility.Public,
             CreatedDate = now
         };
         dbContext.TicketComments.Add(comment);
@@ -191,18 +196,26 @@ public sealed class ManagerTicketService(
         {
             TicketID = ticket.ID,
             PerformedByUserAccountID = managerId,
-            ActionType = TicketHistoryActionNames.ManagerCommentAdded,
-            Description = "A Manager comment was added.",
+            ActionType = TicketHistoryActionNames.CommentAdded,
+            Description = TicketCommentRules.HistoryDescription(
+                CommentVisibility.Public),
             CreatedDate = now
         });
         ticket.UpdatedDate = now;
         await dbContext.SaveChangesAsync(token);
         var author = await dbContext.Users.AsNoTracking()
             .Where(user => user.Id == managerId)
-            .Select(user => user.FirstName + " " + user.LastName)
+            .Select(user => new
+            {
+                Name = user.FirstName + " " + user.LastName,
+                Role = user.UserAccountRoles.Select(item => item.Role.Name!)
+                    .FirstOrDefault() ?? string.Empty
+            })
             .SingleAsync(token);
         return new(TicketOperationStatus.Success,
-            new(comment.ID, author, comment.Content, now, null, false));
+            new(comment.ID, author.Name, author.Role, comment.Content,
+                now, null, false,
+                CommentVisibility.Public.ToString()));
     }
 
     public async Task<ManagerDashboardDto> GetDashboardAsync(CancellationToken token)

@@ -47,15 +47,6 @@ export const addAgentTicketComment = (ticketReference, request) =>
     body: JSON.stringify(request),
   })
 
-export const getAgentInternalNotes = (ticketReference, signal) =>
-  apiRequest(`/api/agent/tickets/${encodeURIComponent(ticketReference)}/internal-notes`, { signal })
-
-export const addAgentInternalNote = (ticketReference, request) =>
-  apiRequest(`/api/agent/tickets/${encodeURIComponent(ticketReference)}/internal-notes`, {
-    method: 'POST',
-    body: JSON.stringify(request),
-  })
-
 export const getAgentTicketHistory = (ticketReference, signal) =>
   apiRequest(`/api/agent/tickets/${encodeURIComponent(ticketReference)}/history`, { signal })
 

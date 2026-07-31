@@ -7,7 +7,6 @@ public static class TicketHistoryActionNames
     public const string TicketWorkStarted = "Ticket Work Started";
     public const string StatusChanged = "Status Changed";
     public const string CommentAdded = "Comment Added";
-    public const string InternalNoteAdded = "Internal Note Added";
     public const string TicketResolved = "Ticket Resolved";
     public const string TicketClosed = "Ticket Closed";
     public const string TicketReopened = "Ticket Reopened";
@@ -16,5 +15,4 @@ public static class TicketHistoryActionNames
     public const string AssignmentRequested = "Assignment Requested";
     public const string AssignmentRequestApproved = "Assignment Request Approved";
     public const string AssignmentRequestRejected = "Assignment Request Rejected";
-    public const string ManagerCommentAdded = "Manager Comment Added";
 }

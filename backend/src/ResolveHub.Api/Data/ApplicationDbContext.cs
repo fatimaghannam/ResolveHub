@@ -240,12 +240,14 @@ public sealed class ApplicationDbContext
             entity.Property(comment => comment.Content).HasMaxLength(5000).IsRequired();
             entity.Property(comment => comment.CreatedDate).HasColumnType("datetime2");
             entity.Property(comment => comment.UpdatedDate).HasColumnType("datetime2");
+            entity.Property(comment => comment.Visibility)
+                .HasConversion<string>().HasMaxLength(20);
             entity.Property(comment => comment.IsEdited).HasDefaultValue(false);
             entity.Property(comment => comment.IsDeleted).HasDefaultValue(false);
             entity.HasIndex(comment => new
             {
                 comment.TicketID,
-                comment.IsInternal,
+                comment.Visibility,
                 comment.IsDeleted,
                 comment.CreatedDate
             });

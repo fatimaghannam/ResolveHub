@@ -1,4 +1,4 @@
-import { ArrowLeft, FileText, MessageSquareText, NotebookPen } from 'lucide-react'
+import { ArrowLeft, FileText } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
@@ -8,8 +8,8 @@ import {
   TicketPriorityBadge,
   TicketStatusBadge,
 } from '../components/tickets/TicketBadges.jsx'
+import TicketComments from '../components/tickets/TicketComments.jsx'
 import {
-  addAgentInternalNote,
   addAgentTicketComment,
   closeAgentTicket,
   downloadAgentTicketAttachment,
@@ -30,7 +30,7 @@ function AgentTicketDetailsPage() {
   const [resolutionSummary, setResolutionSummary] = useState('')
   const [closingNote, setClosingNote] = useState('')
   const [comment, setComment] = useState('')
-  const [internalNote, setInternalNote] = useState('')
+  const [visibility, setVisibility] = useState('Public')
   const [saving, setSaving] = useState('')
   const [toast, setToast] = useState(null)
   const dismissToast = useCallback(() => setToast(null), [])
@@ -137,25 +137,21 @@ function AgentTicketDetailsPage() {
     }
   }
 
-  async function addMessage(type) {
-    const value = type === 'comment' ? comment : internalNote
-    if (!value.trim() || saving) return
+  async function addMessage(event) {
+    event.preventDefault()
+    if (!comment.trim() || saving) return
     try {
-      setSaving(type)
-      const created = type === 'comment'
-        ? await addAgentTicketComment(ticket.ticketReferenceNumber, { content: value.trim() })
-        : await addAgentInternalNote(ticket.ticketReferenceNumber, { content: value.trim() })
+      setSaving('comment')
+      const created = await addAgentTicketComment(ticket.ticketReferenceNumber, {
+        message: comment.trim(),
+        visibility,
+      })
       setTicket((current) => ({
         ...current,
-        [type === 'comment' ? 'comments' : 'internalNotes']: [
-          ...current[type === 'comment' ? 'comments' : 'internalNotes'],
-          created,
-        ],
+        comments: [...current.comments, created],
       }))
-      if (type === 'comment') setComment('')
-      else setInternalNote('')
-      notify('success', type === 'comment' ? 'Comment Added' : 'Work Note Added', 'Your update was saved.')
-      setReload((value) => value + 1)
+      setComment('')
+      notify('success', 'Comment Added', `Your ${visibility} comment was added.`)
     } catch (requestError) {
       notify('error', 'Unable to Save Update', requestError.message)
     } finally {
@@ -226,18 +222,23 @@ function AgentTicketDetailsPage() {
           </dl>
         </aside>
       </div>
-      <div className="agent-collaboration-grid">
-        <section className="panel">
-          <div className="panel__heading"><div><h2>Employee Comments</h2><p>Visible to the ticket requester.</p></div><MessageSquareText size={20} aria-hidden="true" /></div>
-          <div className="agent-message-list">{ticket.comments.map((item) => <article key={item.id}><strong>{item.authorName}</strong><p>{item.content}</p><small>{formatLocalDate(item.createdDate)}</small></article>)}</div>
-          {ticket.canComment && <div className="agent-message-form"><label htmlFor="agent-comment">Add comment</label><textarea id="agent-comment" value={comment} onChange={(event) => setComment(event.target.value)} maxLength="5000" /><button className="button button--secondary" type="button" disabled={!comment.trim() || Boolean(saving)} onClick={() => addMessage('comment')}>{saving === 'comment' ? 'Adding…' : 'Add Comment'}</button></div>}
-        </section>
-        <section className="panel">
-          <div className="panel__heading"><div><h2>Internal Work Notes</h2><p>Visible only to support staff.</p></div><NotebookPen size={20} aria-hidden="true" /></div>
-          <div className="agent-message-list">{ticket.internalNotes.map((item) => <article key={item.id}><strong>{item.authorName}</strong><p>{item.content}</p><small>{formatLocalDate(item.createdDate)}</small></article>)}</div>
-          {ticket.canAddInternalNote && <div className="agent-message-form"><label htmlFor="agent-note">Add work note</label><textarea id="agent-note" value={internalNote} onChange={(event) => setInternalNote(event.target.value)} maxLength="5000" /><button className="button button--secondary" type="button" disabled={!internalNote.trim() || Boolean(saving)} onClick={() => addMessage('note')}>{saving === 'note' ? 'Adding…' : 'Add Work Note'}</button></div>}
-        </section>
-      </div>
+      <TicketComments
+        comments={ticket.comments}
+        helperText={ticket.assignedAgentName
+          ? 'Public comments are visible to everyone with access to this ticket. Private comments are visible only to the requester and assigned IT Support Agent.'
+          : 'Public comments for this ticket are shown below.'}
+        message={comment}
+        onMessageChange={setComment}
+        visibility={visibility}
+        onVisibilityChange={setVisibility}
+        onSubmit={addMessage}
+        isSubmitting={saving === 'comment'}
+        canComment={ticket.canComment}
+        readOnlyMessage={ticket.assignedAgentName
+          ? 'Comments are read-only because this ticket is completed.'
+          : null}
+        formatTimestamp={formatLocalDate}
+      />
       <section className="panel dashboard-section">
         <div className="panel__heading"><div><h2>Ticket History</h2><p>Read-only lifecycle and activity record.</p></div></div>
         <div className="table-scroll"><table className="ticket-table"><thead><tr><th>Action</th><th>Performed By</th><th>Description</th><th>Date</th></tr></thead><tbody>{ticket.history.map((item) => <tr key={item.id}><td><strong>{item.actionType}</strong></td><td>{item.performedByName}</td><td>{item.description ?? '—'}</td><td>{formatLocalDate(item.createdDate)}</td></tr>)}</tbody></table></div>

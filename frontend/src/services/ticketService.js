@@ -43,6 +43,11 @@ export const downloadAttachment = (ticketId, attachmentId) =>
   apiRequest(`/api/tickets/${ticketId}/attachments/${attachmentId}/download`, {
     responseType: 'blob',
   })
+export const addTicketComment = (ticketId, request) =>
+  apiRequest(`/api/tickets/${ticketId}/comments`, {
+    method: 'POST',
+    body: JSON.stringify(request),
+  })
 export const getDrafts = () => apiRequest('/api/ticket-drafts')
 export const getDraft = (id, signal) =>
   apiRequest(`/api/ticket-drafts/${id}`, { signal })

@@ -70,7 +70,7 @@ public sealed class AssignmentRequestWorkflowTests
     }
 
     [Fact]
-    public async Task Manager_CanCommentOnAnyTicket_AndAgentCannotWorkBeforeApproval()
+    public async Task CommentVisibility_IsEnforcedForEveryAuthorizedViewer()
     {
         await using var factory = new ResolveHubApiFactory();
         await factory.SeedTicketLookupsAsync();
@@ -80,25 +80,89 @@ public sealed class AssignmentRequestWorkflowTests
             "comment-owner@resolvehub.test", Password, RoleNames.Employee);
         var agent = await factory.CreateUserAsync(
             "comment-agent@resolvehub.test", Password, RoleNames.ITSupportAgent);
+        var otherEmployee = await factory.CreateUserAsync(
+            "comment-other-employee@resolvehub.test", Password, RoleNames.Employee);
+        var admin = await factory.CreateUserAsync(
+            "comment-admin@resolvehub.test", Password, RoleNames.Admin);
         using var employeeClient = await LoginAsync(factory, employee.Email!);
         using var managerClient = await LoginAsync(factory, manager.Email!);
         using var agentClient = await LoginAsync(factory, agent.Email!);
+        using var otherEmployeeClient = await LoginAsync(factory, otherEmployee.Email!);
+        using var adminClient = await LoginAsync(factory, admin.Email!);
         var ticket = await CreateTicketAsync(factory, employeeClient);
         var statusChange = await agentClient.PatchAsJsonAsync(
             $"/api/agent/tickets/{ticket.TicketReferenceNumber}/status",
             new { statusId = 999 });
         Assert.Equal(HttpStatusCode.NotFound, statusChange.StatusCode);
+        var unassignedAgentComment = await agentClient.PostAsJsonAsync(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/comments",
+            new { message = "Must not be accepted.", visibility = "Public" });
+        Assert.Equal(HttpStatusCode.NotFound, unassignedAgentComment.StatusCode);
 
+        var employeePublic = await employeeClient.PostAsJsonAsync(
+            $"/api/tickets/{ticket.Id}/comments",
+            new { message = "Public employee update.", visibility = "Public" });
+        var employeePrivate = await employeeClient.PostAsJsonAsync(
+            $"/api/tickets/{ticket.Id}/comments",
+            new { message = "Private employee update.", visibility = "Private" });
         var comment = await managerClient.PostAsJsonAsync(
             $"/api/manager/tickets/{ticket.TicketReferenceNumber}/comments",
-            new { content = "Manager is coordinating this request." });
+            new { message = "Manager is coordinating this request.", visibility = "Private" });
+        var adminComment = await adminClient.PostAsJsonAsync(
+            $"/api/admin/tickets/{ticket.TicketReferenceNumber}/comments",
+            new { message = "Administrator public update.", visibility = "Private" });
+        var emptyComment = await employeeClient.PostAsJsonAsync(
+            $"/api/tickets/{ticket.Id}/comments",
+            new { message = "   ", visibility = "Public" });
+        var invalidVisibility = await employeeClient.PostAsJsonAsync(
+            $"/api/tickets/{ticket.Id}/comments",
+            new { message = "Invalid visibility.", visibility = "Internal" });
         Assert.Equal(HttpStatusCode.Created, comment.StatusCode);
-        var details = await managerClient.GetFromJsonAsync<AdminTicketDetailsDto>(
+        Assert.Equal(HttpStatusCode.Created, adminComment.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, employeePublic.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, employeePrivate.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, emptyComment.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, invalidVisibility.StatusCode);
+
+        var managerDetails = await managerClient.GetFromJsonAsync<AdminTicketDetailsDto>(
             $"/api/manager/tickets/{ticket.TicketReferenceNumber}");
-        Assert.Contains(details!.Comments,
+        var adminDetails = await adminClient.GetFromJsonAsync<AdminTicketDetailsDto>(
+            $"/api/admin/tickets/{ticket.TicketReferenceNumber}");
+        var employeeDetails = await employeeClient.GetFromJsonAsync<TicketDetailsDto>(
+            $"/api/tickets/{ticket.Id}");
+        var openAgentDetails = await agentClient.GetFromJsonAsync<AgentTicketDetailsDto>(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}");
+        var otherEmployeeDetails = await otherEmployeeClient.GetAsync(
+            $"/api/tickets/{ticket.Id}");
+
+        Assert.DoesNotContain(managerDetails!.Comments,
+            item => item.Content == "Private employee update.");
+        Assert.DoesNotContain(adminDetails!.Comments,
+            item => item.Content == "Private employee update.");
+        Assert.DoesNotContain(openAgentDetails!.Comments,
+            item => item.Content == "Private employee update.");
+        Assert.Contains(employeeDetails!.Comments,
+            item => item.Content == "Private employee update.");
+        Assert.Contains(managerDetails.Comments,
             item => item.Content == "Manager is coordinating this request.");
-        Assert.Contains(details.History,
-            item => item.ActionType == TicketHistoryActionNames.ManagerCommentAdded);
+        Assert.All(managerDetails.Comments,
+            item => Assert.Equal(nameof(CommentVisibility.Public), item.Visibility));
+        Assert.All(adminDetails.Comments,
+            item => Assert.Equal(nameof(CommentVisibility.Public), item.Visibility));
+        Assert.Contains(openAgentDetails.Comments,
+            item => item.Content == "Public employee update.");
+        Assert.DoesNotContain(openAgentDetails.History,
+            item => item.NewValue == nameof(CommentVisibility.Private));
+        Assert.Equal(HttpStatusCode.NotFound, otherEmployeeDetails.StatusCode);
+        Assert.Contains(managerDetails.History,
+            item => item.ActionType == TicketHistoryActionNames.CommentAdded);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var privateHistory = await db.TicketHistory.SingleAsync(item =>
+            item.TicketID == ticket.Id && item.NewValue == "Private");
+        Assert.True(privateHistory.IsInternal);
+        Assert.DoesNotContain("Private employee update.", privateHistory.Description ?? "");
     }
 
     private static async Task<TicketDetailsDto> CreateTicketAsync(

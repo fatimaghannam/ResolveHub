@@ -12,7 +12,9 @@ namespace ResolveHub.Api.Controllers;
 [ApiController]
 [Route("api/admin")]
 [Authorize(Roles = RoleNames.Admin)]
-public sealed class AdminTicketsController(IAdminTicketService service)
+public sealed class AdminTicketsController(
+    IAdminTicketService service,
+    IManagerTicketService managerTicketService)
     : ControllerBase
 {
     [HttpGet("ticket-assignments")]
@@ -41,6 +43,24 @@ public sealed class AdminTicketsController(IAdminTicketService service)
     {
         var ticket = await service.GetTicketAsync(ticketReference, token);
         return ticket is null ? NotFound() : Ok(ticket);
+    }
+
+    [HttpPost("tickets/{ticketReference}/comments")]
+    public async Task<ActionResult<TicketCommentDto>> AddComment(
+        string ticketReference, AddTicketCommentRequestDto request,
+        CancellationToken token)
+    {
+        var result = await managerTicketService.AddCommentAsync(
+            GetUserId(), ticketReference, request, token);
+        return result.Status switch
+        {
+            TicketOperationStatus.Success => Created(
+                $"/api/admin/tickets/{ticketReference}/comments", result.Value),
+            TicketOperationStatus.NotFound => NotFound(),
+            TicketOperationStatus.Conflict =>
+                Conflict(new { message = result.Message }),
+            _ => BadRequest(new { message = result.Message })
+        };
     }
 
     [HttpPost("tickets/{ticketReference}/assign")]

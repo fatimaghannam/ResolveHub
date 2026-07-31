@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using ResolveHub.Api.Constants;
 
 namespace ResolveHub.Api.DTOs.Tickets;
 
@@ -68,8 +69,8 @@ public sealed record AgentDashboardDto(
 public sealed record AllowedStatusTransitionDto(int StatusId, string StatusName);
 
 public sealed record TicketCommentDto(
-    int Id, string AuthorName, string Content, DateTime CreatedDate,
-    DateTime? UpdatedDate, bool IsEdited);
+    int Id, string AuthorName, string AuthorRole, string Content, DateTime CreatedDate,
+    DateTime? UpdatedDate, bool IsEdited, string Visibility);
 
 public sealed record TicketHistoryDto(
     int Id, string ActionType, string PerformedByName, string? OldValue,
@@ -97,7 +98,6 @@ public sealed record AgentTicketDetailsDto(
     string? AssignedAgentName,
     IReadOnlyCollection<TicketAttachmentDto> Attachments,
     IReadOnlyCollection<TicketCommentDto> Comments,
-    IReadOnlyCollection<TicketCommentDto> InternalNotes,
     IReadOnlyCollection<TicketHistoryDto> History,
     string? ResolutionSummary,
     IReadOnlyCollection<AllowedStatusTransitionDto> AllowedStatusTransitions,
@@ -106,7 +106,6 @@ public sealed record AgentTicketDetailsDto(
     bool CanAssign,
     bool CanReassign,
     bool CanComment,
-    bool CanAddInternalNote,
     bool CanChangeStatus,
     bool CanResolve,
     bool CanClose,
@@ -148,6 +147,8 @@ public sealed class CloseTicketRequestDto
 
 public sealed class AddTicketCommentRequestDto
 {
-    [Required, StringLength(5000)]
-    public string Content { get; init; } = string.Empty;
+    [Required, StringLength(TicketCommentRules.MaximumMessageLength)]
+    public string Message { get; init; } = string.Empty;
+
+    public string? Visibility { get; init; }
 }

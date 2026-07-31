@@ -164,17 +164,15 @@ public sealed class AgentTicketFlowTests
             new { statusId = closedId });
         var comment = await agentClient.PostAsJsonAsync(
             $"/api/agent/tickets/{ticket.TicketReferenceNumber}/comments",
-            new { content = "Please test the VPN connection again." });
+            new { message = "Please test the VPN connection again.", visibility = "Public" });
         var note = await agentClient.PostAsJsonAsync(
-            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/internal-notes",
-            new { content = "VPN profile was rebuilt by the support agent." });
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/comments",
+            new { message = "VPN profile was rebuilt by the support agent.", visibility = "Private" });
         var resolve = await agentClient.PostAsJsonAsync(
             $"/api/agent/tickets/{ticket.TicketReferenceNumber}/resolve",
             new { resolutionSummary = "Rebuilt the VPN profile and reset cached credentials." });
         var publicComments = await employeeClient.GetFromJsonAsync<
             IReadOnlyCollection<TicketCommentDto>>($"/api/tickets/{ticket.Id}/comments");
-        var employeeNotes = await employeeClient.GetAsync(
-            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/internal-notes");
         var details = await agentClient.GetFromJsonAsync<AgentTicketDetailsDto>(
             $"/api/agent/tickets/{ticket.TicketReferenceNumber}");
 
@@ -183,14 +181,13 @@ public sealed class AgentTicketFlowTests
         Assert.Equal(HttpStatusCode.Created, comment.StatusCode);
         Assert.Equal(HttpStatusCode.Created, note.StatusCode);
         Assert.Equal(HttpStatusCode.OK, resolve.StatusCode);
-        Assert.Single(publicComments!);
-        Assert.Equal(HttpStatusCode.Forbidden, employeeNotes.StatusCode);
+        Assert.Equal(2, publicComments!.Count);
         Assert.Equal(TicketStatusNames.Resolved, details!.StatusName);
         Assert.NotNull(details.ResolvedDate);
         Assert.Equal(agent.Id, await ResolvedByAsync(factory, ticket.Id));
         Assert.Contains(details.History,
             item => item.ActionType == TicketHistoryActionNames.TicketResolved);
-        Assert.DoesNotContain(publicComments!, item => item.Content.Contains("rebuilt by"));
+        Assert.Contains(publicComments!, item => item.Content.Contains("rebuilt by"));
     }
 
     [Fact]
@@ -242,10 +239,10 @@ public sealed class AgentTicketFlowTests
             new { });
         var comment = await agentClient.PostAsJsonAsync(
             $"/api/agent/tickets/{ticket.TicketReferenceNumber}/comments",
-            new { content = "The corrected configuration is ready for verification." });
+            new { message = "The corrected configuration is ready for verification.", visibility = "Public" });
         var note = await agentClient.PostAsJsonAsync(
-            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/internal-notes",
-            new { content = "Configuration backup retained for audit purposes." });
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/comments",
+            new { message = "Configuration backup retained for audit purposes.", visibility = "Private" });
         var resolve = await agentClient.PostAsJsonAsync(
             $"/api/agent/tickets/{ticket.TicketReferenceNumber}/resolve",
             new { resolutionSummary = "Corrected the configuration and verified connectivity." });
@@ -260,6 +257,18 @@ public sealed class AgentTicketFlowTests
         var closeAgain = await agentClient.PostAsJsonAsync(
             $"/api/agent/tickets/{ticket.TicketReferenceNumber}/close",
             new { });
+        var agentCommentAfterClose = await agentClient.PostAsJsonAsync(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/comments",
+            new { message = "Too late.", visibility = "Public" });
+        var employeeCommentAfterClose = await employeeClient.PostAsJsonAsync(
+            $"/api/tickets/{ticket.Id}/comments",
+            new { message = "Too late.", visibility = "Public" });
+        var managerCommentAfterClose = await managerClient.PostAsJsonAsync(
+            $"/api/manager/tickets/{ticket.TicketReferenceNumber}/comments",
+            new { message = "Too late." });
+        var adminCommentAfterClose = await adminClient.PostAsJsonAsync(
+            $"/api/admin/tickets/{ticket.TicketReferenceNumber}/comments",
+            new { message = "Too late." });
         var employeeDetails = await employeeClient.GetFromJsonAsync<TicketDetailsDto>(
             $"/api/tickets/{ticket.Id}");
         var managerDetails = await managerClient.GetFromJsonAsync<AdminTicketDetailsDto>(
@@ -281,8 +290,7 @@ public sealed class AgentTicketFlowTests
         Assert.False(closed.CanClose);
         Assert.False(closed.CanResolve);
         Assert.False(closed.CanComment);
-        Assert.Single(closed.Comments);
-        Assert.Single(closed.InternalNotes);
+        Assert.Equal(2, closed.Comments.Count);
         Assert.Single(closed.Attachments);
         Assert.Contains(closed.History,
             item => item.ActionType == TicketHistoryActionNames.TicketWorkStarted);
@@ -292,9 +300,16 @@ public sealed class AgentTicketFlowTests
             item => item.ActionType == TicketHistoryActionNames.TicketClosed);
         Assert.Equal(0, afterClose!.ActiveAssignedTickets);
         Assert.Equal(HttpStatusCode.Conflict, closeAgain.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, agentCommentAfterClose.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, employeeCommentAfterClose.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, managerCommentAfterClose.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, adminCommentAfterClose.StatusCode);
         Assert.Equal(TicketStatusNames.Closed, employeeDetails!.StatusName);
         Assert.Equal(TicketStatusNames.Closed, managerDetails!.StatusName);
         Assert.Equal(TicketStatusNames.Closed, adminDetails!.StatusName);
+        Assert.Equal(2, employeeDetails.Comments.Count);
+        Assert.Single(managerDetails.Comments);
+        Assert.Single(adminDetails.Comments);
         Assert.Contains(employeeDetails.History,
             item => item.ActionType == TicketHistoryActionNames.TicketClosed);
         Assert.Contains(managerDetails.History,

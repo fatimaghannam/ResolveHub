@@ -134,7 +134,7 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
         int agentId, string ticketReference, CancellationToken token)
     {
         var details = await ProjectDetails(ReadableTickets(agentId)
-                .Where(ticket => ticket.TicketReferenceNumber == ticketReference))
+                .Where(ticket => ticket.TicketReferenceNumber == ticketReference), agentId)
             .SingleOrDefaultAsync(token);
         if (details is null) return null;
         var ownsAssignment = await dbContext.Tickets.AsNoTracking().AnyAsync(ticket =>
@@ -155,8 +155,6 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
             AllowedStatusTransitions = transitions,
             CanChangeStatus = transitions.Count > 0,
             CanComment = ownsAssignment && details.StatusName is not
-                (TicketStatusNames.Closed or TicketStatusNames.Cancelled),
-            CanAddInternalNote = ownsAssignment && details.StatusName is not
                 (TicketStatusNames.Closed or TicketStatusNames.Cancelled),
             CanResolve = ownsAssignment && details.StatusName == TicketStatusNames.InProgress,
             CanClose = ownsAssignment && details.StatusName == TicketStatusNames.Resolved,
@@ -348,48 +346,57 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
     }
 
     public async Task<IReadOnlyCollection<TicketCommentDto>?> GetCommentsAsync(
-        int agentId, string ticketReference, bool isInternal, CancellationToken token)
+        int agentId, string ticketReference, CancellationToken token)
     {
         var ticketId = await OwnedTickets(agentId)
             .Where(ticket => ticket.TicketReferenceNumber == ticketReference)
             .Select(ticket => (int?)ticket.ID).SingleOrDefaultAsync(token);
-        return ticketId is null ? null : await ProjectComments(ticketId.Value, isInternal)
+        return ticketId is null ? null : await ProjectComments(ticketId.Value)
             .ToListAsync(token);
     }
 
     public async Task<TicketServiceResult<TicketCommentDto>> AddCommentAsync(
         int agentId, string ticketReference, AddTicketCommentRequestDto request,
-        bool isInternal, CancellationToken token)
+        CancellationToken token)
     {
-        var content = request.Content?.Trim();
-        if (string.IsNullOrWhiteSpace(content) || content.Length > 5000)
+        var content = request.Message?.Trim();
+        if (!TicketCommentRules.TryParseVisibility(
+                request.Visibility, out var visibility))
+            return new(TicketOperationStatus.Invalid,
+                Message: "Visibility must be Public or Private.");
+        if (string.IsNullOrWhiteSpace(content) ||
+            content.Length > TicketCommentRules.MaximumMessageLength)
             return new(TicketOperationStatus.Invalid,
                 Message: "Comment content is required and cannot exceed 5000 characters.");
-        var ticket = await dbContext.Tickets.SingleOrDefaultAsync(item =>
+        var ticket = await dbContext.Tickets.Include(item => item.TicketStatus)
+            .SingleOrDefaultAsync(item =>
             item.TicketReferenceNumber == ticketReference &&
             item.AssignedToUserAccountID == agentId && !item.IsDeleted, token);
         if (ticket is null) return new(TicketOperationStatus.NotFound);
-        if (ticket.ClosedDate.HasValue || ticket.CancelledDate.HasValue)
+        if (TicketCommentRules.IsReadOnly(ticket.TicketStatus.Name))
             return new(TicketOperationStatus.Conflict,
                 Message: "Comments cannot be added to a closed or cancelled ticket.");
         var now = DateTime.UtcNow;
         var comment = new TicketComment
         {
             TicketID = ticket.ID, AuthorUserAccountID = agentId,
-            Content = content, IsInternal = isInternal, CreatedDate = now
+            Content = content, Visibility = visibility, CreatedDate = now
         };
         dbContext.TicketComments.Add(comment);
         ticket.UpdatedDate = now;
         AddHistory(ticket.ID, agentId,
-            isInternal ? TicketHistoryActionNames.InternalNoteAdded :
-                TicketHistoryActionNames.CommentAdded,
-            null, null, isInternal ? "An internal note was added." : "A comment was added.",
-            isInternal, now);
+            TicketHistoryActionNames.CommentAdded,
+            null, visibility.ToString(),
+            TicketCommentRules.HistoryDescription(visibility),
+            visibility == CommentVisibility.Private, now);
         await dbContext.SaveChangesAsync(token);
         var authorName = await dbContext.Users.Where(user => user.Id == agentId)
             .Select(user => user.FirstName + " " + user.LastName).SingleAsync(token);
         return new(TicketOperationStatus.Success,
-            new(comment.ID, authorName, comment.Content, comment.CreatedDate, null, false));
+            new(comment.ID, authorName,
+                await GetUserRoleAsync(agentId, token),
+                comment.Content, comment.CreatedDate,
+                null, false, visibility.ToString()));
     }
 
     public async Task<IReadOnlyCollection<TicketHistoryDto>?> GetHistoryAsync(
@@ -408,7 +415,49 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
         var ownsTicket = await dbContext.Tickets.AnyAsync(ticket =>
             ticket.ID == ticketId && ticket.CreatedByUserAccountID == employeeId &&
             !ticket.IsDeleted, token);
-        return !ownsTicket ? null : await ProjectComments(ticketId, false).ToListAsync(token);
+        return !ownsTicket ? null : await ProjectComments(ticketId).ToListAsync(token);
+    }
+
+    public async Task<TicketServiceResult<TicketCommentDto>> AddEmployeeCommentAsync(
+        int employeeId, int ticketId, AddTicketCommentRequestDto request,
+        CancellationToken token)
+    {
+        var content = request.Message?.Trim();
+        if (!TicketCommentRules.TryParseVisibility(
+                request.Visibility, out var visibility))
+            return new(TicketOperationStatus.Invalid,
+                Message: "Visibility must be Public or Private.");
+        if (string.IsNullOrWhiteSpace(content) ||
+            content.Length > TicketCommentRules.MaximumMessageLength)
+            return new(TicketOperationStatus.Invalid,
+                Message: "Comment message is required and cannot exceed 5000 characters.");
+        var ticket = await dbContext.Tickets.Include(item => item.TicketStatus)
+            .SingleOrDefaultAsync(item =>
+            item.ID == ticketId && item.CreatedByUserAccountID == employeeId &&
+            !item.IsDeleted, token);
+        if (ticket is null) return new(TicketOperationStatus.NotFound);
+        if (TicketCommentRules.IsReadOnly(ticket.TicketStatus.Name))
+            return new(TicketOperationStatus.Conflict,
+                Message: "Comments cannot be added to a closed or cancelled ticket.");
+        var now = DateTime.UtcNow;
+        var comment = new TicketComment
+        {
+            TicketID = ticket.ID, AuthorUserAccountID = employeeId,
+            Content = content, Visibility = visibility, CreatedDate = now
+        };
+        dbContext.TicketComments.Add(comment);
+        AddHistory(ticket.ID, employeeId, TicketHistoryActionNames.CommentAdded,
+            null, visibility.ToString(),
+            TicketCommentRules.HistoryDescription(visibility),
+            visibility == CommentVisibility.Private, now);
+        await dbContext.SaveChangesAsync(token);
+        var authorName = await dbContext.Users.Where(user => user.Id == employeeId)
+            .Select(user => user.FirstName + " " + user.LastName).SingleAsync(token);
+        return new(TicketOperationStatus.Success,
+            new(comment.ID, authorName,
+                await GetUserRoleAsync(employeeId, token),
+                content, now, null, false,
+                visibility.ToString()));
     }
 
     private IQueryable<Ticket> OwnedTickets(int agentId) =>
@@ -504,6 +553,12 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
             .Select(user => user.FirstName + " " + user.LastName)
             .SingleAsync(token);
 
+    private async Task<string> GetUserRoleAsync(
+        int userId, CancellationToken token) =>
+        await dbContext.UserRoles.Where(assignment => assignment.UserId == userId)
+            .Select(assignment => assignment.Role.Name!)
+            .FirstOrDefaultAsync(token) ?? string.Empty;
+
     private static string? NullIfWhiteSpace(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
@@ -537,7 +592,8 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
                 ticket.AssignedToUserAccount.LastName,
             ticket.CreatedDate, ticket.UpdatedDate, ticket.AssignedDate, ticket.ResolvedDate));
 
-    private static IQueryable<AgentTicketDetailsDto> ProjectDetails(IQueryable<Ticket> query) =>
+    private static IQueryable<AgentTicketDetailsDto> ProjectDetails(
+        IQueryable<Ticket> query, int agentId) =>
         query.Select(ticket => new AgentTicketDetailsDto(
             ticket.ID, ticket.TicketReferenceNumber, ticket.Title, ticket.Description,
             ticket.CreatedByUserAccount.FirstName + " " + ticket.CreatedByUserAccount.LastName,
@@ -557,37 +613,45 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
                 .Select(item => new TicketAttachmentDto(
                     item.ID, item.FileName, item.ContentType, item.FileSizeBytes,
                     item.UploadedDate, false)).ToList(),
-            ticket.Comments.Where(item => !item.IsInternal && !item.IsDeleted)
+            ticket.Comments.Where(item => !item.IsDeleted &&
+                    (item.Visibility == CommentVisibility.Public ||
+                     ticket.AssignedToUserAccountID == agentId ||
+                     ticket.CreatedByUserAccountID == agentId))
                 .OrderBy(item => item.CreatedDate)
                 .Select(item => new TicketCommentDto(
                     item.ID, item.AuthorUserAccount.FirstName + " " +
                         item.AuthorUserAccount.LastName,
-                    item.Content, item.CreatedDate, item.UpdatedDate, item.IsEdited)).ToList(),
-            ticket.Comments.Where(item => item.IsInternal && !item.IsDeleted)
+                    item.AuthorUserAccount.UserAccountRoles
+                        .Select(assignment => assignment.Role.Name!)
+                        .FirstOrDefault() ?? string.Empty,
+                    item.Content, item.CreatedDate, item.UpdatedDate, item.IsEdited,
+                    item.Visibility.ToString())).ToList(),
+            ticket.History
+                .Where(item => !item.IsInternal ||
+                    ticket.AssignedToUserAccountID == agentId ||
+                    ticket.CreatedByUserAccountID == agentId)
                 .OrderBy(item => item.CreatedDate)
-                .Select(item => new TicketCommentDto(
-                    item.ID, item.AuthorUserAccount.FirstName + " " +
-                        item.AuthorUserAccount.LastName,
-                    item.Content, item.CreatedDate, item.UpdatedDate, item.IsEdited)).ToList(),
-            ticket.History.OrderBy(item => item.CreatedDate)
                 .Select(item => new TicketHistoryDto(
                     item.ID, item.ActionType,
                     item.PerformedByUserAccount.FirstName + " " +
                         item.PerformedByUserAccount.LastName,
                     item.OldValue, item.NewValue, item.Description, item.CreatedDate)).ToList(),
             ticket.ResolutionSummary, Array.Empty<AllowedStatusTransitionDto>(),
-            false, false, false, false, true, true, false, false, false,
+            false, false, false, false, true, false, false, false,
             false, null));
 
-    private IQueryable<TicketCommentDto> ProjectComments(int ticketId, bool isInternal) =>
+    private IQueryable<TicketCommentDto> ProjectComments(int ticketId) =>
         dbContext.TicketComments.AsNoTracking()
-            .Where(item => item.TicketID == ticketId &&
-                item.IsInternal == isInternal && !item.IsDeleted)
+            .Where(item => item.TicketID == ticketId && !item.IsDeleted)
             .OrderBy(item => item.CreatedDate)
             .Select(item => new TicketCommentDto(
                 item.ID, item.AuthorUserAccount.FirstName + " " +
                     item.AuthorUserAccount.LastName,
-                item.Content, item.CreatedDate, item.UpdatedDate, item.IsEdited));
+                item.AuthorUserAccount.UserAccountRoles
+                    .Select(assignment => assignment.Role.Name!)
+                    .FirstOrDefault() ?? string.Empty,
+                item.Content, item.CreatedDate, item.UpdatedDate, item.IsEdited,
+                item.Visibility.ToString()));
 
     private IQueryable<TicketHistoryDto> ProjectHistory(int ticketId, bool includeInternal) =>
         dbContext.TicketHistory.AsNoTracking()

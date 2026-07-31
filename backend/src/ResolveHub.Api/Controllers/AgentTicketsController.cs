@@ -80,7 +80,7 @@ public sealed class AgentTicketsController(
     public async Task<ActionResult<IReadOnlyCollection<TicketCommentDto>>> Comments(
         string ticketReference, CancellationToken token) =>
         Collection(await service.GetCommentsAsync(
-            GetUserId(), ticketReference, false, token));
+            GetUserId(), ticketReference, token));
 
     [HttpPost("{ticketReference}/comments")]
     public async Task<ActionResult<TicketCommentDto>> AddComment(
@@ -88,24 +88,8 @@ public sealed class AgentTicketsController(
         CancellationToken token)
     {
         var result = await service.AddCommentAsync(
-            GetUserId(), ticketReference, request, false, token);
+            GetUserId(), ticketReference, request, token);
         return CreatedResult(ticketReference, "comments", result);
-    }
-
-    [HttpGet("{ticketReference}/internal-notes")]
-    public async Task<ActionResult<IReadOnlyCollection<TicketCommentDto>>> InternalNotes(
-        string ticketReference, CancellationToken token) =>
-        Collection(await service.GetCommentsAsync(
-            GetUserId(), ticketReference, true, token));
-
-    [HttpPost("{ticketReference}/internal-notes")]
-    public async Task<ActionResult<TicketCommentDto>> AddInternalNote(
-        string ticketReference, AddTicketCommentRequestDto request,
-        CancellationToken token)
-    {
-        var result = await service.AddCommentAsync(
-            GetUserId(), ticketReference, request, true, token);
-        return CreatedResult(ticketReference, "internal-notes", result);
     }
 
     [HttpGet("{ticketReference}/history")]

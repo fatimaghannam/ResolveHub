@@ -449,6 +449,22 @@ public sealed class TicketService(ApplicationDbContext dbContext)
                     ticket.TicketStatus.Name == TicketStatusNames.Open &&
                         ticket.AssignedToUserAccountID == null))
                 .ToList(),
+            ticket.Comments
+                .Where(comment => !comment.IsDeleted)
+                .OrderBy(comment => comment.CreatedDate)
+                .Select(comment => new TicketCommentDto(
+                    comment.ID,
+                    comment.AuthorUserAccount.FirstName + " " +
+                        comment.AuthorUserAccount.LastName,
+                    comment.AuthorUserAccount.UserAccountRoles
+                        .Select(assignment => assignment.Role.Name!)
+                        .FirstOrDefault() ?? string.Empty,
+                    comment.Content,
+                    comment.CreatedDate,
+                    comment.UpdatedDate,
+                    comment.IsEdited,
+                    comment.Visibility.ToString()))
+                .ToList(),
             ticket.History
                 .Where(history => !history.IsInternal)
                 .OrderBy(history => history.CreatedDate)

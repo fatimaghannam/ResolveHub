@@ -25,14 +25,17 @@ public interface IAgentTicketService
         int agentId, string ticketReference,
         CloseTicketRequestDto request, CancellationToken token);
     Task<IReadOnlyCollection<TicketCommentDto>?> GetCommentsAsync(
-        int agentId, string ticketReference, bool isInternal, CancellationToken token);
+        int agentId, string ticketReference, CancellationToken token);
     Task<TicketServiceResult<TicketCommentDto>> AddCommentAsync(
         int agentId, string ticketReference, AddTicketCommentRequestDto request,
-        bool isInternal, CancellationToken token);
+        CancellationToken token);
     Task<IReadOnlyCollection<TicketHistoryDto>?> GetHistoryAsync(
         int agentId, string ticketReference, CancellationToken token);
     Task<IReadOnlyCollection<TicketCommentDto>?> GetEmployeeCommentsAsync(
         int employeeId, int ticketId, CancellationToken token);
+    Task<TicketServiceResult<TicketCommentDto>> AddEmployeeCommentAsync(
+        int employeeId, int ticketId, AddTicketCommentRequestDto request,
+        CancellationToken token);
     Task<TicketServiceResult<TicketAssignmentRequestDto>> RequestAssignmentAsync(
         int agentId, string ticketReference, CancellationToken token);
 }

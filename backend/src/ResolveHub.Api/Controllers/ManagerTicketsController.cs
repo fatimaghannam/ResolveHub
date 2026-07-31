@@ -80,6 +80,8 @@ public sealed class ManagerTicketsController(IManagerTicketService service) : Co
             TicketOperationStatus.Success => Created(
                 $"/api/manager/tickets/{ticketReference}/comments", result.Value),
             TicketOperationStatus.NotFound => NotFound(),
+            TicketOperationStatus.Conflict =>
+                Conflict(new { message = result.Message }),
             _ => BadRequest(new { message = result.Message })
         };
     }

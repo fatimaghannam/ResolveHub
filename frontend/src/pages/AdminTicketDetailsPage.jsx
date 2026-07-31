@@ -4,7 +4,9 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
 import Toast from '../components/common/Toast.jsx'
 import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
+import TicketComments from '../components/tickets/TicketComments.jsx'
 import {
+  addAdminTicketComment,
   getAdminTicket,
   removeAdminDuplicateTicket,
 } from '../services/adminService.js'
@@ -106,27 +108,21 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
     if (!comment.trim() || addingComment) return
     try {
       setAddingComment(true)
-      const created = await addManagerTicketComment(
-        ticket.ticketReferenceNumber,
-        comment.trim(),
-      )
+      const addCommentRequest = roleArea === 'manager'
+        ? addManagerTicketComment
+        : addAdminTicketComment
+      const created = await addCommentRequest(
+        ticket.ticketReferenceNumber, comment.trim())
       setTicket((current) => ({
         ...current,
         comments: [...current.comments, created],
-        history: [...current.history, {
-          id: `comment-${created.id}`,
-          actionType: 'Manager Comment Added',
-          performedByName: created.authorName,
-          description: 'A Manager comment was added.',
-          createdDate: created.createdDate,
-        }],
       }))
       setComment('')
       setToast({
         id: Date.now(),
         type: 'success',
         title: 'Comment Added',
-        message: 'Your comment was added successfully.',
+        message: 'Your Public comment was added.',
       })
     } catch (requestError) {
       setToast({
@@ -149,15 +145,18 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
         {roleArea === 'admin' && <button className="button button--danger-outline" type="button" onClick={() => { setDuplicateError(''); setDuplicateDialogOpen(true) }}>Remove Duplicate</button>}
       </section>
       <div className="details-grid"><section className="panel"><h2>Ticket Summary</h2><p className="ticket-description">{ticket.description}</p></section><aside className="panel details-side"><h2>Ticket Information</h2><dl><div><dt>Requester</dt><dd>{ticket.requesterName}</dd></div><div><dt>Category</dt><dd>{ticket.categoryName}</dd></div><div><dt>Priority</dt><dd><TicketPriorityBadge value={ticket.priorityName} /></dd></div><div><dt>Status</dt><dd><TicketStatusBadge value={ticket.statusName} /></dd></div><div><dt>Assigned agent</dt><dd>{ticket.assignedAgentName ?? 'Unassigned'}</dd></div>{ticket.resolvedDate && <div><dt>Resolved</dt><dd>{formatLocalDate(ticket.resolvedDate)}</dd></div>}{ticket.closedDate && <div><dt>Closed</dt><dd>{formatLocalDate(ticket.closedDate)}</dd></div>}</dl></aside></div>
-      {roleArea === 'manager' && <section className="panel dashboard-section">
-        <div className="panel__heading"><div><h2>Comments</h2><p>Public updates visible to the requester and assigned IT Agent.</p></div></div>
-        <div className="agent-message-list">{ticket.comments.map((item) => <article key={item.id}><strong>{item.authorName}</strong><p>{item.content}</p><small>{formatLocalDate(item.createdDate)}</small></article>)}</div>
-        <form className="agent-message-form" onSubmit={addComment}>
-          <label htmlFor="manager-comment">Add comment</label>
-          <textarea id="manager-comment" value={comment} onChange={(event) => setComment(event.target.value)} maxLength="5000" disabled={addingComment} />
-          <button className="button button--secondary" type="submit" disabled={!comment.trim() || addingComment}>{addingComment ? 'Adding…' : 'Add Comment'}</button>
-        </form>
-      </section>}
+      <TicketComments
+        comments={ticket.comments}
+        helperText="You can add Public comments visible to everyone with access to this ticket."
+        message={comment}
+        onMessageChange={setComment}
+        onSubmit={addComment}
+        isSubmitting={addingComment}
+        canComment={!['Closed', 'Cancelled'].includes(ticket.statusName)}
+        publicOnly
+        readOnlyMessage="Comments are read-only because this ticket is completed."
+        formatTimestamp={formatLocalDate}
+      />
       <section className="panel dashboard-section">
         <div className="panel__heading"><div><h2>Ticket History</h2><p>Read-only record of important ticket actions.</p></div></div>
         {ticket.history.length === 0

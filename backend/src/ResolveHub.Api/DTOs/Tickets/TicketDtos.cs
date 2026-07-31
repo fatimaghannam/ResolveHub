@@ -34,6 +34,7 @@ public sealed record TicketDetailsDto(
     string? CancelledReason,
     string? ResolutionSummary,
     IReadOnlyCollection<TicketAttachmentDto> Attachments,
+    IReadOnlyCollection<TicketCommentDto> Comments,
     IReadOnlyCollection<TicketHistoryDto> History,
     bool CanEdit,
     bool CanDelete);

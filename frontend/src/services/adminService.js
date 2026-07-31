@@ -40,6 +40,12 @@ export const removeAdminDuplicateTicket = (
     },
   )
 
+export const addAdminTicketComment = (ticketReference, message) =>
+  apiRequest(`/api/admin/tickets/${encodeURIComponent(ticketReference)}/comments`, {
+    method: 'POST',
+    body: JSON.stringify({ message }),
+  })
+
 export const getAdminUsers = (signal) =>
   apiRequest('/api/admin/users', { signal })
 

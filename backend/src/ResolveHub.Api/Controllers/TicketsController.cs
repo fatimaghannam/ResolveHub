@@ -118,6 +118,24 @@ public sealed class TicketsController(
         return comments is null ? NotFound() : Ok(comments);
     }
 
+    [HttpPost("{id:int}/comments")]
+    [Authorize(Roles = RoleNames.Employee)]
+    public async Task<ActionResult<TicketCommentDto>> AddComment(
+        int id, AddTicketCommentRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var result = await agentTicketService.AddEmployeeCommentAsync(
+            GetUserId(), id, request, cancellationToken);
+        return result.Status switch
+        {
+            TicketOperationStatus.Success => Created(
+                $"/api/tickets/{id}/comments", result.Value),
+            TicketOperationStatus.NotFound => NotFound(),
+            TicketOperationStatus.Conflict => Conflict(new { message = result.Message }),
+            _ => BadRequest(new { message = result.Message })
+        };
+    }
+
     private int GetUserId()
     {
         var value = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;

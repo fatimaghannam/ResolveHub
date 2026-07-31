@@ -32,8 +32,8 @@ export const reviewManagerAssignmentRequest = (requestId, decision) =>
     method: 'POST',
   })
 
-export const addManagerTicketComment = (ticketReference, content) =>
+export const addManagerTicketComment = (ticketReference, message) =>
   apiRequest(`/api/manager/tickets/${encodeURIComponent(ticketReference)}/comments`, {
     method: 'POST',
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ message }),
   })

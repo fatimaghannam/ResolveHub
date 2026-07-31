@@ -6,7 +6,7 @@ public sealed class TicketComment
     public int TicketID { get; set; }
     public int AuthorUserAccountID { get; set; }
     public string Content { get; set; } = string.Empty;
-    public bool IsInternal { get; set; }
+    public CommentVisibility Visibility { get; set; } = CommentVisibility.Public;
     public DateTime CreatedDate { get; set; }
     public DateTime? UpdatedDate { get; set; }
     public bool IsEdited { get; set; }

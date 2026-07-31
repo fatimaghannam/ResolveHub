@@ -239,11 +239,18 @@ public sealed class AdminTicketService(ApplicationDbContext dbContext)
                 ticket.Attachments.Where(item => !item.IsDeleted).Select(item =>
                     new TicketAttachmentDto(item.ID, item.FileName, item.ContentType,
                         item.FileSizeBytes, item.UploadedDate, false)).ToList(),
-                ticket.Comments.Where(item => !item.IsDeleted).Select(item =>
+                ticket.Comments.Where(item => !item.IsDeleted &&
+                        item.Visibility == CommentVisibility.Public)
+                    .OrderBy(item => item.CreatedDate).Select(item =>
                     new TicketCommentDto(item.ID,
                         item.AuthorUserAccount.FirstName + " " + item.AuthorUserAccount.LastName,
-                        item.Content, item.CreatedDate, item.UpdatedDate, item.IsEdited)).ToList(),
-                ticket.History.OrderByDescending(item => item.CreatedDate).Select(item =>
+                        item.AuthorUserAccount.UserAccountRoles
+                            .Select(assignment => assignment.Role.Name!)
+                            .FirstOrDefault() ?? string.Empty,
+                        item.Content, item.CreatedDate, item.UpdatedDate, item.IsEdited,
+                        item.Visibility.ToString())).ToList(),
+                ticket.History.Where(item => !item.IsInternal)
+                    .OrderByDescending(item => item.CreatedDate).Select(item =>
                     new TicketHistoryDto(item.ID, item.ActionType,
                         item.PerformedByUserAccount.FirstName + " " +
                         item.PerformedByUserAccount.LastName,
