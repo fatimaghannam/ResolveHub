@@ -25,6 +25,9 @@ public interface IAdminTicketService
     Task<TicketServiceResult<bool>> ReviewDuplicateAsync(
         int administratorId, int reviewId, bool approve,
         string? internalNote, CancellationToken token);
+    Task<TicketServiceResult<bool>> MarkDuplicateAsync(
+        int administratorId, string ticketReference,
+        MarkDuplicateRequestDto request, CancellationToken token);
     Task<IReadOnlyCollection<UserNotificationDto>> GetNotificationsAsync(
         int userId, CancellationToken token);
     Task<bool> MarkNotificationReadAsync(

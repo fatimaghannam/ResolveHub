@@ -79,7 +79,12 @@ public sealed class ManagerTicketService(
 
         var reporter = await dbContext.Users.AsNoTracking()
             .Where(user => user.Id == managerId)
-            .Select(user => user.FirstName + " " + user.LastName)
+            .Select(user => new
+            {
+                Name = user.FirstName + " " + user.LastName,
+                IsAdministrator = user.UserAccountRoles.Any(role =>
+                    role.Role.Name == RoleNames.Admin)
+            })
             .SingleAsync(token);
         var now = DateTime.UtcNow;
         var reason = string.IsNullOrWhiteSpace(request.Reason)
@@ -100,7 +105,7 @@ public sealed class ManagerTicketService(
             PerformedByUserAccountID = managerId,
             ActionType = TicketHistoryActionNames.DuplicateReviewReported,
             NewValue = original.TicketReferenceNumber,
-            Description = $"{reporter} reported {reported.TicketReferenceNumber} as a possible duplicate of {original.TicketReferenceNumber}.",
+            Description = $"{reporter.Name} reported {reported.TicketReferenceNumber} as a possible duplicate of {original.TicketReferenceNumber}.",
             CreatedDate = now
         });
         dbContext.ActivityLogs.Add(new ActivityLog
@@ -109,7 +114,7 @@ public sealed class ManagerTicketService(
             ActionType = TicketHistoryActionNames.DuplicateReviewReported,
             EntityType = "Ticket",
             EntityID = reported.TicketReferenceNumber,
-            Description = $"Manager {reporter} reported {reported.TicketReferenceNumber} as a possible duplicate of {original.TicketReferenceNumber}.",
+            Description = $"{reporter.Name} reported {reported.TicketReferenceNumber} as a possible duplicate of {original.TicketReferenceNumber}.",
             NewValue = original.TicketReferenceNumber,
             CreatedDate = now
         });
@@ -123,7 +128,7 @@ public sealed class ManagerTicketService(
                 UserAccountID = administratorId,
                 Type = "DuplicateReview",
                 Title = "Duplicate Review Pending",
-                Message = $"{reporter} reported {reported.TicketReferenceNumber} as a possible duplicate of {original.TicketReferenceNumber}.",
+                Message = $"{reporter.Name} reported {reported.TicketReferenceNumber} as a possible duplicate of {original.TicketReferenceNumber}.",
                 TicketReferenceNumber = reported.TicketReferenceNumber,
                 CreatedDate = now
             });
@@ -140,7 +145,8 @@ public sealed class ManagerTicketService(
                 original.TicketPriority.Name, original.CreatedDate,
                 original.CreatedByUserAccount.FirstName + " " +
                     original.CreatedByUserAccount.LastName,
-                original.TicketCategory.Name, reporter, reason,
+                original.TicketCategory.Name, reporter.Name,
+                reporter.IsAdministrator, reason,
                 review.Status, now));
     }
 

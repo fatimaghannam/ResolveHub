@@ -123,18 +123,16 @@ public sealed class AdminTicketsController(
         };
     }
 
-    [HttpPost("tickets/{ticketReference}/duplicate-reviews")]
-    public async Task<ActionResult<DuplicateReviewDto>> ReportDuplicate(
-        string ticketReference, CreateDuplicateReviewRequestDto request,
+    [HttpPost("tickets/{ticketReference}/mark-duplicate")]
+    public async Task<IActionResult> MarkDuplicate(
+        string ticketReference, MarkDuplicateRequestDto request,
         CancellationToken token)
     {
-        var result = await managerTicketService.ReportDuplicateAsync(
+        var result = await service.MarkDuplicateAsync(
             GetUserId(), ticketReference, request, token);
         return result.Status switch
         {
-            TicketOperationStatus.Success => Created(
-                $"/api/admin/tickets/{ticketReference}/duplicate-reviews/{result.Value!.Id}",
-                result.Value),
+            TicketOperationStatus.Success => NoContent(),
             TicketOperationStatus.NotFound =>
                 NotFound(new { message = result.Message }),
             TicketOperationStatus.Conflict =>

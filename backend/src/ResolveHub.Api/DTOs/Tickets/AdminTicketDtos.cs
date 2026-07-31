@@ -99,6 +99,17 @@ public sealed class ReviewDuplicateRequestDto
     public string? InternalNote { get; init; }
 }
 
+public sealed class MarkDuplicateRequestDto
+{
+    [Required, StringLength(32)]
+    public string OriginalTicketReference { get; init; } = string.Empty;
+
+    [StringLength(1000)]
+    public string? InternalNote { get; init; }
+
+    public bool Confirmed { get; init; }
+}
+
 public sealed record DuplicateReviewDto(
     int Id,
     string ReportedTicketReference,
@@ -116,6 +127,7 @@ public sealed record DuplicateReviewDto(
     string SuggestedOriginalRequesterName,
     string SuggestedOriginalCategoryName,
     string ReportedByName,
+    bool ReportedByAdministrator,
     string? Reason,
     string Status,
     DateTime CreatedDate);

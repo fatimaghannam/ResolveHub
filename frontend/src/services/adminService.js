@@ -31,8 +31,8 @@ export const reviewAdminDuplicate = (reviewId, decision, internalNote = null) =>
     body: JSON.stringify({ internalNote }),
   })
 
-export const reportAdminDuplicate = (ticketReference, request) =>
-  apiRequest(`/api/admin/tickets/${encodeURIComponent(ticketReference)}/duplicate-reviews`, {
+export const markAdminTicketDuplicate = (ticketReference, request) =>
+  apiRequest(`/api/admin/tickets/${encodeURIComponent(ticketReference)}/mark-duplicate`, {
     method: 'POST',
     body: JSON.stringify(request),
   })

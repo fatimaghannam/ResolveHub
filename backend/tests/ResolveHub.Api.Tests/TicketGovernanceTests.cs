@@ -16,7 +16,7 @@ public sealed class TicketGovernanceTests
     private const string Password = "ValidPassword1!";
 
     [Fact]
-    public async Task AdministratorReportsDuplicate_ThenReviewsItThroughPendingWorkflow()
+    public async Task AdministratorMarksDuplicateImmediately_WithoutReviewRecord()
     {
         await using var factory = new ResolveHubApiFactory();
         await factory.SeedTicketLookupsAsync();
@@ -32,27 +32,15 @@ public sealed class TicketGovernanceTests
             factory, employeeClient, "Repeated direct issue");
 
         var response = await adminClient.PostAsJsonAsync(
-            $"/api/admin/tickets/{duplicate.TicketReferenceNumber}/duplicate-reviews",
+            $"/api/admin/tickets/{duplicate.TicketReferenceNumber}/mark-duplicate",
             new
             {
-                suggestedOriginalTicketReference = original.TicketReferenceNumber,
-                reason = "Both tickets describe the same confirmed incident."
+                originalTicketReference = original.TicketReferenceNumber,
+                internalNote = "Both tickets describe the same confirmed incident.",
+                confirmed = true
             });
 
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var review = (await response.Content.ReadFromJsonAsync<DuplicateReviewDto>())!;
-        var pendingDetails = await adminClient.GetFromJsonAsync<AdminTicketDetailsDto>(
-            $"/api/admin/tickets/{duplicate.TicketReferenceNumber}");
-        Assert.NotNull(pendingDetails);
-        Assert.Equal(TicketStatusNames.Open, pendingDetails.StatusName);
-        Assert.NotNull(pendingDetails.PendingDuplicateReview);
-        Assert.Equal(original.TicketReferenceNumber,
-            pendingDetails.PendingDuplicateReview.SuggestedOriginalTicketReference);
-
-        var approval = await adminClient.PostAsJsonAsync(
-            $"/api/admin/duplicate-reviews/{review.Id}/approve",
-            new { internalNote = "The incident details and requester match." });
-        Assert.Equal(HttpStatusCode.NoContent, approval.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         var details = await adminClient.GetFromJsonAsync<AdminTicketDetailsDto>(
             $"/api/admin/tickets/{duplicate.TicketReferenceNumber}");
         Assert.Equal(TicketStatusNames.Duplicate, details!.StatusName);
@@ -61,23 +49,20 @@ public sealed class TicketGovernanceTests
 
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var approved = await db.DuplicateReviews.SingleAsync(item =>
-            item.TicketID == duplicate.Id);
-        Assert.Equal(DuplicateReviewStatusNames.Approved, approved.Status);
-        Assert.Equal(admin.Id, approved.ReportedByUserAccountID);
-        Assert.Equal(admin.Id, approved.ReviewedByUserAccountID);
+        Assert.False(await db.DuplicateReviews.AnyAsync(item =>
+            item.TicketID == duplicate.Id));
         Assert.True(await db.TicketHistory.AnyAsync(item =>
             item.TicketID == duplicate.Id && item.IsInternal &&
-            item.Description == "The incident details and requester match."));
+            item.Description == "Both tickets describe the same confirmed incident."));
         Assert.True(await db.TicketHistory.AnyAsync(item =>
             item.TicketID == duplicate.Id &&
-            item.ActionType == TicketHistoryActionNames.DuplicateReviewApproved &&
-            item.Description!.Contains(original.TicketReferenceNumber)));
+            item.ActionType == TicketHistoryActionNames.DuplicateMarked &&
+            item.Description == $"Test User marked {duplicate.TicketReferenceNumber} as a duplicate of {original.TicketReferenceNumber}."));
         Assert.True(await db.ActivityLogs.AnyAsync(item =>
             item.EntityID == duplicate.TicketReferenceNumber &&
-            item.ActionType == TicketHistoryActionNames.DuplicateReviewApproved &&
+            item.ActionType == TicketHistoryActionNames.DuplicateMarked &&
             item.Description.Contains(original.TicketReferenceNumber)));
-        Assert.True(await db.UserNotifications.AnyAsync(item =>
+        Assert.False(await db.UserNotifications.AnyAsync(item =>
             item.UserAccountID == admin.Id &&
             item.TicketReferenceNumber == duplicate.TicketReferenceNumber));
 

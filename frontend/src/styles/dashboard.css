@@ -304,6 +304,21 @@
   font-size: 0.8rem;
   line-height: 1.4;
 }
+
+.duplicate-confirmation {
+  grid-template-columns: auto minmax(0, 1fr) !important;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+  cursor: pointer;
+}
+
+.duplicate-confirmation input {
+  width: auto;
+  margin-top: 3px;
+}
 .admin-ticket-filters { grid-template-columns: minmax(240px, 1.6fr) repeat(4, minmax(130px, 1fr)); }
 .manager-assignment-filters { grid-template-columns: minmax(260px, 1.6fr) repeat(3, minmax(150px, 1fr)); }
 .admin-ticket-table { min-width: 1250px; }.admin-assignment-table { min-width: 980px; }.admin-users-table { min-width: 980px; }.admin-activity-table { min-width: 900px; }
