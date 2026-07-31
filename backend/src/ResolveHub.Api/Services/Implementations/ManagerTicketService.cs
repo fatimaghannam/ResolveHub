@@ -405,7 +405,9 @@ public sealed class ManagerTicketService(
                 ticket.AssignedToUserAccount == null ? null :
                     ticket.AssignedToUserAccount.FirstName + " " +
                     ticket.AssignedToUserAccount.LastName,
-                ticket.CreatedDate, ticket.UpdatedDate))
+                ticket.CreatedDate, ticket.UpdatedDate,
+                ticket.OriginalTicket == null ? null :
+                    ticket.OriginalTicket.TicketReferenceNumber))
             .ToListAsync(token);
 
         return new ManagerDashboardDto(

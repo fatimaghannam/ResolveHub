@@ -60,7 +60,8 @@ public sealed record AdminTicketListItemDto(
     int PriorityId, string PriorityName,
     int StatusId, string StatusName,
     int? AssignedAgentId, string? AssignedAgentName,
-    DateTime CreatedDate, DateTime UpdatedDate);
+    DateTime CreatedDate, DateTime UpdatedDate,
+    string? OriginalTicketReference);
 
 public sealed record AdminTicketDetailsDto(
     int Id, string TicketReferenceNumber, string Title, string Description,

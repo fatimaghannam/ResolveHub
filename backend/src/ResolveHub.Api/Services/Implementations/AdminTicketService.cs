@@ -185,7 +185,9 @@ public sealed class AdminTicketService(ApplicationDbContext dbContext)
                 ticket.AssignedToUserAccountID,
                 ticket.AssignedToUserAccount == null ? null :
                     ticket.AssignedToUserAccount.FirstName + " " + ticket.AssignedToUserAccount.LastName,
-                ticket.CreatedDate, ticket.UpdatedDate))
+                ticket.CreatedDate, ticket.UpdatedDate,
+                ticket.OriginalTicket == null ? null :
+                    ticket.OriginalTicket.TicketReferenceNumber))
             .ToListAsync(token);
         return new(items, filter.Page, filter.PageSize, total,
             Math.Max(1, (int)Math.Ceiling(total / (double)filter.PageSize)));
