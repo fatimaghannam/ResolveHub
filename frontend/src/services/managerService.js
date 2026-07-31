@@ -46,3 +46,9 @@ export const reportManagerDuplicate = (ticketReference, request) =>
 
 export const getManagerNotifications = (signal) =>
   apiRequest('/api/manager/notifications', { signal })
+
+export const markManagerNotificationRead = (notificationId) =>
+  apiRequest(`/api/manager/notifications/${notificationId}/read`, { method: 'PATCH' })
+
+export const markAllManagerNotificationsRead = () =>
+  apiRequest('/api/manager/notifications/read-all', { method: 'PATCH' })

@@ -38,6 +38,7 @@ public sealed record TicketDetailsDto(
     IReadOnlyCollection<TicketHistoryDto> History,
     int? OriginalTicketId,
     string? OriginalTicketReference,
+    string? OriginalTicketTitle,
     bool CanEdit,
     bool CanDelete);
 

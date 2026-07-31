@@ -76,6 +76,9 @@ public sealed record AdminTicketDetailsDto(
     IReadOnlyCollection<TicketHistoryDto> History,
     int? OriginalTicketId,
     string? OriginalTicketReference,
+    string? OriginalTicketTitle,
+    DateTime? DuplicateApprovedDate,
+    string? DuplicateApprovedByName,
     DuplicateReviewDto? PendingDuplicateReview);
 
 public sealed record UpdateTicketAssignmentDto(int? AgentUserId);
@@ -89,10 +92,29 @@ public sealed class CreateDuplicateReviewRequestDto
     public string? Reason { get; init; }
 }
 
+public sealed class MarkDuplicateRequestDto
+{
+    [Required, StringLength(32)]
+    public string OriginalTicketReference { get; init; } = string.Empty;
+
+    [Required, StringLength(1000, MinimumLength = 1)]
+    public string Reason { get; init; } = string.Empty;
+
+    public bool Confirmed { get; init; }
+}
+
 public sealed record DuplicateReviewDto(
     int Id,
     string ReportedTicketReference,
+    string ReportedTicketTitle,
+    string ReportedTicketStatus,
+    string ReportedRequesterName,
+    string ReportedCategoryName,
     string SuggestedOriginalTicketReference,
+    string SuggestedOriginalTicketTitle,
+    string SuggestedOriginalTicketStatus,
+    string SuggestedOriginalRequesterName,
+    string SuggestedOriginalCategoryName,
     string ReportedByName,
     string? Reason,
     string Status,

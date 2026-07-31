@@ -30,8 +30,20 @@ export const reviewAdminDuplicate = (reviewId, decision) =>
     method: 'POST',
   })
 
+export const markAdminTicketDuplicate = (ticketReference, request) =>
+  apiRequest(`/api/admin/tickets/${encodeURIComponent(ticketReference)}/mark-duplicate`, {
+    method: 'POST',
+    body: JSON.stringify(request),
+  })
+
 export const getAdminNotifications = (signal) =>
   apiRequest('/api/admin/notifications', { signal })
+
+export const markAdminNotificationRead = (notificationId) =>
+  apiRequest(`/api/admin/notifications/${notificationId}/read`, { method: 'PATCH' })
+
+export const markAllAdminNotificationsRead = () =>
+  apiRequest('/api/admin/notifications/read-all', { method: 'PATCH' })
 
 export const addAdminTicketComment = (ticketReference, message) =>
   apiRequest(`/api/admin/tickets/${encodeURIComponent(ticketReference)}/comments`, {

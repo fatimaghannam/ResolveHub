@@ -223,6 +223,9 @@ public sealed class TicketService(ApplicationDbContext dbContext)
 
         if (ticket is null)
             return new(TicketOperationStatus.NotFound);
+        if (DuplicateTicketRules.IsDuplicate(ticket.TicketStatus.Name))
+            return new(TicketOperationStatus.Conflict,
+                Message: DuplicateTicketRules.ReadOnlyMessage);
         if (!CanModify(ticket))
             return new(
                 TicketOperationStatus.Conflict,
@@ -265,6 +268,9 @@ public sealed class TicketService(ApplicationDbContext dbContext)
 
         if (ticket is null)
             return new(TicketOperationStatus.NotFound);
+        if (DuplicateTicketRules.IsDuplicate(ticket.TicketStatus.Name))
+            return new(TicketOperationStatus.Conflict,
+                Message: DuplicateTicketRules.ReadOnlyMessage);
         if (!CanModify(ticket))
             return new(
                 TicketOperationStatus.Conflict,
@@ -478,9 +484,17 @@ public sealed class TicketService(ApplicationDbContext dbContext)
                     history.Description,
                     history.CreatedDate))
                 .ToList(),
-            ticket.OriginalTicketID,
-            ticket.OriginalTicket == null ? null :
+            ticket.OriginalTicket != null &&
+                ticket.OriginalTicket.CreatedByUserAccountID ==
+                    ticket.CreatedByUserAccountID
+                ? ticket.OriginalTicketID : null,
+            ticket.OriginalTicket == null ||
+                ticket.OriginalTicket.CreatedByUserAccountID !=
+                    ticket.CreatedByUserAccountID ? null :
                 ticket.OriginalTicket.TicketReferenceNumber,
+            ticket.OriginalTicket == null ||
+                ticket.OriginalTicket.CreatedByUserAccountID !=
+                    ticket.CreatedByUserAccountID ? null : ticket.OriginalTicket.Title,
             ticket.TicketStatus.Name == TicketStatusNames.Open &&
                 ticket.AssignedToUserAccountID == null,
             ticket.TicketStatus.Name == TicketStatusNames.Open &&

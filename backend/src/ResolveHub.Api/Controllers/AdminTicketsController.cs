@@ -120,10 +120,41 @@ public sealed class AdminTicketsController(
         };
     }
 
+    [HttpPost("tickets/{ticketReference}/mark-duplicate")]
+    public async Task<IActionResult> MarkDuplicate(
+        string ticketReference, MarkDuplicateRequestDto request,
+        CancellationToken token)
+    {
+        var result = await service.MarkDuplicateAsync(
+            GetUserId(), ticketReference, request, token);
+        return result.Status switch
+        {
+            TicketOperationStatus.Success => NoContent(),
+            TicketOperationStatus.NotFound =>
+                NotFound(new { message = result.Message }),
+            TicketOperationStatus.Conflict =>
+                Conflict(new { message = result.Message }),
+            _ => BadRequest(new { message = result.Message })
+        };
+    }
+
     [HttpGet("notifications")]
     public async Task<ActionResult<IReadOnlyCollection<UserNotificationDto>>> Notifications(
         CancellationToken token) =>
         Ok(await service.GetNotificationsAsync(GetUserId(), token));
+
+    [HttpPatch("notifications/{notificationId:int}/read")]
+    public async Task<IActionResult> MarkNotificationRead(
+        int notificationId, CancellationToken token) =>
+        await service.MarkNotificationReadAsync(GetUserId(), notificationId, token)
+            ? NoContent() : NotFound();
+
+    [HttpPatch("notifications/read-all")]
+    public async Task<IActionResult> MarkAllNotificationsRead(CancellationToken token)
+    {
+        await service.MarkAllNotificationsReadAsync(GetUserId(), token);
+        return NoContent();
+    }
 
     private int GetUserId()
     {

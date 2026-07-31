@@ -108,6 +108,19 @@ public sealed class ManagerTicketsController(IManagerTicketService service) : Co
     public async Task<ActionResult<IReadOnlyCollection<UserNotificationDto>>> Notifications(
         CancellationToken token) => Ok(await service.GetNotificationsAsync(UserId, token));
 
+    [HttpPatch("notifications/{notificationId:int}/read")]
+    public async Task<IActionResult> MarkNotificationRead(
+        int notificationId, CancellationToken token) =>
+        await service.MarkNotificationReadAsync(UserId, notificationId, token)
+            ? NoContent() : NotFound();
+
+    [HttpPatch("notifications/read-all")]
+    public async Task<IActionResult> MarkAllNotificationsRead(CancellationToken token)
+    {
+        await service.MarkAllNotificationsReadAsync(UserId, token);
+        return NoContent();
+    }
+
     [HttpGet("workload")]
     public async Task<ActionResult<IReadOnlyCollection<ManagerAgentWorkloadDto>>> Workload(
         CancellationToken token) =>

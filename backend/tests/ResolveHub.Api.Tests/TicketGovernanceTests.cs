@@ -16,6 +16,70 @@ public sealed class TicketGovernanceTests
     private const string Password = "ValidPassword1!";
 
     [Fact]
+    public async Task AdministratorDirectlyMarksDuplicate_WithoutPendingReview_AndReusesReadOnlyState()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        await factory.SeedTicketLookupsAsync();
+        var admin = await factory.CreateUserAsync(
+            "direct-duplicate-admin@resolvehub.test", Password, RoleNames.Admin);
+        var employee = await factory.CreateUserAsync(
+            "direct-duplicate-owner@resolvehub.test", Password, RoleNames.Employee);
+        using var adminClient = await LoginAsync(factory, admin.Email!);
+        using var employeeClient = await LoginAsync(factory, employee.Email!);
+        var original = await CreateTicketAsync(
+            factory, employeeClient, "Original direct issue");
+        var duplicate = await CreateTicketAsync(
+            factory, employeeClient, "Repeated direct issue");
+
+        var response = await adminClient.PostAsJsonAsync(
+            $"/api/admin/tickets/{duplicate.TicketReferenceNumber}/mark-duplicate",
+            new
+            {
+                originalTicketReference = original.TicketReferenceNumber,
+                reason = "Both tickets describe the same confirmed incident.",
+                confirmed = true
+            });
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var details = await adminClient.GetFromJsonAsync<AdminTicketDetailsDto>(
+            $"/api/admin/tickets/{duplicate.TicketReferenceNumber}");
+        Assert.NotNull(details);
+        Assert.Equal(TicketStatusNames.Duplicate, details.StatusName);
+        Assert.Equal(original.Id, details.OriginalTicketId);
+        Assert.Equal(original.TicketReferenceNumber, details.OriginalTicketReference);
+        Assert.Null(details.PendingDuplicateReview);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Assert.False(await db.DuplicateReviews.AnyAsync(review =>
+            review.TicketID == duplicate.Id &&
+            review.Status == DuplicateReviewStatusNames.Pending));
+        var approved = await db.DuplicateReviews.SingleAsync(review =>
+            review.TicketID == duplicate.Id);
+        Assert.Equal(DuplicateReviewStatusNames.Approved, approved.Status);
+        Assert.Equal(admin.Id, approved.ReportedByUserAccountID);
+        Assert.Equal(admin.Id, approved.ReviewedByUserAccountID);
+        Assert.True(await db.TicketHistory.AnyAsync(item =>
+            item.TicketID == duplicate.Id &&
+            item.ActionType == TicketHistoryActionNames.DuplicateReviewApproved &&
+            item.Description!.Contains(original.TicketReferenceNumber)));
+        Assert.True(await db.ActivityLogs.AnyAsync(item =>
+            item.EntityID == duplicate.TicketReferenceNumber &&
+            item.ActionType == TicketHistoryActionNames.DuplicateReviewApproved &&
+            item.Description.Contains(original.TicketReferenceNumber)));
+        Assert.False(await db.UserNotifications.AnyAsync(item =>
+            item.UserAccountID == admin.Id &&
+            item.TicketReferenceNumber == duplicate.TicketReferenceNumber));
+
+        var assign = await adminClient.PostAsJsonAsync(
+            $"/api/admin/tickets/{duplicate.TicketReferenceNumber}/assign",
+            new { agentUserId = admin.Id });
+        Assert.Equal(HttpStatusCode.Conflict, assign.StatusCode);
+        Assert.Contains(DuplicateTicketRules.ReadOnlyMessage,
+            await assign.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task ManagerReportsAndAdministratorApprovesDuplicate_WithAuditAndNotifications()
     {
         await using var factory = new ResolveHubApiFactory();
@@ -50,7 +114,46 @@ public sealed class TicketGovernanceTests
             $"/api/admin/tickets/{duplicate.TicketReferenceNumber}");
         Assert.Equal(TicketStatusNames.Duplicate, details!.StatusName);
         Assert.Equal(original.TicketReferenceNumber, details.OriginalTicketReference);
+        Assert.Equal(original.Title, details.OriginalTicketTitle);
         Assert.Null(details.PendingDuplicateReview);
+
+        var assign = await adminClient.PostAsJsonAsync(
+            $"/api/admin/tickets/{duplicate.TicketReferenceNumber}/assign",
+            new { agentUserId = 99999 });
+        Assert.Equal(HttpStatusCode.Conflict, assign.StatusCode);
+        Assert.Contains(DuplicateTicketRules.ReadOnlyMessage,
+            await assign.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.Conflict, (await employeeClient.PutAsJsonAsync(
+            $"/api/tickets/{duplicate.Id}", new
+            {
+                title = "A changed duplicate title",
+                description = "This change must be rejected by the backend.",
+                ticketCategoryId = duplicate.TicketCategoryId,
+                ticketPriorityId = duplicate.TicketPriorityId
+            })).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await employeeClient.PostAsJsonAsync(
+            $"/api/tickets/{duplicate.Id}/comments",
+            new { message = "Do not add", visibility = "Public" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await managerClient.PostAsJsonAsync(
+            $"/api/manager/tickets/{duplicate.TicketReferenceNumber}/duplicate-reviews",
+            new { suggestedOriginalTicketReference = original.TicketReferenceNumber }))
+            .StatusCode);
+
+        var notifications = (await adminClient.GetFromJsonAsync<List<UserNotificationDto>>(
+            "/api/admin/notifications"))!;
+        var pendingNotification = Assert.Single(notifications, item =>
+            item.Title == "Duplicate Review Pending");
+        Assert.Equal(duplicate.TicketReferenceNumber,
+            pendingNotification.TicketReferenceNumber);
+        Assert.Equal(HttpStatusCode.NoContent, (await adminClient.PatchAsync(
+            $"/api/admin/notifications/{pendingNotification.Id}/read", null)).StatusCode);
+        Assert.True((await adminClient.GetFromJsonAsync<List<UserNotificationDto>>(
+            "/api/admin/notifications"))!.Single(item =>
+                item.Id == pendingNotification.Id).IsRead);
+        Assert.Equal(HttpStatusCode.NoContent, (await managerClient.PatchAsync(
+            "/api/manager/notifications/read-all", null)).StatusCode);
+        Assert.All((await managerClient.GetFromJsonAsync<List<UserNotificationDto>>(
+            "/api/manager/notifications"))!, item => Assert.True(item.IsRead));
 
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();

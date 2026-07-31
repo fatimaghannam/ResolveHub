@@ -201,7 +201,7 @@ function AgentTicketDetailsPage() {
           {ticket.assignmentRequestStatus === 'Pending' && <PendingApprovalBadge />}
         </div>
       </section>
-      {ticket.statusName === 'Duplicate' && ticket.originalTicketReference && <div className="inline-alert">This ticket was marked as a duplicate of <Link to={`/agent/tickets/${ticket.originalTicketReference}`}>{ticket.originalTicketReference}</Link>.</div>}
+      {ticket.statusName === 'Duplicate' && ticket.originalTicketReference && <section className="duplicate-info-panel" aria-labelledby="duplicate-info-title"><h2 id="duplicate-info-title">Duplicate Ticket</h2><p>This ticket was marked as a duplicate of:</p><Link className="duplicate-info-panel__link" to={`/agent/tickets/${ticket.originalTicketReference}`}><strong>{ticket.originalTicketReference}</strong><span>{ticket.originalTicketTitle || 'View original ticket'}</span></Link></section>}
       <div className="details-grid">
         <section className="panel">
           <h2>Original Ticket Information</h2>

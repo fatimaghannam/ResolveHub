@@ -36,6 +36,13 @@ public sealed class ManagerTicketService(
         int userId, CancellationToken token) =>
         adminTicketService.GetNotificationsAsync(userId, token);
 
+    public Task<bool> MarkNotificationReadAsync(
+        int userId, int notificationId, CancellationToken token) =>
+        adminTicketService.MarkNotificationReadAsync(userId, notificationId, token);
+
+    public Task MarkAllNotificationsReadAsync(int userId, CancellationToken token) =>
+        adminTicketService.MarkAllNotificationsReadAsync(userId, token);
+
     public async Task<TicketServiceResult<DuplicateReviewDto>> ReportDuplicateAsync(
         int managerId, string ticketReference,
         CreateDuplicateReviewRequestDto request, CancellationToken token)
@@ -46,7 +53,10 @@ public sealed class ManagerTicketService(
             return new(TicketOperationStatus.Invalid,
                 Message: "A ticket cannot be reported as a duplicate of itself.");
 
-        var tickets = await dbContext.Tickets.Where(ticket => !ticket.IsDeleted &&
+        var tickets = await dbContext.Tickets.Include(ticket => ticket.TicketStatus)
+            .Include(ticket => ticket.TicketCategory)
+            .Include(ticket => ticket.CreatedByUserAccount)
+            .Where(ticket => !ticket.IsDeleted &&
             (ticket.TicketReferenceNumber == ticketReference ||
              ticket.TicketReferenceNumber == originalReference))
             .ToListAsync(token);
@@ -57,6 +67,9 @@ public sealed class ManagerTicketService(
         if (reported is null || original is null)
             return new(TicketOperationStatus.NotFound,
                 Message: "The reported or suggested original ticket could not be found.");
+        if (DuplicateTicketRules.IsDuplicate(reported.TicketStatus.Name))
+            return new(TicketOperationStatus.Conflict,
+                Message: "This ticket has already been marked as Duplicate.");
         if (await dbContext.DuplicateReviews.AnyAsync(review =>
                 review.TicketID == reported.ID &&
                 review.Status == DuplicateReviewStatusNames.Pending, token))
@@ -86,7 +99,7 @@ public sealed class ManagerTicketService(
             PerformedByUserAccountID = managerId,
             ActionType = TicketHistoryActionNames.DuplicateReviewReported,
             NewValue = original.TicketReferenceNumber,
-            Description = $"{reporter} reported this ticket as a possible duplicate of {original.TicketReferenceNumber}.",
+            Description = $"{reporter} reported {reported.TicketReferenceNumber} as a possible duplicate of {original.TicketReferenceNumber}.",
             CreatedDate = now
         });
         dbContext.ActivityLogs.Add(new ActivityLog
@@ -116,7 +129,15 @@ public sealed class ManagerTicketService(
         await dbContext.SaveChangesAsync(token);
         return new(TicketOperationStatus.Success,
             new DuplicateReviewDto(review.ID, reported.TicketReferenceNumber,
-                original.TicketReferenceNumber, reporter, reason,
+                reported.Title, reported.TicketStatus.Name,
+                reported.CreatedByUserAccount.FirstName + " " +
+                    reported.CreatedByUserAccount.LastName,
+                reported.TicketCategory.Name,
+                original.TicketReferenceNumber, original.Title,
+                original.TicketStatus.Name,
+                original.CreatedByUserAccount.FirstName + " " +
+                    original.CreatedByUserAccount.LastName,
+                original.TicketCategory.Name, reporter, reason,
                 review.Status, now));
     }
 
@@ -269,7 +290,9 @@ public sealed class ManagerTicketService(
         if (ticket is null) return new(TicketOperationStatus.NotFound);
         if (TicketCommentRules.IsReadOnly(ticket.TicketStatus.Name))
             return new(TicketOperationStatus.Conflict,
-                Message: "Comments cannot be added to a closed or cancelled ticket.");
+                Message: DuplicateTicketRules.IsDuplicate(ticket.TicketStatus.Name)
+                    ? DuplicateTicketRules.ReadOnlyMessage
+                    : "Comments cannot be added to a closed or cancelled ticket.");
         var now = DateTime.UtcNow;
         var comment = new TicketComment
         {

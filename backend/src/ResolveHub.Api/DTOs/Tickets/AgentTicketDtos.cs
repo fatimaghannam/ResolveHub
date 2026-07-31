@@ -111,7 +111,8 @@ public sealed record AgentTicketDetailsDto(
     bool CanClose,
     bool CanRequestAssignment,
     string? AssignmentRequestStatus,
-    string? OriginalTicketReference);
+    string? OriginalTicketReference,
+    string? OriginalTicketTitle);
 
 public sealed record TicketAssignmentRequestDto(
     int Id,

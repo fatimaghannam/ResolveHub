@@ -156,7 +156,8 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
             AllowedStatusTransitions = transitions,
             CanChangeStatus = transitions.Count > 0,
             CanComment = ownsAssignment && details.StatusName is not
-                (TicketStatusNames.Closed or TicketStatusNames.Cancelled),
+                (TicketStatusNames.Closed or TicketStatusNames.Cancelled or
+                 TicketStatusNames.Duplicate),
             CanResolve = ownsAssignment && details.StatusName == TicketStatusNames.InProgress,
             CanClose = ownsAssignment && details.StatusName == TicketStatusNames.Resolved,
             CanRequestAssignment = !ownsAssignment &&
@@ -176,6 +177,9 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
                 item.TicketReferenceNumber == ticketReference &&
                 !item.IsDeleted, token);
         if (ticket is null) return new(TicketOperationStatus.NotFound);
+        if (DuplicateTicketRules.IsDuplicate(ticket.TicketStatus.Name))
+            return new(TicketOperationStatus.Conflict,
+                Message: DuplicateTicketRules.ReadOnlyMessage);
         if (ticket.AssignedToUserAccountID.HasValue ||
             ticket.TicketStatus.Name != TicketStatusNames.Open)
             return new(TicketOperationStatus.Conflict,
@@ -219,6 +223,9 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
                 item.TicketReferenceNumber == ticketReference &&
                 item.AssignedToUserAccountID == agentId && !item.IsDeleted, token);
         if (ticket is null) return new(TicketOperationStatus.NotFound);
+        if (DuplicateTicketRules.IsDuplicate(ticket.TicketStatus.Name))
+            return new(TicketOperationStatus.Conflict,
+                Message: DuplicateTicketRules.ReadOnlyMessage);
         var target = await dbContext.TicketStatuses.SingleOrDefaultAsync(
             status => status.ID == request.StatusId && status.IsActive, token);
         if (target is null)
@@ -273,6 +280,9 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
                 item.TicketReferenceNumber == ticketReference &&
                 item.AssignedToUserAccountID == agentId && !item.IsDeleted, token);
         if (ticket is null) return new(TicketOperationStatus.NotFound);
+        if (DuplicateTicketRules.IsDuplicate(ticket.TicketStatus.Name))
+            return new(TicketOperationStatus.Conflict,
+                Message: DuplicateTicketRules.ReadOnlyMessage);
         if (ticket.TicketStatus.Name != TicketStatusNames.InProgress)
             return new(TicketOperationStatus.Conflict,
                 Message: "This ticket cannot be resolved from its current status.");
@@ -313,6 +323,9 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
                 item.AssignedToUserAccountID == agentId &&
                 !item.IsDeleted, token);
         if (ticket is null) return new(TicketOperationStatus.NotFound);
+        if (DuplicateTicketRules.IsDuplicate(ticket.TicketStatus.Name))
+            return new(TicketOperationStatus.Conflict,
+                Message: DuplicateTicketRules.ReadOnlyMessage);
         if (ticket.TicketStatus.Name == TicketStatusNames.Closed)
             return new(TicketOperationStatus.Conflict,
                 Message: "This ticket is already closed.");
@@ -376,7 +389,9 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
         if (ticket is null) return new(TicketOperationStatus.NotFound);
         if (TicketCommentRules.IsReadOnly(ticket.TicketStatus.Name))
             return new(TicketOperationStatus.Conflict,
-                Message: "Comments cannot be added to a closed or cancelled ticket.");
+                Message: DuplicateTicketRules.IsDuplicate(ticket.TicketStatus.Name)
+                    ? DuplicateTicketRules.ReadOnlyMessage
+                    : "Comments cannot be added to a closed or cancelled ticket.");
         var now = DateTime.UtcNow;
         var comment = new TicketComment
         {
@@ -439,7 +454,9 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
         if (ticket is null) return new(TicketOperationStatus.NotFound);
         if (TicketCommentRules.IsReadOnly(ticket.TicketStatus.Name))
             return new(TicketOperationStatus.Conflict,
-                Message: "Comments cannot be added to a closed or cancelled ticket.");
+                Message: DuplicateTicketRules.IsDuplicate(ticket.TicketStatus.Name)
+                    ? DuplicateTicketRules.ReadOnlyMessage
+                    : "Comments cannot be added to a closed or cancelled ticket.");
         var now = DateTime.UtcNow;
         var comment = new TicketComment
         {
@@ -640,8 +657,12 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
             ticket.ResolutionSummary, Array.Empty<AllowedStatusTransitionDto>(),
             false, false, false, false, true, false, false, false,
             false, null,
-            ticket.OriginalTicket == null ? null :
-                ticket.OriginalTicket.TicketReferenceNumber));
+            ticket.OriginalTicket == null ||
+                ticket.OriginalTicket.AssignedToUserAccountID != agentId ? null :
+                ticket.OriginalTicket.TicketReferenceNumber,
+            ticket.OriginalTicket == null ||
+                ticket.OriginalTicket.AssignedToUserAccountID != agentId ? null :
+                ticket.OriginalTicket.Title));
 
     private IQueryable<TicketCommentDto> ProjectComments(int ticketId) =>
         dbContext.TicketComments.AsNoTracking()

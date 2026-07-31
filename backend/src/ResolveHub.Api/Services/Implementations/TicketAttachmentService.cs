@@ -34,6 +34,9 @@ public sealed class TicketAttachmentService(
                 item.CreatedByUserAccountID == userId && !item.IsDeleted,
                 cancellationToken);
         if (ticket is null) return new(TicketOperationStatus.NotFound);
+        if (DuplicateTicketRules.IsDuplicate(ticket.TicketStatus.Name))
+            return new(TicketOperationStatus.Conflict,
+                Message: DuplicateTicketRules.ReadOnlyMessage);
         if (ticket.TicketStatus.Name != TicketStatusNames.Open ||
             ticket.AssignedToUserAccountID != null)
             return new(TicketOperationStatus.Conflict,
@@ -164,6 +167,9 @@ public sealed class TicketAttachmentService(
                 attachment.Ticket.CreatedByUserAccountID == userId &&
                 !attachment.Ticket.IsDeleted, cancellationToken);
         if (item is null) return new(TicketOperationStatus.NotFound);
+        if (DuplicateTicketRules.IsDuplicate(item.Ticket.TicketStatus.Name))
+            return new(TicketOperationStatus.Conflict,
+                Message: DuplicateTicketRules.ReadOnlyMessage);
         if (item.Ticket.TicketStatus.Name != TicketStatusNames.Open ||
             item.Ticket.AssignedToUserAccountID != null)
             return new(TicketOperationStatus.Conflict,

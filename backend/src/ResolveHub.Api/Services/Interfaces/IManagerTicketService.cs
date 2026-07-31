@@ -31,4 +31,7 @@ public interface IManagerTicketService
         CreateDuplicateReviewRequestDto request, CancellationToken token);
     Task<IReadOnlyCollection<UserNotificationDto>> GetNotificationsAsync(
         int userId, CancellationToken token);
+    Task<bool> MarkNotificationReadAsync(
+        int userId, int notificationId, CancellationToken token);
+    Task MarkAllNotificationsReadAsync(int userId, CancellationToken token);
 }
