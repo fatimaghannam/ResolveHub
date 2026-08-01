@@ -14,7 +14,7 @@ namespace ResolveHub.Api.Controllers;
 [Authorize(Roles = RoleNames.Admin)]
 public sealed class AdminTicketsController(
     IAdminTicketService service,
-    IManagerTicketService managerTicketService)
+    ITicketCommentService commentService)
     : ControllerBase
 {
     [HttpGet("ticket-assignments")]
@@ -46,17 +46,20 @@ public sealed class AdminTicketsController(
     }
 
     [HttpPost("tickets/{ticketReference}/comments")]
+    [Consumes("application/json")]
     public async Task<ActionResult<TicketCommentDto>> AddComment(
         string ticketReference, AddTicketCommentRequestDto request,
         CancellationToken token)
     {
-        var result = await managerTicketService.AddCommentAsync(
-            GetUserId(), ticketReference, request, token);
+        var result = await commentService.AddAsync(GetUserId(),
+            TicketCommentAudience.Administrator, null, ticketReference,
+            request, null, token);
         return result.Status switch
         {
             TicketOperationStatus.Success => Created(
                 $"/api/admin/tickets/{ticketReference}/comments", result.Value),
             TicketOperationStatus.NotFound => NotFound(),
+            TicketOperationStatus.Forbidden => StatusCode(403, new { message = result.Message }),
             TicketOperationStatus.Conflict =>
                 Conflict(new { message = result.Message }),
             _ => BadRequest(new { message = result.Message })
@@ -141,6 +144,73 @@ public sealed class AdminTicketsController(
         };
     }
 
+    [HttpPost("tickets/{ticketReference}/comments")]
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult<TicketCommentDto>> AddCommentWithAttachments(
+        string ticketReference, [FromForm] CreateTicketCommentFormRequest request,
+        CancellationToken token) => CommentResult(
+            await commentService.AddWithAttachmentsAsync(GetUserId(),
+                TicketCommentAudience.Administrator, null, ticketReference,
+                request, token));
+
+    [HttpGet("tickets/{ticketReference}/comments")]
+    public async Task<ActionResult<TicketCommentPageDto>> Comments(
+        string ticketReference, string? visibility = null, int page = 1,
+        int pageSize = 15, CancellationToken token = default)
+    {
+        var comments = await commentService.GetAsync(GetUserId(),
+            TicketCommentAudience.Administrator, null, ticketReference, visibility,
+            page, pageSize, token);
+        return comments is null ? NotFound() : Ok(comments);
+    }
+
+    [HttpPost("tickets/{ticketReference}/comments/{commentId:int}/replies")]
+    public async Task<ActionResult<TicketCommentDto>> Reply(
+        string ticketReference, int commentId, AddTicketCommentRequestDto request,
+        CancellationToken token) => CommentResult(await commentService.AddAsync(
+            GetUserId(), TicketCommentAudience.Administrator, null, ticketReference,
+            request, commentId, token));
+
+    [HttpPut("tickets/{ticketReference}/comments/{commentId:int}")]
+    public async Task<ActionResult<TicketCommentDto>> EditComment(
+        string ticketReference, int commentId, EditTicketCommentRequestDto request,
+        CancellationToken token) => CommentResult(await commentService.EditAsync(
+            GetUserId(), TicketCommentAudience.Administrator, null, ticketReference,
+            commentId, request, token));
+
+    [HttpDelete("tickets/{ticketReference}/comments/{commentId:int}")]
+    public async Task<IActionResult> DeleteComment(
+        string ticketReference, int commentId, CancellationToken token) =>
+        BooleanResult(await commentService.DeleteAsync(GetUserId(),
+            TicketCommentAudience.Administrator, null, ticketReference,
+            commentId, token));
+
+    [HttpPost("tickets/{ticketReference}/comments/{commentId:int}/attachments")]
+    public async Task<ActionResult<CommentAttachmentDto>> UploadCommentAttachment(
+        string ticketReference, int commentId, IFormFile file, CancellationToken token) =>
+        CommentAttachmentResult(await commentService.UploadAttachmentAsync(GetUserId(),
+            TicketCommentAudience.Administrator, null, ticketReference, commentId, file, token));
+
+    [HttpGet("tickets/{ticketReference}/comments/{commentId:int}/attachments/{attachmentId:int}")]
+    public async Task<IActionResult> DownloadCommentAttachment(string ticketReference,
+        int commentId, int attachmentId, CancellationToken token)
+    {
+        var file = await commentService.DownloadAttachmentAsync(GetUserId(),
+            TicketCommentAudience.Administrator, null, ticketReference, commentId,
+            attachmentId, token);
+        return file is null ? NotFound() : File(file.Stream, file.ContentType, file.FileName);
+    }
+
+    private ActionResult<CommentAttachmentDto> CommentAttachmentResult(
+        TicketServiceResult<CommentAttachmentDto> result) => result.Status switch
+        {
+            TicketOperationStatus.Success => Ok(result.Value),
+            TicketOperationStatus.NotFound => NotFound(),
+            TicketOperationStatus.Forbidden => StatusCode(403, new { message = result.Message }),
+            TicketOperationStatus.Conflict => Conflict(new { message = result.Message }),
+            _ => BadRequest(new { message = result.Message })
+        };
+
     [HttpGet("notifications")]
     public async Task<ActionResult<IReadOnlyCollection<UserNotificationDto>>> Notifications(
         CancellationToken token) =>
@@ -167,4 +237,24 @@ public sealed class AdminTicketsController(
             : throw new InvalidOperationException(
                 "The authenticated user identifier is invalid.");
     }
+
+    private ActionResult<TicketCommentDto> CommentResult(
+        TicketServiceResult<TicketCommentDto> result) => result.Status switch
+        {
+            TicketOperationStatus.Success => Ok(result.Value),
+            TicketOperationStatus.NotFound => NotFound(),
+            TicketOperationStatus.Forbidden => StatusCode(403, new { message = result.Message }),
+            TicketOperationStatus.Conflict => Conflict(new { message = result.Message }),
+            _ => BadRequest(new { message = result.Message })
+        };
+
+    private IActionResult BooleanResult(TicketServiceResult<bool> result) =>
+        result.Status switch
+        {
+            TicketOperationStatus.Success => NoContent(),
+            TicketOperationStatus.NotFound => NotFound(),
+            TicketOperationStatus.Forbidden => StatusCode(403, new { message = result.Message }),
+            TicketOperationStatus.Conflict => Conflict(new { message = result.Message }),
+            _ => BadRequest(new { message = result.Message })
+        };
 }

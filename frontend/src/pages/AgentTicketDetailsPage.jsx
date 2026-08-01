@@ -10,7 +10,6 @@ import {
 } from '../components/tickets/TicketBadges.jsx'
 import TicketComments from '../components/tickets/TicketComments.jsx'
 import {
-  addAgentTicketComment,
   closeAgentTicket,
   downloadAgentTicketAttachment,
   getAgentTicketDetails,
@@ -29,8 +28,6 @@ function AgentTicketDetailsPage() {
   const [dialog, setDialog] = useState(null)
   const [resolutionSummary, setResolutionSummary] = useState('')
   const [closingNote, setClosingNote] = useState('')
-  const [comment, setComment] = useState('')
-  const [visibility, setVisibility] = useState('Public')
   const [saving, setSaving] = useState('')
   const [toast, setToast] = useState(null)
   const dismissToast = useCallback(() => setToast(null), [])
@@ -137,28 +134,6 @@ function AgentTicketDetailsPage() {
     }
   }
 
-  async function addMessage(event) {
-    event.preventDefault()
-    if (!comment.trim() || saving) return
-    try {
-      setSaving('comment')
-      const created = await addAgentTicketComment(ticket.ticketReferenceNumber, {
-        message: comment.trim(),
-        visibility,
-      })
-      setTicket((current) => ({
-        ...current,
-        comments: [...current.comments, created],
-      }))
-      setComment('')
-      notify('success', 'Comment Added', `Your ${visibility} comment was added.`)
-    } catch (requestError) {
-      notify('error', 'Unable to Save Update', requestError.message)
-    } finally {
-      setSaving('')
-    }
-  }
-
   async function downloadAttachment(file) {
     try {
       const blob = await downloadAgentTicketAttachment(
@@ -225,20 +200,14 @@ function AgentTicketDetailsPage() {
       </div>
       <TicketComments
         comments={ticket.comments}
-        helperText={ticket.assignedAgentName
-          ? 'Public comments are visible to everyone with access to this ticket. Private comments are visible only to the requester and assigned IT Support Agent.'
-          : 'Public comments for this ticket are shown below.'}
-        message={comment}
-        onMessageChange={setComment}
-        visibility={visibility}
-        onVisibilityChange={setVisibility}
-        onSubmit={addMessage}
-        isSubmitting={saving === 'comment'}
+        endpoint={`/api/agent/tickets/${encodeURIComponent(ticket.ticketReferenceNumber)}/comments`}
+        canViewPrivate={Boolean(ticket.assignedAgentName)}
         canComment={ticket.canComment}
         readOnlyMessage={ticket.assignedAgentName
           ? 'Comments are read-only because this ticket is completed.'
           : null}
         formatTimestamp={formatLocalDate}
+        onNotify={notify}
       />
       <section className="panel dashboard-section">
         <div className="panel__heading"><div><h2>Ticket History</h2><p>Read-only lifecycle and activity record.</p></div></div>

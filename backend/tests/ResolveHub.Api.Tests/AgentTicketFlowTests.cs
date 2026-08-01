@@ -171,8 +171,8 @@ public sealed class AgentTicketFlowTests
         var resolve = await agentClient.PostAsJsonAsync(
             $"/api/agent/tickets/{ticket.TicketReferenceNumber}/resolve",
             new { resolutionSummary = "Rebuilt the VPN profile and reset cached credentials." });
-        var publicComments = await employeeClient.GetFromJsonAsync<
-            IReadOnlyCollection<TicketCommentDto>>($"/api/tickets/{ticket.Id}/comments");
+        var publicComments = (await employeeClient.GetFromJsonAsync<
+            TicketCommentPageDto>($"/api/tickets/{ticket.Id}/comments"))!.Items;
         var details = await agentClient.GetFromJsonAsync<AgentTicketDetailsDto>(
             $"/api/agent/tickets/{ticket.TicketReferenceNumber}");
 
@@ -181,13 +181,13 @@ public sealed class AgentTicketFlowTests
         Assert.Equal(HttpStatusCode.Created, comment.StatusCode);
         Assert.Equal(HttpStatusCode.Created, note.StatusCode);
         Assert.Equal(HttpStatusCode.OK, resolve.StatusCode);
-        Assert.Equal(2, publicComments!.Count);
+        Assert.Equal(2, publicComments.Count);
         Assert.Equal(TicketStatusNames.Resolved, details!.StatusName);
         Assert.NotNull(details.ResolvedDate);
         Assert.Equal(agent.Id, await ResolvedByAsync(factory, ticket.Id));
         Assert.Contains(details.History,
             item => item.ActionType == TicketHistoryActionNames.TicketResolved);
-        Assert.Contains(publicComments!, item => item.Content.Contains("rebuilt by"));
+        Assert.Contains(publicComments, item => item.Content.Contains("rebuilt by"));
     }
 
     [Fact]

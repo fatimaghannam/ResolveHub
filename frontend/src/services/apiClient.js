@@ -59,8 +59,8 @@ export async function apiRequest(path, options = {}) {
     }[response.status]
     throw new ApiError(
       validation ||
-        statusMessage ||
         body?.message ||
+        statusMessage ||
         `The request could not be completed (HTTP ${response.status}).`,
       response.status,
       body,

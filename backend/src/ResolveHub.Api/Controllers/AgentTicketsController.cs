@@ -14,7 +14,8 @@ namespace ResolveHub.Api.Controllers;
 [Authorize(Roles = RoleNames.ITSupportAgent)]
 public sealed class AgentTicketsController(
     IAgentTicketService service,
-    ITicketAttachmentService attachmentService) : ControllerBase
+    ITicketAttachmentService attachmentService,
+    ITicketCommentService commentService) : ControllerBase
 {
     [HttpGet]
     [ProducesResponseType(typeof(PagedResultDto<AgentTicketListItemDto>), 200)]
@@ -52,6 +53,7 @@ public sealed class AgentTicketsController(
                 $"/api/agent/tickets/{ticketReference}/assignment-requests",
                 result.Value),
             TicketOperationStatus.NotFound => NotFound(),
+            TicketOperationStatus.Forbidden => StatusCode(403, new { message = result.Message }),
             TicketOperationStatus.Conflict => Conflict(new { message = result.Message }),
             _ => BadRequest(new { message = result.Message })
         };
@@ -77,20 +79,79 @@ public sealed class AgentTicketsController(
         Result(await service.CloseAsync(GetUserId(), ticketReference, request, token));
 
     [HttpGet("{ticketReference}/comments")]
-    public async Task<ActionResult<IReadOnlyCollection<TicketCommentDto>>> Comments(
-        string ticketReference, CancellationToken token) =>
-        Collection(await service.GetCommentsAsync(
-            GetUserId(), ticketReference, token));
+    public async Task<ActionResult<TicketCommentPageDto>> Comments(
+        string ticketReference, string? visibility = null, int page = 1,
+        int pageSize = 15, CancellationToken token = default)
+    {
+        var comments = await commentService.GetAsync(GetUserId(),
+            TicketCommentAudience.Agent, null, ticketReference, visibility,
+            page, pageSize, token);
+        return comments is null ? NotFound() : Ok(comments);
+    }
 
     [HttpPost("{ticketReference}/comments")]
+    [Consumes("application/json")]
     public async Task<ActionResult<TicketCommentDto>> AddComment(
         string ticketReference, AddTicketCommentRequestDto request,
         CancellationToken token)
     {
-        var result = await service.AddCommentAsync(
-            GetUserId(), ticketReference, request, token);
+        var result = await commentService.AddAsync(GetUserId(),
+            TicketCommentAudience.Agent, null, ticketReference, request, null, token);
         return CreatedResult(ticketReference, "comments", result);
     }
+
+    [HttpPost("{ticketReference}/comments")]
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult<TicketCommentDto>> AddCommentWithAttachments(
+        string ticketReference, [FromForm] CreateTicketCommentFormRequest request,
+        CancellationToken token) => CommentResult(
+            await commentService.AddWithAttachmentsAsync(GetUserId(),
+                TicketCommentAudience.Agent, null, ticketReference, request, token));
+
+    [HttpPost("{ticketReference}/comments/{commentId:int}/replies")]
+    public async Task<ActionResult<TicketCommentDto>> Reply(
+        string ticketReference, int commentId, AddTicketCommentRequestDto request,
+        CancellationToken token) => CommentResult(await commentService.AddAsync(
+            GetUserId(), TicketCommentAudience.Agent, null, ticketReference,
+            request, commentId, token));
+
+    [HttpPut("{ticketReference}/comments/{commentId:int}")]
+    public async Task<ActionResult<TicketCommentDto>> EditComment(
+        string ticketReference, int commentId, EditTicketCommentRequestDto request,
+        CancellationToken token) => CommentResult(await commentService.EditAsync(
+            GetUserId(), TicketCommentAudience.Agent, null, ticketReference,
+            commentId, request, token));
+
+    [HttpDelete("{ticketReference}/comments/{commentId:int}")]
+    public async Task<IActionResult> DeleteComment(
+        string ticketReference, int commentId, CancellationToken token) =>
+        BooleanResult(await commentService.DeleteAsync(GetUserId(),
+            TicketCommentAudience.Agent, null, ticketReference, commentId, token));
+
+    [HttpPost("{ticketReference}/comments/{commentId:int}/attachments")]
+    public async Task<ActionResult<CommentAttachmentDto>> UploadCommentAttachment(
+        string ticketReference, int commentId, IFormFile file, CancellationToken token) =>
+        CommentAttachmentResult(await commentService.UploadAttachmentAsync(GetUserId(),
+            TicketCommentAudience.Agent, null, ticketReference, commentId, file, token));
+
+    [HttpGet("{ticketReference}/comments/{commentId:int}/attachments/{attachmentId:int}")]
+    public async Task<IActionResult> DownloadCommentAttachment(string ticketReference,
+        int commentId, int attachmentId, CancellationToken token)
+    {
+        var file = await commentService.DownloadAttachmentAsync(GetUserId(),
+            TicketCommentAudience.Agent, null, ticketReference, commentId, attachmentId, token);
+        return file is null ? NotFound() : File(file.Stream, file.ContentType, file.FileName);
+    }
+
+    private ActionResult<CommentAttachmentDto> CommentAttachmentResult(
+        TicketServiceResult<CommentAttachmentDto> result) => result.Status switch
+        {
+            TicketOperationStatus.Success => Ok(result.Value),
+            TicketOperationStatus.NotFound => NotFound(),
+            TicketOperationStatus.Forbidden => StatusCode(403, new { message = result.Message }),
+            TicketOperationStatus.Conflict => Conflict(new { message = result.Message }),
+            _ => BadRequest(new { message = result.Message })
+        };
 
     [HttpGet("{ticketReference}/history")]
     public async Task<ActionResult<IReadOnlyCollection<TicketHistoryDto>>> History(
@@ -116,6 +177,7 @@ public sealed class AgentTicketsController(
         {
             TicketOperationStatus.Success => Ok(result.Value),
             TicketOperationStatus.NotFound => NotFound(),
+            TicketOperationStatus.Forbidden => StatusCode(403, new { message = result.Message }),
             TicketOperationStatus.Conflict => Conflict(new { message = result.Message }),
             _ => BadRequest(new { message = result.Message })
         };
@@ -132,6 +194,27 @@ public sealed class AgentTicketsController(
             TicketOperationStatus.Success => Created(
                 $"/api/agent/tickets/{ticketReference}/{segment}", result.Value),
             TicketOperationStatus.NotFound => NotFound(),
+            TicketOperationStatus.Forbidden => StatusCode(403, new { message = result.Message }),
+            TicketOperationStatus.Conflict => Conflict(new { message = result.Message }),
+            _ => BadRequest(new { message = result.Message })
+        };
+
+    private ActionResult<TicketCommentDto> CommentResult(
+        TicketServiceResult<TicketCommentDto> result) => result.Status switch
+        {
+            TicketOperationStatus.Success => Ok(result.Value),
+            TicketOperationStatus.NotFound => NotFound(),
+            TicketOperationStatus.Forbidden => StatusCode(403, new { message = result.Message }),
+            TicketOperationStatus.Conflict => Conflict(new { message = result.Message }),
+            _ => BadRequest(new { message = result.Message })
+        };
+
+    private IActionResult BooleanResult(TicketServiceResult<bool> result) =>
+        result.Status switch
+        {
+            TicketOperationStatus.Success => NoContent(),
+            TicketOperationStatus.NotFound => NotFound(),
+            TicketOperationStatus.Forbidden => StatusCode(403, new { message = result.Message }),
             TicketOperationStatus.Conflict => Conflict(new { message = result.Message }),
             _ => BadRequest(new { message = result.Message })
         };

@@ -70,7 +70,26 @@ public sealed record AllowedStatusTransitionDto(int StatusId, string StatusName)
 
 public sealed record TicketCommentDto(
     int Id, string AuthorName, string AuthorRole, string Content, DateTime CreatedDate,
-    DateTime? UpdatedDate, bool IsEdited, string Visibility);
+    DateTime? UpdatedDate, bool IsEdited, string Visibility,
+    int? ParentCommentId = null, bool IsDeleted = false,
+    DateTime? DeletedDate = null, bool CanEdit = false, bool CanDelete = false,
+    bool IsTicketCreator = false, bool IsAssignedAgent = false,
+    int ReplyCount = 0, bool HasMoreReplies = false,
+    IReadOnlyCollection<CommentAttachmentDto>? Attachments = null);
+
+public sealed record CommentAttachmentDto(
+    int Id, string FileName, string ContentType, long FileSizeBytes,
+    DateTime UploadedDate);
+
+public sealed record TicketCommentPageDto(
+    IReadOnlyCollection<TicketCommentDto> Items,
+    int Page,
+    int PageSize,
+    int TotalThreads,
+    int TotalVisibleComments,
+    int PublicCount,
+    int PrivateCount,
+    bool HasMore);
 
 public sealed record TicketHistoryDto(
     int Id, string ActionType, string PerformedByName, string? OldValue,
@@ -153,4 +172,22 @@ public sealed class AddTicketCommentRequestDto
     public string Message { get; init; } = string.Empty;
 
     public string? Visibility { get; init; }
+}
+
+public sealed class CreateTicketCommentFormRequest
+{
+    [Required, StringLength(TicketCommentRules.MaximumMessageLength)]
+    public string Content { get; init; } = string.Empty;
+
+    public string? Visibility { get; init; }
+
+    public int? ParentCommentId { get; init; }
+
+    public List<IFormFile> Attachments { get; init; } = [];
+}
+
+public sealed class EditTicketCommentRequestDto
+{
+    [Required, StringLength(TicketCommentRules.MaximumMessageLength)]
+    public string Message { get; init; } = string.Empty;
 }

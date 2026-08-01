@@ -6,12 +6,11 @@ import Toast from '../components/common/Toast.jsx'
 import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
 import TicketComments from '../components/tickets/TicketComments.jsx'
 import {
-  addAdminTicketComment,
   getAdminTicket,
   markAdminTicketDuplicate,
   reviewAdminDuplicate,
 } from '../services/adminService.js'
-import { addManagerTicketComment, getManagerTicket, reportManagerDuplicate } from '../services/managerService.js'
+import { getManagerTicket, reportManagerDuplicate } from '../services/managerService.js'
 import { formatLocalDate } from '../utils/dateTime.js'
 
 function getDirectDuplicateError(error) {
@@ -54,8 +53,6 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
   const [loadingOriginal, setLoadingOriginal] = useState(false)
   const [reviewNote, setReviewNote] = useState('')
   const [duplicateConfirmed, setDuplicateConfirmed] = useState(false)
-  const [comment, setComment] = useState('')
-  const [addingComment, setAddingComment] = useState(false)
   const duplicateTriggerRef = useRef(null)
   const location = useLocation()
   const [toast, setToast] = useState(() => {
@@ -63,6 +60,9 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
     return notification ? { id: Date.now(), ...notification } : null
   })
   const dismissToast = useCallback(() => setToast(null), [])
+  const notify = useCallback((type, title, message) => {
+    setToast({ id: Date.now(), type, title, message })
+  }, [])
 
   useEffect(() => {
     if (!location.state?.toast) return
@@ -214,39 +214,6 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
     }
   }
 
-  async function addComment(event) {
-    event.preventDefault()
-    if (!comment.trim() || addingComment) return
-    try {
-      setAddingComment(true)
-      const addCommentRequest = roleArea === 'manager'
-        ? addManagerTicketComment
-        : addAdminTicketComment
-      const created = await addCommentRequest(
-        ticket.ticketReferenceNumber, comment.trim())
-      setTicket((current) => ({
-        ...current,
-        comments: [...current.comments, created],
-      }))
-      setComment('')
-      setToast({
-        id: Date.now(),
-        type: 'success',
-        title: 'Comment Added',
-        message: 'Your Public comment was added.',
-      })
-    } catch (requestError) {
-      setToast({
-        id: Date.now(),
-        type: 'error',
-        title: 'Unable to Add Comment',
-        message: requestError.message,
-      })
-    } finally {
-      setAddingComment(false)
-    }
-  }
-
   const reviewingDuplicate = roleArea === 'admin' && Boolean(ticket.pendingDuplicateReview) && !ticket.pendingDuplicateReview.reportedByAdministrator
   const markingDuplicate = roleArea === 'admin' && !reviewingDuplicate
   const reviewReportedTicket = reviewingDuplicate ? {
@@ -283,15 +250,12 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
       <div className="details-grid"><section className="panel"><h2>Ticket Summary</h2><p className="ticket-description">{ticket.description}</p></section><aside className="panel details-side"><h2>Ticket Information</h2><dl><div><dt>Requester</dt><dd>{ticket.requesterName}</dd></div><div><dt>Category</dt><dd>{ticket.categoryName}</dd></div><div><dt>Priority</dt><dd><TicketPriorityBadge value={ticket.priorityName} /></dd></div><div><dt>Status</dt><dd><TicketStatusBadge value={ticket.statusName} /></dd></div>{ticket.originalTicketReference && <div><dt>Original Ticket</dt><dd><Link to={`/${roleArea}/tickets/${ticket.originalTicketReference}`}>{ticket.originalTicketReference}</Link></dd></div>}<div><dt>Assigned agent</dt><dd>{ticket.assignedAgentName ?? 'Unassigned'}</dd></div>{ticket.resolvedDate && <div><dt>Resolved</dt><dd>{formatLocalDate(ticket.resolvedDate)}</dd></div>}{ticket.closedDate && <div><dt>Closed</dt><dd>{formatLocalDate(ticket.closedDate)}</dd></div>}</dl></aside></div>
       <TicketComments
         comments={ticket.comments}
-        helperText="You can add Public comments visible to everyone with access to this ticket."
-        message={comment}
-        onMessageChange={setComment}
-        onSubmit={addComment}
-        isSubmitting={addingComment}
+        endpoint={`/api/${roleArea}/tickets/${encodeURIComponent(ticket.ticketReferenceNumber)}/comments`}
+        canViewPrivate={false}
         canComment={!['Closed', 'Cancelled', 'Duplicate'].includes(ticket.statusName)}
-        publicOnly
         readOnlyMessage="Comments are read-only because this ticket is completed."
         formatTimestamp={formatLocalDate}
+        onNotify={notify}
       />
       <section className="panel dashboard-section">
         <div className="panel__heading"><div><h2>Ticket History</h2><p>Read-only record of important ticket actions.</p></div></div>

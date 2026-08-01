@@ -107,10 +107,16 @@ public sealed class AssignmentRequestWorkflowTests
             new { message = "Private employee update.", visibility = "Private" });
         var comment = await managerClient.PostAsJsonAsync(
             $"/api/manager/tickets/{ticket.TicketReferenceNumber}/comments",
-            new { message = "Manager is coordinating this request.", visibility = "Private" });
+            new { message = "Manager is coordinating this request.", visibility = "Public" });
         var adminComment = await adminClient.PostAsJsonAsync(
             $"/api/admin/tickets/{ticket.TicketReferenceNumber}/comments",
-            new { message = "Administrator public update.", visibility = "Private" });
+            new { message = "Administrator public update.", visibility = "Public" });
+        var managerPrivate = await managerClient.PostAsJsonAsync(
+            $"/api/manager/tickets/{ticket.TicketReferenceNumber}/comments",
+            new { message = "Manager private attempt.", visibility = "Private" });
+        var adminPrivate = await adminClient.PostAsJsonAsync(
+            $"/api/admin/tickets/{ticket.TicketReferenceNumber}/comments",
+            new { message = "Administrator private attempt.", visibility = "Private" });
         var emptyComment = await employeeClient.PostAsJsonAsync(
             $"/api/tickets/{ticket.Id}/comments",
             new { message = "   ", visibility = "Public" });
@@ -119,6 +125,8 @@ public sealed class AssignmentRequestWorkflowTests
             new { message = "Invalid visibility.", visibility = "Internal" });
         Assert.Equal(HttpStatusCode.Created, comment.StatusCode);
         Assert.Equal(HttpStatusCode.Created, adminComment.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, managerPrivate.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, adminPrivate.StatusCode);
         Assert.Equal(HttpStatusCode.Created, employeePublic.StatusCode);
         Assert.Equal(HttpStatusCode.Created, employeePrivate.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, emptyComment.StatusCode);
@@ -163,6 +171,238 @@ public sealed class AssignmentRequestWorkflowTests
             item.TicketID == ticket.Id && item.NewValue == "Private");
         Assert.True(privateHistory.IsInternal);
         Assert.DoesNotContain("Private employee update.", privateHistory.Description ?? "");
+    }
+
+    [Fact]
+    public async Task ThreadedComments_EnforceVisibilityOwnershipDepthAndSoftDelete()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        await factory.SeedTicketLookupsAsync();
+        var employee = await factory.CreateUserAsync(
+            "thread-owner@resolvehub.test", Password, RoleNames.Employee);
+        var agent = await factory.CreateUserAsync(
+            "thread-agent@resolvehub.test", Password, RoleNames.ITSupportAgent);
+        var manager = await factory.CreateUserAsync(
+            "thread-manager@resolvehub.test", Password, RoleNames.Manager);
+        var admin = await factory.CreateUserAsync(
+            "thread-admin@resolvehub.test", Password, RoleNames.Admin);
+        using var employeeClient = await LoginAsync(factory, employee.Email!);
+        using var agentClient = await LoginAsync(factory, agent.Email!);
+        using var managerClient = await LoginAsync(factory, manager.Email!);
+        using var adminClient = await LoginAsync(factory, admin.Email!);
+        var ticket = await CreateTicketAsync(factory, employeeClient);
+        Assert.Equal(HttpStatusCode.NoContent, (await adminClient.PostAsJsonAsync(
+            $"/api/admin/tickets/{ticket.TicketReferenceNumber}/assign",
+            new { agentUserId = agent.Id })).StatusCode);
+
+        var parentResponse = await employeeClient.PostAsJsonAsync(
+            $"/api/tickets/{ticket.Id}/comments",
+            new { message = "Private diagnostic context.", visibility = "Private" });
+        Assert.Equal(HttpStatusCode.Created, parentResponse.StatusCode);
+        var parent = (await parentResponse.Content.ReadFromJsonAsync<TicketCommentDto>())!;
+        var replyResponse = await agentClient.PostAsJsonAsync(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/comments/{parent.Id}/replies",
+            new { message = "Private assigned-agent reply.", visibility = "Public" });
+        Assert.Equal(HttpStatusCode.OK, replyResponse.StatusCode);
+        var reply = (await replyResponse.Content.ReadFromJsonAsync<TicketCommentDto>())!;
+        Assert.Equal(parent.Id, reply.ParentCommentId);
+        Assert.Equal(nameof(CommentVisibility.Private), reply.Visibility);
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await employeeClient.PostAsJsonAsync(
+            $"/api/tickets/{ticket.Id}/comments/{reply.Id}/replies",
+            new { message = "A forbidden second-level reply." })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await managerClient.PutAsJsonAsync(
+            $"/api/manager/tickets/{ticket.TicketReferenceNumber}/comments/{parent.Id}",
+            new { message = "Manager must not edit another user's comment." })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await managerClient.DeleteAsync(
+            $"/api/manager/tickets/{ticket.TicketReferenceNumber}/comments/{parent.Id}"))
+            .StatusCode);
+        var edited = await employeeClient.PutAsJsonAsync(
+            $"/api/tickets/{ticket.Id}/comments/{parent.Id}",
+            new { message = "Updated private diagnostic context." });
+        Assert.Equal(HttpStatusCode.OK, edited.StatusCode);
+        Assert.True((await edited.Content.ReadFromJsonAsync<TicketCommentDto>())!.IsEdited);
+
+        var managerComments = (await managerClient.GetFromJsonAsync<TicketCommentPageDto>(
+            $"/api/manager/tickets/{ticket.TicketReferenceNumber}/comments"))!.Items;
+        var adminComments = (await adminClient.GetFromJsonAsync<TicketCommentPageDto>(
+            $"/api/admin/tickets/{ticket.TicketReferenceNumber}/comments"))!.Items;
+        Assert.Empty(managerComments);
+        Assert.Empty(adminComments);
+
+        var ownerCommentsBeforeDelete = (await employeeClient.GetFromJsonAsync<TicketCommentPageDto>(
+            $"/api/tickets/{ticket.Id}/comments"))!.Items;
+        Assert.False(Assert.Single(ownerCommentsBeforeDelete, item => item.Id == parent.Id).CanDelete);
+        Assert.False(Assert.Single(ownerCommentsBeforeDelete, item => item.Id == reply.Id).CanDelete);
+        var agentCommentsBeforeDelete = (await agentClient.GetFromJsonAsync<TicketCommentPageDto>(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/comments"))!.Items;
+        Assert.True(Assert.Single(agentCommentsBeforeDelete, item => item.Id == reply.Id).CanDelete);
+
+        var rejectedDelete = await employeeClient.DeleteAsync(
+            $"/api/tickets/{ticket.Id}/comments/{parent.Id}");
+        var rejectedDeleteBody = await rejectedDelete.Content.ReadAsStringAsync();
+        Assert.True(rejectedDelete.StatusCode == HttpStatusCode.Conflict,
+            $"Expected 409 Conflict but received {(int)rejectedDelete.StatusCode}: {rejectedDeleteBody}");
+        Assert.Contains("cannot be deleted because it has replies",
+            rejectedDeleteBody,
+            StringComparison.OrdinalIgnoreCase);
+        var ownerComments = (await employeeClient.GetFromJsonAsync<TicketCommentPageDto>(
+            $"/api/tickets/{ticket.Id}/comments"))!.Items;
+        Assert.Equal(2, ownerComments.Count);
+        Assert.False(Assert.Single(ownerComments, item => item.Id == parent.Id).IsDeleted);
+        Assert.Contains(ownerComments, item => item.ParentCommentId == parent.Id);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var stored = await db.TicketComments.SingleAsync(item => item.ID == parent.Id);
+        Assert.False(stored.IsDeleted);
+        Assert.Null(stored.DeletedDate);
+        Assert.False((await db.TicketComments.SingleAsync(item => item.ID == reply.Id)).IsDeleted);
+        Assert.False(await db.UserNotifications.AnyAsync(item =>
+            (item.UserAccountID == manager.Id || item.UserAccountID == admin.Id) &&
+            item.TicketReferenceNumber == ticket.TicketReferenceNumber));
+
+        Assert.Equal(HttpStatusCode.NoContent, (await agentClient.DeleteAsync(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/comments/{reply.Id}"))
+            .StatusCode);
+
+        var afterReplyDelete = (await employeeClient.GetFromJsonAsync<TicketCommentPageDto>(
+            $"/api/tickets/{ticket.Id}/comments"))!.Items;
+        Assert.True(Assert.Single(afterReplyDelete, item => item.Id == reply.Id).IsDeleted);
+        Assert.True(Assert.Single(afterReplyDelete, item => item.Id == parent.Id).CanDelete);
+        Assert.Equal(HttpStatusCode.NoContent, (await employeeClient.DeleteAsync(
+            $"/api/tickets/{ticket.Id}/comments/{parent.Id}")).StatusCode);
+
+        var publicResponse = await employeeClient.PostAsJsonAsync(
+            $"/api/tickets/{ticket.Id}/comments",
+            new { message = "Public comment without replies.", visibility = "Public" });
+        Assert.Equal(HttpStatusCode.Created, publicResponse.StatusCode);
+        var publicComment = (await publicResponse.Content.ReadFromJsonAsync<TicketCommentDto>())!;
+        Assert.True(publicComment.CanDelete);
+        Assert.Equal(HttpStatusCode.NoContent, (await employeeClient.DeleteAsync(
+            $"/api/tickets/{ticket.Id}/comments/{publicComment.Id}")).StatusCode);
+
+        var afterValidDeletes = (await employeeClient.GetFromJsonAsync<TicketCommentPageDto>(
+            $"/api/tickets/{ticket.Id}/comments"))!.Items;
+        Assert.Equal(3, afterValidDeletes.Count);
+        Assert.All(afterValidDeletes, item => Assert.True(item.IsDeleted));
+        db.ChangeTracker.Clear();
+        Assert.True((await db.TicketComments.SingleAsync(item => item.ID == parent.Id)).IsDeleted);
+        Assert.True((await db.TicketComments.SingleAsync(item => item.ID == reply.Id)).IsDeleted);
+        Assert.True((await db.TicketComments.SingleAsync(item => item.ID == publicComment.Id)).IsDeleted);
+    }
+
+    [Fact]
+    public async Task CommentAttachments_ValidateFilesAndEnforceCommentVisibility()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        await factory.SeedTicketLookupsAsync();
+        var employee = await factory.CreateUserAsync(
+            "attachment-owner@resolvehub.test", Password, RoleNames.Employee);
+        var agent = await factory.CreateUserAsync(
+            "attachment-agent@resolvehub.test", Password, RoleNames.ITSupportAgent);
+        var manager = await factory.CreateUserAsync(
+            "attachment-manager@resolvehub.test", Password, RoleNames.Manager);
+        var admin = await factory.CreateUserAsync(
+            "attachment-admin@resolvehub.test", Password, RoleNames.Admin);
+        using var employeeClient = await LoginAsync(factory, employee.Email!);
+        using var agentClient = await LoginAsync(factory, agent.Email!);
+        using var managerClient = await LoginAsync(factory, manager.Email!);
+        using var adminClient = await LoginAsync(factory, admin.Email!);
+        var ticket = await CreateTicketAsync(factory, employeeClient);
+        Assert.Equal(HttpStatusCode.NoContent, (await adminClient.PostAsJsonAsync(
+            $"/api/admin/tickets/{ticket.TicketReferenceNumber}/assign",
+            new { agentUserId = agent.Id })).StatusCode);
+
+        using var multipartComment = new MultipartFormDataContent();
+        multipartComment.Add(new StringContent("Private attachment context."), "Content");
+        multipartComment.Add(new StringContent("Private"), "Visibility");
+        using var image = new ByteArrayContent(Convert.FromBase64String(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="));
+        image.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        multipartComment.Add(image, "Attachments", "diagnostic.png");
+        using var report = new ByteArrayContent("%PDF-1.7 private report"u8.ToArray());
+        report.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+        multipartComment.Add(report, "Attachments", "private-report.pdf");
+        var privateResponse = await employeeClient.PostAsync(
+            $"/api/tickets/{ticket.Id}/comments", multipartComment);
+        privateResponse.EnsureSuccessStatusCode();
+        var privateComment = (await privateResponse.Content.ReadFromJsonAsync<TicketCommentDto>())!;
+        Assert.Equal(2, privateComment.Attachments!.Count);
+        var attachment = privateComment.Attachments.Single(item =>
+            item.FileName == "private-report.pdf");
+
+        Assert.Equal(HttpStatusCode.OK, (await employeeClient.GetAsync(
+            $"/api/tickets/{ticket.Id}/comments/{privateComment.Id}/attachments/{attachment.Id}"))
+            .StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await agentClient.GetAsync(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/comments/{privateComment.Id}/attachments/{attachment.Id}"))
+            .StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await managerClient.GetAsync(
+            $"/api/manager/tickets/{ticket.TicketReferenceNumber}/comments/{privateComment.Id}/attachments/{attachment.Id}"))
+            .StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await adminClient.GetAsync(
+            $"/api/admin/tickets/{ticket.TicketReferenceNumber}/comments/{privateComment.Id}/attachments/{attachment.Id}"))
+            .StatusCode);
+
+        using var invalidUpload = new MultipartFormDataContent();
+        using var executable = new ByteArrayContent("not executable"u8.ToArray());
+        executable.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        invalidUpload.Add(executable, "file", "unsafe.exe");
+        Assert.Equal(HttpStatusCode.BadRequest, (await employeeClient.PostAsync(
+            $"/api/tickets/{ticket.Id}/comments/{privateComment.Id}/attachments", invalidUpload))
+            .StatusCode);
+
+        var refreshed = (await employeeClient.GetFromJsonAsync<TicketCommentPageDto>(
+            $"/api/tickets/{ticket.Id}/comments"))!;
+        var storedComment = Assert.Single(refreshed.Items, item => item.Id == privateComment.Id);
+        Assert.Equal(2, storedComment.Attachments!.Count);
+        Assert.Contains(storedComment.Attachments,
+            item => item.FileName == "private-report.pdf");
+        Assert.Contains(storedComment.Attachments,
+            item => item.FileName == "diagnostic.png");
+    }
+
+    [Fact]
+    public async Task Comments_PaginateVisibleTopLevelThreads_WithRepliesAndCounts()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        await factory.SeedTicketLookupsAsync();
+        var employee = await factory.CreateUserAsync(
+            "pagination-owner@resolvehub.test", Password, RoleNames.Employee);
+        using var client = await LoginAsync(factory, employee.Email!);
+        var ticket = await CreateTicketAsync(factory, client);
+        TicketCommentDto? first = null;
+        for (var index = 1; index <= 31; index++)
+        {
+            var response = await client.PostAsJsonAsync(
+                $"/api/tickets/{ticket.Id}/comments",
+                new { message = $"Timeline comment {index}.", visibility = "Public" });
+            response.EnsureSuccessStatusCode();
+            first ??= await response.Content.ReadFromJsonAsync<TicketCommentDto>();
+        }
+        for (var index = 1; index <= 3; index++)
+        {
+            var response = await client.PostAsJsonAsync(
+                $"/api/tickets/{ticket.Id}/comments/{first!.Id}/replies",
+                new { message = $"Attached reply {index}." });
+            response.EnsureSuccessStatusCode();
+        }
+
+        var pageOne = (await client.GetFromJsonAsync<TicketCommentPageDto>(
+            $"/api/tickets/{ticket.Id}/comments?page=1&pageSize=15"))!;
+        var pageTwo = (await client.GetFromJsonAsync<TicketCommentPageDto>(
+            $"/api/tickets/{ticket.Id}/comments?page=2&pageSize=15"))!;
+        Assert.Equal(15, pageOne.Items.Count(item => item.ParentCommentId is null));
+        Assert.Equal(3, pageOne.Items.Count(item => item.ParentCommentId == first!.Id));
+        Assert.Equal(15, pageTwo.Items.Count(item => item.ParentCommentId is null));
+        Assert.Equal(31, pageOne.TotalThreads);
+        Assert.Equal(34, pageOne.TotalVisibleComments);
+        Assert.Equal(34, pageOne.PublicCount);
+        Assert.True(pageOne.HasMore);
+        Assert.True(pageTwo.HasMore);
+        Assert.Empty(pageOne.Items.Select(item => item.Id)
+            .Intersect(pageTwo.Items.Select(item => item.Id)));
     }
 
     private static async Task<TicketDetailsDto> CreateTicketAsync(

@@ -30,6 +30,7 @@ public sealed class ApplicationDbContext
     public DbSet<TicketAttachment> TicketAttachments => Set<TicketAttachment>();
     public DbSet<TicketDraft> TicketDrafts => Set<TicketDraft>();
     public DbSet<TicketComment> TicketComments => Set<TicketComment>();
+    public DbSet<TicketCommentAttachment> TicketCommentAttachments => Set<TicketCommentAttachment>();
     public DbSet<TicketHistory> TicketHistory => Set<TicketHistory>();
     public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
     public DbSet<TicketAssignmentRequest> TicketAssignmentRequests =>
@@ -52,6 +53,7 @@ public sealed class ApplicationDbContext
         ConfigureTicketAttachment(builder);
         ConfigureTicketDraft(builder);
         ConfigureTicketComment(builder);
+        ConfigureTicketCommentAttachment(builder);
         ConfigureTicketHistory(builder);
         ConfigureActivityLog(builder);
         ConfigureTicketAssignmentRequest(builder);
@@ -296,6 +298,7 @@ public sealed class ApplicationDbContext
             entity.Property(comment => comment.Content).HasMaxLength(5000).IsRequired();
             entity.Property(comment => comment.CreatedDate).HasColumnType("datetime2");
             entity.Property(comment => comment.UpdatedDate).HasColumnType("datetime2");
+            entity.Property(comment => comment.DeletedDate).HasColumnType("datetime2");
             entity.Property(comment => comment.Visibility)
                 .HasConversion<string>().HasMaxLength(20);
             entity.Property(comment => comment.IsEdited).HasDefaultValue(false);
@@ -308,6 +311,7 @@ public sealed class ApplicationDbContext
                 comment.CreatedDate
             });
             entity.HasIndex(comment => comment.AuthorUserAccountID);
+            entity.HasIndex(comment => comment.ParentCommentID);
             entity.HasOne(comment => comment.Ticket)
                 .WithMany(ticket => ticket.Comments)
                 .HasForeignKey(comment => comment.TicketID)
@@ -315,6 +319,30 @@ public sealed class ApplicationDbContext
             entity.HasOne(comment => comment.AuthorUserAccount)
                 .WithMany(user => user.TicketComments)
                 .HasForeignKey(comment => comment.AuthorUserAccountID)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(comment => comment.ParentComment)
+                .WithMany(comment => comment.Replies)
+                .HasForeignKey(comment => comment.ParentCommentID)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureTicketCommentAttachment(ModelBuilder builder)
+    {
+        builder.Entity<TicketCommentAttachment>(entity =>
+        {
+            entity.ToTable("TicketCommentAttachment");
+            entity.HasKey(item => item.ID);
+            entity.Property(item => item.FileName).HasMaxLength(255).IsRequired();
+            entity.Property(item => item.StoredFileName).HasMaxLength(255).IsRequired();
+            entity.Property(item => item.FilePath).HasMaxLength(500).IsRequired();
+            entity.Property(item => item.ContentType).HasMaxLength(150).IsRequired();
+            entity.HasIndex(item => item.TicketCommentID);
+            entity.HasOne(item => item.TicketComment).WithMany(comment => comment.Attachments)
+                .HasForeignKey(item => item.TicketCommentID).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(item => item.UploadedByUserAccount)
+                .WithMany(user => user.UploadedCommentAttachments)
+                .HasForeignKey(item => item.UploadedByUserAccountID)
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }

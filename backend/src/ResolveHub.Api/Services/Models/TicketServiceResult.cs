@@ -4,6 +4,7 @@ public enum TicketOperationStatus
 {
     Success,
     NotFound,
+    Forbidden,
     Conflict,
     Invalid
 }

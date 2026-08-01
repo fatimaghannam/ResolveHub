@@ -12,7 +12,9 @@ namespace ResolveHub.Api.Controllers;
 [ApiController]
 [Route("api/manager")]
 [Authorize(Roles = RoleNames.Manager)]
-public sealed class ManagerTicketsController(IManagerTicketService service) : ControllerBase
+public sealed class ManagerTicketsController(
+    IManagerTicketService service,
+    ITicketCommentService commentService) : ControllerBase
 {
     [HttpGet("dashboard")]
     public async Task<ActionResult<ManagerDashboardDto>> Dashboard(CancellationToken token) =>
@@ -46,6 +48,7 @@ public sealed class ManagerTicketsController(IManagerTicketService service) : Co
         {
             TicketOperationStatus.Success => NoContent(),
             TicketOperationStatus.NotFound => NotFound(),
+            TicketOperationStatus.Forbidden => StatusCode(403, new { message = result.Message }),
             TicketOperationStatus.Conflict => Conflict(new { message = result.Message }),
             _ => BadRequest(new { message = result.Message })
         };
@@ -69,22 +72,90 @@ public sealed class ManagerTicketsController(IManagerTicketService service) : Co
             UserId, requestId, false, token));
 
     [HttpPost("tickets/{ticketReference}/comments")]
+    [Consumes("application/json")]
     public async Task<ActionResult<TicketCommentDto>> AddComment(
         string ticketReference, AddTicketCommentRequestDto request,
         CancellationToken token)
     {
-        var result = await service.AddCommentAsync(
-            UserId, ticketReference, request, token);
+        var result = await commentService.AddAsync(UserId,
+            TicketCommentAudience.Manager, null, ticketReference,
+            request, null, token);
         return result.Status switch
         {
             TicketOperationStatus.Success => Created(
                 $"/api/manager/tickets/{ticketReference}/comments", result.Value),
             TicketOperationStatus.NotFound => NotFound(),
+            TicketOperationStatus.Forbidden => StatusCode(403, new { message = result.Message }),
             TicketOperationStatus.Conflict =>
                 Conflict(new { message = result.Message }),
             _ => BadRequest(new { message = result.Message })
         };
     }
+
+    [HttpPost("tickets/{ticketReference}/comments")]
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult<TicketCommentDto>> AddCommentWithAttachments(
+        string ticketReference, [FromForm] CreateTicketCommentFormRequest request,
+        CancellationToken token) => CommentResult(
+            await commentService.AddWithAttachmentsAsync(UserId,
+                TicketCommentAudience.Manager, null, ticketReference, request, token));
+
+    [HttpGet("tickets/{ticketReference}/comments")]
+    public async Task<ActionResult<TicketCommentPageDto>> Comments(
+        string ticketReference, string? visibility = null, int page = 1,
+        int pageSize = 15, CancellationToken token = default)
+    {
+        var comments = await commentService.GetAsync(UserId,
+            TicketCommentAudience.Manager, null, ticketReference, visibility,
+            page, pageSize, token);
+        return comments is null ? NotFound() : Ok(comments);
+    }
+
+    [HttpPost("tickets/{ticketReference}/comments/{commentId:int}/replies")]
+    public async Task<ActionResult<TicketCommentDto>> Reply(
+        string ticketReference, int commentId, AddTicketCommentRequestDto request,
+        CancellationToken token) => CommentResult(await commentService.AddAsync(
+            UserId, TicketCommentAudience.Manager, null, ticketReference,
+            request, commentId, token));
+
+    [HttpPut("tickets/{ticketReference}/comments/{commentId:int}")]
+    public async Task<ActionResult<TicketCommentDto>> EditComment(
+        string ticketReference, int commentId, EditTicketCommentRequestDto request,
+        CancellationToken token) => CommentResult(await commentService.EditAsync(
+            UserId, TicketCommentAudience.Manager, null, ticketReference,
+            commentId, request, token));
+
+    [HttpDelete("tickets/{ticketReference}/comments/{commentId:int}")]
+    public async Task<IActionResult> DeleteComment(
+        string ticketReference, int commentId, CancellationToken token) =>
+        BooleanResult(await commentService.DeleteAsync(UserId,
+            TicketCommentAudience.Manager, null, ticketReference, commentId, token));
+
+    [HttpPost("tickets/{ticketReference}/comments/{commentId:int}/attachments")]
+    public async Task<ActionResult<CommentAttachmentDto>> UploadCommentAttachment(
+        string ticketReference, int commentId, IFormFile file, CancellationToken token) =>
+        CommentAttachmentResult(await commentService.UploadAttachmentAsync(UserId,
+            TicketCommentAudience.Manager, null, ticketReference, commentId, file, token));
+
+    [HttpGet("tickets/{ticketReference}/comments/{commentId:int}/attachments/{attachmentId:int}")]
+    public async Task<IActionResult> DownloadCommentAttachment(string ticketReference,
+        int commentId, int attachmentId, CancellationToken token)
+    {
+        var file = await commentService.DownloadAttachmentAsync(UserId,
+            TicketCommentAudience.Manager, null, ticketReference, commentId,
+            attachmentId, token);
+        return file is null ? NotFound() : File(file.Stream, file.ContentType, file.FileName);
+    }
+
+    private ActionResult<CommentAttachmentDto> CommentAttachmentResult(
+        TicketServiceResult<CommentAttachmentDto> result) => result.Status switch
+        {
+            TicketOperationStatus.Success => Ok(result.Value),
+            TicketOperationStatus.NotFound => NotFound(),
+            TicketOperationStatus.Forbidden => StatusCode(403, new { message = result.Message }),
+            TicketOperationStatus.Conflict => Conflict(new { message = result.Message }),
+            _ => BadRequest(new { message = result.Message })
+        };
 
     [HttpPost("tickets/{ticketReference}/duplicate-reviews")]
     public async Task<ActionResult<DuplicateReviewDto>> ReportDuplicate(
@@ -148,7 +219,23 @@ public sealed class ManagerTicketsController(IManagerTicketService service) : Co
         {
             TicketOperationStatus.Success => NoContent(),
             TicketOperationStatus.NotFound => NotFound(),
+            TicketOperationStatus.Forbidden => StatusCode(403, new { message = result.Message }),
             TicketOperationStatus.Conflict => Conflict(new { message = result.Message }),
             _ => BadRequest(new { message = result.Message })
         };
+
+    private ActionResult<TicketCommentDto> CommentResult(
+        TicketServiceResult<TicketCommentDto> result) => result.Status switch
+        {
+            TicketOperationStatus.Success => Ok(result.Value),
+            TicketOperationStatus.NotFound => NotFound(),
+            TicketOperationStatus.Forbidden => StatusCode(403, new { message = result.Message }),
+            TicketOperationStatus.Conflict => Conflict(new { message = result.Message }),
+            _ => BadRequest(new { message = result.Message })
+        };
+
+    private IActionResult BooleanResult(TicketServiceResult<bool> result) =>
+        result.Status == TicketOperationStatus.Forbidden
+            ? StatusCode(403, new { message = result.Message })
+            : ReviewResult(result);
 }

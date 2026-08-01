@@ -325,6 +325,7 @@ builder.Services.AddScoped<
 builder.Services.AddScoped<ITicketService, TicketService>();
 builder.Services.AddScoped<ITicketAttachmentService, TicketAttachmentService>();
 builder.Services.AddScoped<ITicketDraftService, TicketDraftService>();
+builder.Services.AddScoped<ITicketCommentService, TicketCommentService>();
 builder.Services.AddScoped<IAgentTicketService, AgentTicketService>();
 builder.Services.AddScoped<IAdminTicketService, AdminTicketService>();
 builder.Services.AddScoped<IAdminUserService, AdminUserService>();
