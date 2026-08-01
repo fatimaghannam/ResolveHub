@@ -324,6 +324,7 @@ function CommentComposer({ canViewPrivate, onSubmit }) {
 
 function TicketComments({ comments: initialComments = [], endpoint, canViewPrivate, canComment, readOnlyMessage, formatTimestamp, onNotify }) {
   const [expanded, setExpanded] = useState(false)
+  const [contentMounted, setContentMounted] = useState(false)
   const [comments, setComments] = useState(initialComments)
   const [filter, setFilter] = useState('All')
   const [page, setPage] = useState(1)
@@ -406,7 +407,8 @@ function TicketComments({ comments: initialComments = [], endpoint, canViewPriva
 
   function toggleComments() {
     if (!expanded) {
-      setExpanded(true)
+      setContentMounted(true)
+      requestAnimationFrame(() => requestAnimationFrame(() => setExpanded(true)))
       return
     }
 
@@ -501,8 +503,16 @@ function TicketComments({ comments: initialComments = [], endpoint, canViewPriva
       </button>
     </div>
     <p className="comments-count" aria-live="polite">{commentCount.toLocaleString()} {commentCount === 1 ? 'comment' : 'comments'}</p>
-    <div className="comments-collapsible" aria-hidden={!expanded}>
-      <div id={contentId} className="comments-collapsible__inner" inert={!expanded}>
+    <div
+      id={contentId}
+      className="comments-collapsible"
+      aria-hidden={!expanded}
+      onTransitionEnd={(event) => {
+        if (event.propertyName === 'grid-template-rows' && !expanded)
+          setContentMounted(false)
+      }}
+    >
+      {contentMounted && <div className="comments-collapsible__inner" inert={!expanded}>
     <CommentFilters selected={filter} counts={counts} canViewPrivate={canViewPrivate} onChange={changeFilter} />
     {!loading && !loadError && <p className="comments-summary">Showing {comments.length} of {pageInfo.totalVisibleComments} visible comments</p>}
     {loading && page === 1 ? <CommentSkeletons /> : loadError ? <div className="comments-load-error" role="alert"><strong>Comments could not be loaded.</strong><span>{loadError}</span><button type="button" onClick={() => setLoadVersion((value) => value + 1)}>Try again</button></div> : roots.length === 0 ? <div className="comments-empty"><MessageSquare size={22} /><strong>{emptyTitle}</strong><span>Start the conversation with an update or question.</span></div> : <div className="comments-list">{timelineGroups.map((group) => group.type === 'deleted' ? <DeletedCommentsGroup key={`deleted-${group.comments[0].id}`} comments={group.comments} formatTimestamp={formatTimestamp} /> : <CommentCard key={group.comment.id} comment={group.comment} replies={repliesFor(group.comment.id)} formatTimestamp={formatTimestamp} onReply={reply} onEdit={edit} onDelete={setDeleteTarget} onDownload={(commentId, attachment) => downloadCommentAttachment(endpoint, commentId, attachment).catch((error) => notify('error', 'Unable to Download File', error.message))} />)}</div>}
@@ -510,7 +520,7 @@ function TicketComments({ comments: initialComments = [], endpoint, canViewPriva
     <div ref={latestRef}>{canComment ? <CommentComposer canViewPrivate={canViewPrivate} onSubmit={create} /> : readOnlyMessage && <p className="comments-read-only">{readOnlyMessage}</p>}</div>
     {showBackToLatest && <button type="button" className="comments-back-latest" onClick={() => latestRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })}><ChevronDown size={15} />Back to latest</button>}
     {deleteTarget && <><div className="dialog-backdrop" onClick={() => !deleting && setDeleteTarget(null)} aria-hidden="true" /><section className="dialog" role="dialog" aria-modal="true" aria-labelledby="delete-comment-title" aria-describedby="delete-comment-description"><h2 id="delete-comment-title">Delete comment?</h2><p id="delete-comment-description">This action cannot be undone.</p><div className="dialog__actions"><button type="button" className="button button--secondary" onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancel</button><button type="button" className="button button--danger" onClick={remove} disabled={deleting} autoFocus>{deleting ? 'Deleting…' : 'Delete'}</button></div></section></>}
-      </div>
+      </div>}
     </div>
   </section>
 }
