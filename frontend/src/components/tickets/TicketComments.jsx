@@ -12,7 +12,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import {
   addComment,
   deleteComment,
@@ -323,10 +323,17 @@ function CommentComposer({ canViewPrivate, onSubmit }) {
 }
 
 function TicketComments({ comments: initialComments = [], endpoint, canViewPrivate, canComment, readOnlyMessage, formatTimestamp, onNotify }) {
+  const [expanded, setExpanded] = useState(false)
   const [comments, setComments] = useState(initialComments)
   const [filter, setFilter] = useState('All')
   const [page, setPage] = useState(1)
-  const [pageInfo, setPageInfo] = useState({ totalThreads: 0, totalVisibleComments: 0, publicCount: 0, privateCount: 0, hasMore: false })
+  const [pageInfo, setPageInfo] = useState({
+    totalThreads: initialComments.filter((comment) => !comment.parentCommentId).length,
+    totalVisibleComments: initialComments.length,
+    publicCount: initialComments.filter((comment) => comment.visibility === 'Public').length,
+    privateCount: initialComments.filter((comment) => comment.visibility === 'Private').length,
+    hasMore: false,
+  })
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [loadVersion, setLoadVersion] = useState(0)
@@ -335,6 +342,7 @@ function TicketComments({ comments: initialComments = [], endpoint, canViewPriva
   const [showBackToLatest, setShowBackToLatest] = useState(false)
   const sectionRef = useRef(null)
   const latestRef = useRef(null)
+  const contentId = useId()
 
   useEffect(() => {
     const controller = new AbortController()
@@ -394,6 +402,18 @@ function TicketComments({ comments: initialComments = [], endpoint, canViewPriva
 
   function notify(type, title, detail) {
     onNotify?.(type, title, detail)
+  }
+
+  function toggleComments() {
+    if (!expanded) {
+      setExpanded(true)
+      return
+    }
+
+    setExpanded(false)
+    requestAnimationFrame(() => {
+      sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
   }
 
   async function create(request) {
@@ -470,9 +490,19 @@ function TicketComments({ comments: initialComments = [], endpoint, canViewPriva
   }
 
   const emptyTitle = filter === 'Private' ? 'No private comments yet.' : filter === 'Public' ? 'No public comments yet.' : 'No comments yet.'
+  const commentCount = pageInfo.totalVisibleComments
 
-  return <section className="panel dashboard-section comments-panel" ref={sectionRef}>
-    <div className="comments-heading"><div><h2>Comments</h2><p>Discuss updates and questions related to this ticket.</p></div><MessageSquare size={20} aria-hidden="true" /></div>
+  return <section className={`panel dashboard-section comments-panel ${expanded ? 'comments-panel--expanded' : 'comments-panel--collapsed'}`} ref={sectionRef}>
+    <div className="comments-heading">
+      <div><h2>Comments</h2><p>Discuss updates and questions related to this ticket.</p></div>
+      <button type="button" className="comments-toggle" aria-expanded={expanded} aria-controls={contentId} onClick={toggleComments}>
+        <span>{expanded ? 'Hide Comments' : `View Comments (${commentCount})`}</span>
+        {expanded ? <ChevronUp size={17} aria-hidden="true" /> : <ChevronDown size={17} aria-hidden="true" />}
+      </button>
+    </div>
+    <p className="comments-count" aria-live="polite">{commentCount.toLocaleString()} {commentCount === 1 ? 'comment' : 'comments'}</p>
+    <div className="comments-collapsible" aria-hidden={!expanded}>
+      <div id={contentId} className="comments-collapsible__inner" inert={!expanded}>
     <CommentFilters selected={filter} counts={counts} canViewPrivate={canViewPrivate} onChange={changeFilter} />
     {!loading && !loadError && <p className="comments-summary">Showing {comments.length} of {pageInfo.totalVisibleComments} visible comments</p>}
     {loading && page === 1 ? <CommentSkeletons /> : loadError ? <div className="comments-load-error" role="alert"><strong>Comments could not be loaded.</strong><span>{loadError}</span><button type="button" onClick={() => setLoadVersion((value) => value + 1)}>Try again</button></div> : roots.length === 0 ? <div className="comments-empty"><MessageSquare size={22} /><strong>{emptyTitle}</strong><span>Start the conversation with an update or question.</span></div> : <div className="comments-list">{timelineGroups.map((group) => group.type === 'deleted' ? <DeletedCommentsGroup key={`deleted-${group.comments[0].id}`} comments={group.comments} formatTimestamp={formatTimestamp} /> : <CommentCard key={group.comment.id} comment={group.comment} replies={repliesFor(group.comment.id)} formatTimestamp={formatTimestamp} onReply={reply} onEdit={edit} onDelete={setDeleteTarget} onDownload={(commentId, attachment) => downloadCommentAttachment(endpoint, commentId, attachment).catch((error) => notify('error', 'Unable to Download File', error.message))} />)}</div>}
@@ -480,6 +510,8 @@ function TicketComments({ comments: initialComments = [], endpoint, canViewPriva
     <div ref={latestRef}>{canComment ? <CommentComposer canViewPrivate={canViewPrivate} onSubmit={create} /> : readOnlyMessage && <p className="comments-read-only">{readOnlyMessage}</p>}</div>
     {showBackToLatest && <button type="button" className="comments-back-latest" onClick={() => latestRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })}><ChevronDown size={15} />Back to latest</button>}
     {deleteTarget && <><div className="dialog-backdrop" onClick={() => !deleting && setDeleteTarget(null)} aria-hidden="true" /><section className="dialog" role="dialog" aria-modal="true" aria-labelledby="delete-comment-title" aria-describedby="delete-comment-description"><h2 id="delete-comment-title">Delete comment?</h2><p id="delete-comment-description">This action cannot be undone.</p><div className="dialog__actions"><button type="button" className="button button--secondary" onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancel</button><button type="button" className="button button--danger" onClick={remove} disabled={deleting} autoFocus>{deleting ? 'Deleting…' : 'Delete'}</button></div></section></>}
+      </div>
+    </div>
   </section>
 }
 
