@@ -13,7 +13,6 @@ import {
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
-  PlusCircle,
   Tags,
   Ticket,
   Users,
@@ -34,7 +33,7 @@ import '../../styles/dashboard.css'
 const employeeNavigation = [
   { id: 'dashboard', to: '/employee/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'tickets', to: '/employee/tickets', label: 'My Tickets', icon: Ticket },
-  { id: 'create', to: '/employee/tickets/create', label: 'Create Ticket', icon: PlusCircle },
+  { id: 'create', to: '/employee/tickets/create', label: 'Create Ticket', icon: FilePlus2 },
   { to: '/employee/coming-soon', label: 'Notifications', icon: Bell, soon: true },
   { to: '/employee/coming-soon', label: 'Profile', icon: CircleUserRound, soon: true },
 ]

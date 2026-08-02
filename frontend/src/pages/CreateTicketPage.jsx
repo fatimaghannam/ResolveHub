@@ -18,11 +18,7 @@ function CreateTicketPage({ roleArea = 'employee' }) {
     <div className="create-ticket-page">
       <section className="page-heading">
         <h2>Create Support Ticket</h2>
-        <p>
-          {isManagement
-            ? 'Submit a new support request on behalf of yourself or the organization.'
-            : 'Provide clear details so the IT support team can understand and resolve the issue efficiently.'}
-        </p>
+        <p>Provide clear details so the IT support team can understand and resolve the issue efficiently.</p>
       </section>
       <TicketForm mode="create" submitLabel="Submit Ticket" onCancel={() => navigate(`/${roleArea}/tickets`)} onSaveDraft={async (values) => {
         const draft = draftId

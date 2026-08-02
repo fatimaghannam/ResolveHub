@@ -53,7 +53,7 @@ function App() {
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<EmployeeDashboardPage />} />
           <Route path="tickets" element={<EmployeeTicketsPage />} />
-          <Route path="tickets/create" element={<CreateTicketPage />} />
+          <Route path="tickets/create" element={<CreateTicketPage roleArea="employee" />} />
           <Route path="tickets/drafts" element={<TicketDraftsPage />} />
           <Route path="tickets/drafts/:id" element={<EditTicketDraftPage />} />
           <Route path="tickets/:id" element={<TicketDetailsPage />} />
