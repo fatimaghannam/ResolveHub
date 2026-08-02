@@ -279,9 +279,11 @@ function DashboardLayout() {
             </span>
           </div>
         </header>
-        <main className="dashboard-content">
-          <Outlet context={{ user, role: roleLabel }} />
-        </main>
+        <div className="dashboard-scroll">
+          <main className="dashboard-content">
+            <Outlet context={{ user, role: roleLabel }} />
+          </main>
+        </div>
       </div>
     </div>
   )

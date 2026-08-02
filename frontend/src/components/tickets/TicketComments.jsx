@@ -363,16 +363,17 @@ function TicketComments({ comments: initialComments = [], endpoint, canViewPriva
   }, [endpoint, filter, page, loadVersion])
 
   useEffect(() => {
+    const scrollContainer = sectionRef.current?.closest('.dashboard-scroll')
     function updateBackToLatest() {
       const section = sectionRef.current?.getBoundingClientRect()
       const latest = latestRef.current?.getBoundingClientRect()
       setShowBackToLatest(Boolean(section && latest && section.top < -320 && latest.top > window.innerHeight + 180))
     }
     updateBackToLatest()
-    window.addEventListener('scroll', updateBackToLatest, { passive: true })
+    scrollContainer?.addEventListener('scroll', updateBackToLatest, { passive: true })
     window.addEventListener('resize', updateBackToLatest)
     return () => {
-      window.removeEventListener('scroll', updateBackToLatest)
+      scrollContainer?.removeEventListener('scroll', updateBackToLatest)
       window.removeEventListener('resize', updateBackToLatest)
     }
   }, [comments])

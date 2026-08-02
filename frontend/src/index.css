@@ -48,6 +48,14 @@ body {
   overflow-x: clip;
 }
 
+html:has(.dashboard-shell),
+body:has(.dashboard-shell),
+#root:has(.dashboard-shell) {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
 body {
   min-width: 320px;
 }
