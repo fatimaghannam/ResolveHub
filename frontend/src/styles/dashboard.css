@@ -191,6 +191,7 @@ html:has(.dashboard-shell) { scroll-padding-top: 98px; }
 .comment-filters button { display: inline-flex; align-items: center; gap: 7px; padding: 6px 10px; color: #5a697c; border: 0; border-radius: 7px; background: transparent; font: inherit; font-size: .78rem; font-weight: 700; cursor: pointer; }
 .comment-filters button span { min-width: 20px; padding: 2px 5px; border-radius: 999px; color: #607087; background: #edf2f7; font-size: .7rem; text-align: center; }
 .comment-filters button:hover, .comment-filters button.is-active { color: #155ea8; background: #eaf3fc; }
+.comment-filters button:disabled { color: #98a4b3; background: transparent; cursor: not-allowed; opacity: .65; }
 .comment-filters + * { padding-top: 16px; border-top: 1px solid var(--line); }
 .comment-filters button:focus-visible, .comment-card__actions button:focus-visible, .comment-reply-form button:focus-visible { outline: 3px solid rgba(36,120,206,.22); outline-offset: 2px; }
 .comments-list { display: grid; gap: 0; }
@@ -284,6 +285,7 @@ html:has(.dashboard-shell) { scroll-padding-top: 98px; }
 .comment-visibility legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .comment-visibility label { position: relative; display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border: 0; border-radius: 6px; background: transparent; cursor: pointer; }
 .comment-visibility label:has(input:checked) { color: #155ea8; background: white; box-shadow: 0 1px 3px rgba(20,39,68,.1); }
+.comment-visibility label:has(input:disabled) { color: #98a4b3; cursor: not-allowed; opacity: .65; }
 .comment-visibility input { position: absolute; opacity: 0; pointer-events: none; }
 .comment-visibility strong { color: inherit; font-size: .76rem; }
 .comment-visibility small { color: var(--muted); font-size: .75rem; font-weight: 400; line-height: 1.35; }
@@ -305,6 +307,8 @@ html:has(.dashboard-shell) { scroll-padding-top: 98px; }
 .comment-attachments { margin: 7px 0 0 44px; }
 .comment-attachments button { cursor: pointer; }
 .comment-attachments button:hover { color: var(--blue); background: #edf4fb; }
+.comment-attachments strong { color: var(--blue); font-size: .72rem; }
+.comment-reply-form__counter { margin-top: -4px; color: var(--muted); font-size: .72rem; text-align: right; }
 .comment-validation { margin: -3px 0 0; color: #b42318; font-size: .76rem; }
 .comment-actions-menu { position: relative; }
 .comment-menu-trigger { width: 28px; height: 28px; display: grid; place-items: center; padding: 0; color: #64748b; border: 0; border-radius: 6px; background: transparent; cursor: pointer; }

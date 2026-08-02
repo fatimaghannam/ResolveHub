@@ -24,6 +24,9 @@ import {
 
 const MAX_COMMENT_LENGTH = 5000
 const COMMENT_PAGE_SIZE = 5
+const MAX_COMMENT_FILES = 5
+const MAX_COMMENT_FILE_SIZE = 10 * 1024 * 1024
+const ALLOWED_COMMENT_FILE = /\.(png|jpe?g|gif|webp|pdf|docx?|xlsx?|txt|zip)$/i
 
 function initials(name) {
   return name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()
@@ -60,13 +63,15 @@ function VisibilityBadge({ visibility }) {
 }
 
 function CommentFilters({ selected, counts, canViewPrivate, onChange }) {
-  const options = ['All', 'Public', ...(canViewPrivate ? ['Private'] : [])]
+  const options = ['All', 'Public', 'Private']
   return <div className="comment-filters" role="group" aria-label="Filter comments">
     {options.map((option) => <button
       key={option}
       type="button"
       className={selected === option ? 'is-active' : ''}
       aria-pressed={selected === option}
+      disabled={option === 'Private' && !canViewPrivate}
+      title={option === 'Private' && !canViewPrivate ? 'Private comments are available only to the ticket creator and assigned IT Agent.' : undefined}
       onClick={() => onChange(option)}
     >
       {option}<span>{counts[option]}</span>
@@ -123,12 +128,9 @@ function ReplyComposer({ comment, busy, onCancel, onSubmit }) {
 
   function selectFiles(event) {
     const selected = Array.from(event.target.files ?? [])
-    const invalid = selected.find((file) => !/\.(png|jpe?g|gif|webp|pdf|docx?|xlsx?|txt|zip)$/i.test(file.name) || file.size <= 0 || file.size > 10 * 1024 * 1024)
-    if (invalid) setValidation(`${invalid.name} is unsupported, empty, or exceeds the 10 MB limit.`)
-    else {
-      setFiles((current) => [...current, ...selected.filter((file) => !current.some((item) => item.name === file.name && item.size === file.size))].slice(0, 5))
-      setValidation('')
-    }
+    const error = validateSelectedFiles(selected, files)
+    if (error) setValidation(error)
+    else { setFiles((current) => mergeSelectedFiles(current, selected)); setValidation('') }
     event.target.value = ''
   }
 
@@ -146,6 +148,7 @@ function ReplyComposer({ comment, busy, onCancel, onSubmit }) {
       disabled={busy}
       autoFocus
     />
+    <div className="comment-reply-form__counter">{message.length.toLocaleString()} / {MAX_COMMENT_LENGTH.toLocaleString()}</div>
     {validation && <p className="comment-validation" role="alert">{validation}</p>}
     {files.length > 0 && <div className="comment-pending-files">{files.map((file) => <div key={`${file.name}-${file.size}`}><FileText size={14} /><span>{file.name}</span><small>{formatFileSize(file.size)}</small><button type="button" onClick={() => setFiles((current) => current.filter((item) => item !== file))} aria-label={`Remove ${file.name}`}><X size={14} /></button></div>)}</div>}
     <div className="comment-reply-form__footer">
@@ -220,7 +223,7 @@ function CommentCard({ comment, replies, formatTimestamp, onReply, onEdit, onDel
       {editing ? <form className="comment-inline-form" onSubmit={saveEdit}>
         <textarea value={editValue} maxLength={MAX_COMMENT_LENGTH} onChange={(event) => setEditValue(event.target.value)} disabled={busy} autoFocus />
         <div className="comment-inline-form__actions"><span>{editValue.length} / {MAX_COMMENT_LENGTH}</span><button type="button" className="button button--secondary" onClick={() => setEditing(false)} disabled={busy}>Cancel</button><button type="submit" className="button button--primary" disabled={!editValue.trim() || busy}>{busy ? 'Saving…' : 'Save'}</button></div>
-      </form> : <><p className="comment-card__message">{comment.content}</p>{comment.attachments?.length > 0 && <div className="comment-attachments">{comment.attachments.map((attachment) => <button type="button" key={attachment.id} onClick={() => onDownload(comment.id, attachment)}><FileText size={14} /><span>{attachment.fileName}</span><small>{formatFileSize(attachment.fileSizeBytes)}</small></button>)}</div>}</>}
+      </form> : <><p className="comment-card__message">{comment.content}</p>{comment.attachments?.length > 0 && <div className="comment-attachments">{comment.attachments.map((attachment) => <button type="button" key={attachment.id} onClick={() => onDownload(comment.id, attachment)}><FileText size={14} /><span>{attachment.fileName}</span><small>{formatFileSize(attachment.fileSizeBytes)} · {formatFileType(attachment.contentType)}</small><strong>Download</strong></button>)}</div>}</>}
 
       {!editing && !comment.isDeleted && !comment.parentCommentId && <footer className="comment-card__actions">
         <button type="button" onClick={() => setReplying((value) => !value)} aria-expanded={replying}><Reply size={14} />Reply</button>
@@ -277,16 +280,14 @@ function CommentComposer({ canViewPrivate, onSubmit }) {
   }
 
   function selectFiles(event) {
-    const allowed = /\.(png|jpe?g|gif|webp|pdf|docx?|xlsx?|txt|zip)$/i
     const selected = Array.from(event.target.files ?? [])
-    const invalid = selected.find((file) => !allowed.test(file.name) || file.size <= 0 || file.size > 10 * 1024 * 1024)
-    if (invalid) {
-      setValidation(`${invalid.name} is unsupported, empty, or exceeds the 10 MB limit.`)
+    const error = validateSelectedFiles(selected, files)
+    if (error) {
+      setValidation(error)
       event.target.value = ''
       return
     }
-    setFiles((current) => [...current, ...selected.filter((file) =>
-      !current.some((existing) => existing.name === file.name && existing.size === file.size))].slice(0, 5))
+    setFiles((current) => mergeSelectedFiles(current, selected))
     setValidation('')
     event.target.value = ''
   }
@@ -315,9 +316,10 @@ function CommentComposer({ canViewPrivate, onSubmit }) {
     <textarea ref={textareaRef} id="ticket-comment" value={message} onChange={(event) => updateMessage(event.target.value)} maxLength={MAX_COMMENT_LENGTH} placeholder="Write an update or ask a question…" disabled={submitting} rows={1} />
     {validation && <p className="comment-validation" role="alert">{validation}</p>}
     {files.length > 0 && <div className="comment-pending-files">{files.map((file) => <div key={`${file.name}-${file.size}`}><FileText size={14} /><span>{file.name}</span><small>{formatFileSize(file.size)}</small><button type="button" onClick={() => setFiles((current) => current.filter((item) => item !== file))} aria-label={`Remove ${file.name}`}><X size={14} /></button></div>)}</div>}
-    <div className="comment-composer__toolbar"><div className="comment-composer__tools"><input ref={fileInputRef} type="file" multiple hidden accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip" onChange={selectFiles} /><button type="button" onClick={() => fileInputRef.current?.click()} aria-label="Attach files" title="Attach files"><Paperclip size={16} /></button></div><fieldset className={`comment-visibility ${canViewPrivate ? '' : 'comment-visibility--single'}`}><legend>Visibility</legend>{['Public', ...(canViewPrivate ? ['Private'] : [])].map((option) => {
+    <div className="comment-composer__toolbar"><div className="comment-composer__tools"><input ref={fileInputRef} type="file" multiple hidden accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip" onChange={selectFiles} /><button type="button" onClick={() => fileInputRef.current?.click()} aria-label="Attach files" title="Attach files"><Paperclip size={16} /></button></div><fieldset className="comment-visibility"><legend>Visibility</legend>{['Public', 'Private'].map((option) => {
       const Icon = option === 'Private' ? LockKeyhole : Globe2
-      return <label key={option}><input type="radio" name="comment-visibility" value={option} checked={visibility === option} onChange={(event) => setVisibility(event.target.value)} disabled={submitting} /><Icon size={14} aria-hidden="true" /><strong>{option}</strong></label>
+      const unavailable = option === 'Private' && !canViewPrivate
+      return <label key={option} title={unavailable ? 'Private comments are available only to the ticket creator and assigned IT Agent.' : undefined}><input type="radio" name="comment-visibility" value={option} checked={visibility === option} onChange={(event) => setVisibility(event.target.value)} disabled={submitting || unavailable} /><Icon size={14} aria-hidden="true" /><strong>{option}</strong></label>
     })}</fieldset><button className="button button--primary comment-submit" type="submit" disabled={!message.trim() || submitting}>{submitting && <span className="button-spinner" aria-hidden="true" />}{submitting ? 'Sending…' : 'Send'}</button></div>
   </form>
 }
@@ -524,6 +526,30 @@ function TicketComments({ comments: initialComments = [], endpoint, canViewPriva
       </div>}
     </div>
   </section>
+}
+
+function formatFileType(contentType) {
+  const subtype = contentType?.split('/')[1]?.split(/[;+]/)[0]
+  return subtype ? subtype.toUpperCase() : 'FILE'
+}
+
+function validateSelectedFiles(selected, current) {
+  const unsupported = selected.find((file) => !ALLOWED_COMMENT_FILE.test(file.name))
+  if (unsupported) return `${unsupported.name}: this file type is not supported.`
+  const empty = selected.find((file) => file.size <= 0)
+  if (empty) return `${empty.name}: the selected file is empty.`
+  const oversized = selected.find((file) => file.size > MAX_COMMENT_FILE_SIZE)
+  if (oversized) return `${oversized.name}: the file exceeds the 10 MB limit.`
+  const unique = selected.filter((file) => !current.some((item) =>
+    item.name === file.name && item.size === file.size && item.lastModified === file.lastModified))
+  if (current.length + unique.length > MAX_COMMENT_FILES)
+    return `A maximum of ${MAX_COMMENT_FILES} attachments is allowed per comment.`
+  return ''
+}
+
+function mergeSelectedFiles(current, selected) {
+  return [...current, ...selected.filter((file) => !current.some((item) =>
+    item.name === file.name && item.size === file.size && item.lastModified === file.lastModified))]
 }
 
 export default TicketComments

@@ -40,6 +40,10 @@ public sealed class TicketCommentService(
         var settings = fileOptions?.Value ?? new FileStorageSettings();
         if (request.Attachments.Count > Math.Min(5, settings.MaxFilesPerTicket))
             return Invalid("A maximum of 5 attachments is allowed per comment.");
+        if (request.Attachments
+            .GroupBy(file => new { Name = Path.GetFileName(file.FileName).ToUpperInvariant(), file.Length })
+            .Any(group => group.Count() > 1))
+            return Invalid("The same attachment cannot be added more than once.");
         foreach (var file in request.Attachments)
         {
             var validation = ValidateAttachment(file, settings);
@@ -59,14 +63,23 @@ public sealed class TicketCommentService(
                     Visibility = request.Visibility
                 }, request.ParentCommentId, token);
             if (result.Status != TicketOperationStatus.Success)
+            {
+                if (transaction is not null)
+                    await transaction.RollbackAsync(CancellationToken.None);
                 return result;
+            }
 
             foreach (var file in request.Attachments)
             {
                 var upload = await UploadAttachmentAsync(userId, audience, ticketId,
                     ticketReference, result.Value!.Id, file, token);
                 if (upload.Status != TicketOperationStatus.Success)
+                {
+                    if (transaction is not null)
+                        await transaction.RollbackAsync(CancellationToken.None);
+                    DeleteStoredFiles(storedPaths, settings);
                     return new(upload.Status, Message: upload.Message);
+                }
                 var path = dbContext.ChangeTracker.Entries<TicketCommentAttachment>()
                     .Where(entry => entry.Entity.ID == upload.Value!.Id)
                     .Select(entry => entry.Entity.FilePath).Single();
