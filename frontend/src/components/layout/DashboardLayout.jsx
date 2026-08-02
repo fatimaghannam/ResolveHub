@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   Bell,
   ClipboardCheck,
@@ -150,6 +150,9 @@ function getPageTitle(pathname, roleArea) {
 function DashboardLayout() {
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
+  const mainRef = useRef(null)
+  const mainRectBeforeToggleRef = useRef(null)
+  const mainTransitionRef = useRef(null)
   const navigate = useNavigate()
   const location = useLocation()
   const auth = getStoredAuth()
@@ -178,6 +181,45 @@ function DashboardLayout() {
       document.removeEventListener('keydown', closeOnEscape)
     }
   }, [isMobileSidebarOpen])
+
+  useLayoutEffect(() => {
+    const main = mainRef.current
+    const previousRect = mainRectBeforeToggleRef.current
+    mainRectBeforeToggleRef.current = null
+
+    if (
+      !main ||
+      !previousRect ||
+      window.matchMedia('(max-width: 820px)').matches ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
+      return
+    }
+
+    const currentRect = main.getBoundingClientRect()
+    const horizontalOffset = previousRect.left - currentRect.left
+
+    if (Math.abs(horizontalOffset) < 1) return
+
+    mainTransitionRef.current = main.animate(
+      [
+        { transform: `translate3d(${horizontalOffset}px, 0, 0)` },
+        { transform: 'translate3d(0, 0, 0)' },
+      ],
+      {
+        duration: 180,
+        easing: 'cubic-bezier(.2, .8, .2, 1)',
+      },
+    )
+  }, [isDesktopCollapsed])
+
+  useEffect(() => () => mainTransitionRef.current?.cancel(), [])
+
+  function toggleDesktopSidebar() {
+    mainTransitionRef.current?.cancel()
+    mainRectBeforeToggleRef.current = mainRef.current?.getBoundingClientRect() ?? null
+    setIsDesktopCollapsed((current) => !current)
+  }
 
   function logout() {
     clearStoredAuth()
@@ -209,7 +251,7 @@ function DashboardLayout() {
           <button
             type="button"
             className="icon-button sidebar__desktop-toggle"
-            onClick={() => setIsDesktopCollapsed((current) => !current)}
+            onClick={toggleDesktopSidebar}
             aria-label={isDesktopCollapsed ? 'Expand navigation' : 'Collapse navigation'}
             aria-expanded={!isDesktopCollapsed}
             aria-controls={sidebarId}
@@ -258,7 +300,7 @@ function DashboardLayout() {
         </button>
       </aside>
 
-      <div className="dashboard-main">
+      <div ref={mainRef} className="dashboard-main">
         <header className="topbar">
           <button
             className="icon-button topbar__menu"
