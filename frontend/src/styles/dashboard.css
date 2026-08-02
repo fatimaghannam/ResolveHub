@@ -124,8 +124,9 @@ html:has(.dashboard-shell) { scroll-padding-top: 98px; }
 .state-panel { min-height: 240px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 32px; border: 1px dashed #cbd7e4; border-radius: 13px; background: white; text-align: center; }.state-panel h2, .state-panel p { margin: 0; }.state-panel p { color: var(--muted); }.state-panel--error { border-color: #efc3be; }
 .dashboard-spinner { width: 26px; height: 26px; border: 3px solid #d9e5f1; border-top-color: var(--blue); border-radius: 50%; animation: spin 700ms linear infinite; }
 .ticket-form { width: min(100%, 980px); height: auto; max-height: none; display: grid; gap: 22px; padding: clamp(24px, 3vw, 30px); overflow: visible; }.ticket-form label > span:first-child, .dialog label > span { font-size: .9rem; }.ticket-form label > small { color: var(--muted); font-weight: 400; }.ticket-form textarea { resize: vertical; line-height: 1.55; }.ticket-form b { color: var(--danger); }.ticket-form em { min-height: 18px; color: var(--danger); font-size: .76rem; font-style: normal; font-weight: 500; }.field-meta { display: flex; justify-content: space-between; }.field-meta small { color: var(--muted); font-weight: 400; }.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }.form-actions { display: flex; justify-content: flex-end; gap: 10px; padding-top: 4px; }.form-actions--split { justify-content: space-between; }.form-actions--split > div { display: flex; gap: 10px; }.form-actions .button { gap: 8px; }
-.create-ticket-page { width: 100%; max-width: 980px; margin-inline: auto; }
-.create-ticket-page > .page-heading { margin-bottom: 24px; }
+.create-ticket-page { width: 100%; max-width: 980px;  margin-left: 40px;
+    margin-right: auto; }
+.create-ticket-page > .page-heading { margin-bottom: 20px;     margin-left: 10px; }
 .create-ticket-page > .page-heading h2 { margin-bottom: 8px; font-size: clamp(1.7rem, 2.5vw, 2.15rem); font-weight: 780; line-height: 1.2; }
 .create-ticket-page > .page-heading p { max-width: 600px; line-height: 1.55; }
 .create-ticket-page > .ticket-form { width: 100%; max-width: none; gap: 24px; padding: clamp(28px, 3vw, 36px); border-color: #e1e8f0; border-radius: 14px; background: white; box-shadow: 0 8px 24px rgba(20,39,68,.05); }
