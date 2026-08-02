@@ -145,6 +145,10 @@ function TicketForm({
     <form className="ticket-form panel" onSubmit={submit} noValidate>
       {toast && <div className="app-toast-region"><Toast key={toast.id} type={toast.type} title={toast.title} message={toast.message} onDismiss={dismissToast} /></div>}
       {errors.form && <div className="inline-alert inline-alert--error" role="alert">{errors.form}</div>}
+      {mode === 'create' && <div className="ticket-form__section-heading">
+        <h3>Ticket Information</h3>
+        <p>Complete the required information below before submitting your support request.</p>
+      </div>}
 
       <label>
         <span>Title <b aria-hidden="true">*</b></span>

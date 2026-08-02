@@ -15,7 +15,7 @@ function CreateTicketPage({ roleArea = 'employee' }) {
   const isManagement = roleArea === 'admin' || roleArea === 'manager'
 
   return (
-    <>
+    <div className="create-ticket-page">
       <section className="page-heading">
         <h2>Create Support Ticket</h2>
         <p>
@@ -57,7 +57,7 @@ function CreateTicketPage({ roleArea = 'employee' }) {
           },
         })
       }} />
-    </>
+    </div>
   )
 }
 
