@@ -5,6 +5,7 @@ import { EmptyState, ErrorState, LoadingState } from '../components/common/State
 import Toast from '../components/common/Toast.jsx'
 import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
 import TicketComments from '../components/tickets/TicketComments.jsx'
+import TicketAttachments from '../components/tickets/TicketAttachments.jsx'
 import {
   getAdminTicket,
   markAdminTicketDuplicate,
@@ -12,6 +13,7 @@ import {
 } from '../services/adminService.js'
 import { getManagerTicket, reportManagerDuplicate } from '../services/managerService.js'
 import { formatLocalDate } from '../utils/dateTime.js'
+import { downloadAttachment } from '../services/ticketService.js'
 
 function getDirectDuplicateError(error) {
   if (error.status === 404) {
@@ -133,6 +135,20 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
   if (error) return <ErrorState message={error} />
   if (!ticket) return <EmptyState title="Ticket not found" message="This ticket is not available." action={<Link className="button button--secondary" to={`/${roleArea}/tickets`}>Back to All Tickets</Link>} />
 
+  async function downloadTicketAttachment(file) {
+    try {
+      const blob = await downloadAttachment(ticket.id, file.id)
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = file.fileName
+      anchor.click()
+      URL.revokeObjectURL(url)
+    } catch (requestError) {
+      notify('error', 'Unable to Download Attachment', requestError.message)
+    }
+  }
+
   async function reportDuplicate() {
     if (!originalTicketPreview || processingDuplicate) return
     try {
@@ -247,7 +263,14 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
       </section>
       {ticket.pendingDuplicateReview && !(roleArea === 'admin' && ticket.pendingDuplicateReview.reportedByAdministrator) && <div className="inline-alert"><span className="badge badge--pending-approval">Duplicate Review Pending</span></div>}
       {ticket.statusName === 'Duplicate' && ticket.originalTicketReference && <section className="duplicate-info-panel" aria-labelledby="duplicate-info-title"><h2 id="duplicate-info-title">Duplicate Ticket</h2><p>This ticket was marked as a duplicate of:</p><Link className="duplicate-info-panel__link" to={`/${roleArea}/tickets/${ticket.originalTicketReference}`}><strong>{ticket.originalTicketReference}</strong><span>{ticket.originalTicketTitle || 'View original ticket'}</span></Link>{(ticket.duplicateApprovedDate || ticket.duplicateApprovedByName) && <p className="duplicate-info-panel__meta">Approved{ticket.duplicateApprovedDate ? ` ${formatLocalDate(ticket.duplicateApprovedDate)}` : ''}{ticket.duplicateApprovedByName ? ` by ${ticket.duplicateApprovedByName}` : ''}</p>}</section>}
-      <div className="details-grid"><section className="panel"><h2>Ticket Summary</h2><p className="ticket-description">{ticket.description}</p></section><aside className="panel details-side"><h2>Ticket Information</h2><dl><div><dt>Requester</dt><dd>{ticket.requesterName}</dd></div><div><dt>Category</dt><dd>{ticket.categoryName}</dd></div><div><dt>Priority</dt><dd><TicketPriorityBadge value={ticket.priorityName} /></dd></div><div><dt>Status</dt><dd><TicketStatusBadge value={ticket.statusName} /></dd></div>{ticket.originalTicketReference && <div><dt>Original Ticket</dt><dd><Link to={`/${roleArea}/tickets/${ticket.originalTicketReference}`}>{ticket.originalTicketReference}</Link></dd></div>}<div><dt>Assigned agent</dt><dd>{ticket.assignedAgentName ?? 'Unassigned'}</dd></div>{ticket.resolvedDate && <div><dt>Resolved</dt><dd>{formatLocalDate(ticket.resolvedDate)}</dd></div>}{ticket.closedDate && <div><dt>Closed</dt><dd>{formatLocalDate(ticket.closedDate)}</dd></div>}</dl></aside></div>
+      <div className="details-grid">
+        <section className="panel">
+          <h2>Ticket Summary</h2>
+          <p className="ticket-description">{ticket.description}</p>
+          <TicketAttachments attachments={ticket.attachments} onDownload={downloadTicketAttachment} />
+        </section>
+        <aside className="panel details-side"><h2>Ticket Information</h2><dl><div><dt>Requester</dt><dd>{ticket.requesterName}</dd></div><div><dt>Category</dt><dd>{ticket.categoryName}</dd></div><div><dt>Priority</dt><dd><TicketPriorityBadge value={ticket.priorityName} /></dd></div><div><dt>Status</dt><dd><TicketStatusBadge value={ticket.statusName} /></dd></div>{ticket.originalTicketReference && <div><dt>Original Ticket</dt><dd><Link to={`/${roleArea}/tickets/${ticket.originalTicketReference}`}>{ticket.originalTicketReference}</Link></dd></div>}<div><dt>Assigned agent</dt><dd>{ticket.assignedAgentName ?? 'Unassigned'}</dd></div>{ticket.resolvedDate && <div><dt>Resolved</dt><dd>{formatLocalDate(ticket.resolvedDate)}</dd></div>}{ticket.closedDate && <div><dt>Closed</dt><dd>{formatLocalDate(ticket.closedDate)}</dd></div>}</dl></aside>
+      </div>
       <TicketComments
         comments={ticket.comments}
         endpoint={`/api/${roleArea}/tickets/${encodeURIComponent(ticket.ticketReferenceNumber)}/comments`}

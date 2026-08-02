@@ -1,4 +1,4 @@
-import { ArrowLeft, FileText } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
@@ -9,6 +9,7 @@ import {
   TicketStatusBadge,
 } from '../components/tickets/TicketBadges.jsx'
 import TicketComments from '../components/tickets/TicketComments.jsx'
+import TicketAttachments from '../components/tickets/TicketAttachments.jsx'
 import {
   closeAgentTicket,
   downloadAgentTicketAttachment,
@@ -182,7 +183,7 @@ function AgentTicketDetailsPage() {
           <h2>Original Ticket Information</h2>
           <p className="ticket-description">{ticket.description}</p>
           {ticket.resolutionSummary && <div className="resolution-summary"><strong>Resolution summary</strong><p>{ticket.resolutionSummary}</p></div>}
-          {ticket.attachments.length > 0 && <div className="agent-detail-list"><h3>Attachments</h3>{ticket.attachments.map((file) => <div key={file.id}><FileText size={17} aria-hidden="true" /><span>{file.fileName}</span><button className="table-action" type="button" onClick={() => downloadAttachment(file)}>Download</button></div>)}</div>}
+          <TicketAttachments attachments={ticket.attachments} onDownload={downloadAttachment} showEmpty={false} />
         </section>
         <aside className="panel details-side">
           <h2>Ticket Information</h2>

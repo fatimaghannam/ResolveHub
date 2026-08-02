@@ -39,7 +39,9 @@ public sealed class TicketAttachmentsController(
         int ticketId, int attachmentId, CancellationToken cancellationToken)
     {
         var result = await attachmentService.DownloadAsync(
-            GetUserId(), ticketId, attachmentId, cancellationToken);
+            GetUserId(), ticketId, attachmentId,
+            User.IsInRole(RoleNames.Admin) || User.IsInRole(RoleNames.Manager),
+            cancellationToken);
         return result is null
             ? NotFound()
             : File(result.Stream, result.ContentType, result.FileName);

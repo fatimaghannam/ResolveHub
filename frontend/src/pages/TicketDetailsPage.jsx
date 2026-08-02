@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ErrorState, LoadingState } from '../components/common/States.jsx'
 import Toast from '../components/common/Toast.jsx'
 import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
+import TicketAttachments from '../components/tickets/TicketAttachments.jsx'
 import TicketComments from '../components/tickets/TicketComments.jsx'
 import {
   cancelTicket,
@@ -138,10 +139,7 @@ function TicketDetailsPage() {
       <div className="details-grid">
         <section className="panel details-main"><h2>Issue Description</h2><p className="ticket-description">{ticket.description}</p>
           {ticket.resolutionSummary && <div className="resolution-summary"><strong>Resolution summary</strong><p>{ticket.resolutionSummary}</p></div>}
-          <h2>Attachments</h2>
-          {ticket.attachments.length === 0 ? <p>No attachments.</p> : ticket.attachments.map((file) => (
-            <div className="attachment-row" key={file.id}><span>{file.fileName}</span><small>{Math.ceil(file.fileSizeBytes / 1024)} KB · <time dateTime={file.uploadedDate}>{formatLocalDateTime(file.uploadedDate)}</time></small><button type="button" onClick={() => download(file)}>Download</button></div>
-          ))}
+          <TicketAttachments attachments={ticket.attachments} onDownload={download} />
         </section>
         <aside className="panel details-side"><h2>Ticket Information</h2>
           <dl><div><dt>Status</dt><dd><TicketStatusBadge value={ticket.statusName} /></dd></div><div><dt>Priority</dt><dd><TicketPriorityBadge value={ticket.priorityName} /></dd></div><div><dt>Category</dt><dd>{ticket.categoryName}</dd></div><div><dt>Created by</dt><dd>{ticket.createdByName}</dd></div><div><dt>Assigned to</dt><dd>{ticket.assignedToName ?? 'Unassigned'}</dd></div>{ticket.resolvedDate && <div><dt>Resolved</dt><dd>{formatLocalDateTime(ticket.resolvedDate)}</dd></div>}{ticket.closedDate && <div><dt>Closed</dt><dd>{formatLocalDateTime(ticket.closedDate)}</dd></div>}<div><dt>Last updated</dt><dd><time dateTime={ticket.updatedDate} title="Displayed in your local time">{formatLocalDateTime(ticket.updatedDate)}</time></dd></div></dl>

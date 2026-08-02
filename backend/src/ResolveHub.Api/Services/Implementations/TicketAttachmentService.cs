@@ -100,12 +100,14 @@ public sealed class TicketAttachmentService(
     }
 
     public async Task<AttachmentDownload?> DownloadAsync(
-        int userId, int ticketId, int attachmentId, CancellationToken cancellationToken)
+        int userId, int ticketId, int attachmentId, bool canViewAllTickets,
+        CancellationToken cancellationToken)
     {
         var item = await dbContext.TicketAttachments.AsNoTracking()
             .Where(attachment => attachment.ID == attachmentId &&
                 attachment.TicketID == ticketId && !attachment.IsDeleted &&
-                attachment.Ticket.CreatedByUserAccountID == userId &&
+                (canViewAllTickets ||
+                    attachment.Ticket.CreatedByUserAccountID == userId) &&
                 !attachment.Ticket.IsDeleted)
             .Select(attachment => new
             {
