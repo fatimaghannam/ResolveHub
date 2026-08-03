@@ -1,6 +1,6 @@
 import {
   Activity, AlertCircle, Archive, ArrowRight, CheckCircle2, ChevronDown,
-  CirclePause, CirclePlay, Clock3, FileText, MessageSquareText, Paperclip,
+  CirclePause, CirclePlay, ClipboardList, Clock3, FileText, MessageSquareText, Paperclip,
   RefreshCcw, Tag, UserRoundCheck,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -242,7 +242,7 @@ export default function TicketActivityLog({ ticketReference }) {
 
   return <section className="panel activity-log">
     <button className="activity-log__toggle" type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-controls="ticket-activity-content" aria-label={`${open ? 'Collapse' : 'Expand'} ticket activity log`}>
-      <span className="activity-log__title"><span className="activity-log__title-icon"><Activity size={19} /></span><span><strong>Activity Log</strong><small>Complete audit trail of this ticket.</small></span></span>
+      <span className="activity-log__title"><span className="activity-log__title-icon"><ClipboardList size={19} /></span><span><strong>Activity Log</strong><small>Complete audit trail of this ticket.</small></span></span>
       <span className="activity-log__header-metrics"><span><strong>{timelineLoading ? '—' : activities.length}</strong> Activities</span><i /><span><strong>{summary ? liveTotalTime : '—'}</strong> worked</span><em className={`live-work-indicator live-work-indicator--${state.tone}`}><i aria-hidden="true" />{state.label}</em>{refreshing && <span className="activity-log__sync" role="status">Syncing…</span>}</span>
       <ChevronDown className="activity-log__chevron" size={20} aria-hidden="true" />
     </button>
