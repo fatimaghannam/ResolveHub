@@ -500,14 +500,11 @@ function TicketComments({ comments: initialComments = [], endpoint, canViewPriva
   const commentCount = pageInfo.totalVisibleComments
 
   return <section className={`panel dashboard-section comments-panel ${expanded ? 'comments-panel--expanded' : 'comments-panel--collapsed'}`} ref={sectionRef}>
-    <div className="comments-heading">
-      <div><h2>Comments</h2><p>Discuss updates and questions related to this ticket.</p></div>
-      <button type="button" className="comments-toggle" aria-expanded={expanded} aria-controls={contentId} onClick={toggleComments}>
-        <span>{expanded ? 'Hide Comments' : `View Comments (${commentCount})`}</span>
-        {expanded ? <ChevronUp size={17} aria-hidden="true" /> : <ChevronDown size={17} aria-hidden="true" />}
-      </button>
-    </div>
-    <p className="comments-count" aria-live="polite">{commentCount.toLocaleString()} {commentCount === 1 ? 'comment' : 'comments'}</p>
+    <button type="button" className="comments-heading unified-collapsible__header" aria-expanded={expanded} aria-controls={contentId} onClick={toggleComments}>
+      <strong>Comments</strong>
+      <span className="comments-count" aria-live="polite">{commentCount.toLocaleString()} {commentCount === 1 ? 'comment' : 'comments'}</span>
+      <ChevronDown className="section-header__chevron" size={18} strokeWidth={2} aria-hidden="true" />
+    </button>
     <div
       id={contentId}
       className="comments-collapsible"

@@ -6,6 +6,8 @@ import Toast from '../components/common/Toast.jsx'
 import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
 import TicketComments from '../components/tickets/TicketComments.jsx'
 import TicketAttachments from '../components/tickets/TicketAttachments.jsx'
+import TicketActivityLog from '../components/tickets/TicketActivityLog.jsx'
+import TicketHistorySection from '../components/tickets/TicketHistorySection.jsx'
 import {
   getAdminTicket,
   markAdminTicketDuplicate,
@@ -271,6 +273,7 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
         </section>
         <aside className="panel details-side"><h2>Ticket Information</h2><dl><div><dt>Requester</dt><dd>{ticket.requesterName}</dd></div><div><dt>Category</dt><dd>{ticket.categoryName}</dd></div><div><dt>Priority</dt><dd><TicketPriorityBadge value={ticket.priorityName} /></dd></div><div><dt>Status</dt><dd><TicketStatusBadge value={ticket.statusName} /></dd></div>{ticket.originalTicketReference && <div><dt>Original Ticket</dt><dd><Link to={`/${roleArea}/tickets/${ticket.originalTicketReference}`}>{ticket.originalTicketReference}</Link></dd></div>}<div><dt>Assigned agent</dt><dd>{ticket.assignedAgentName ?? 'Unassigned'}</dd></div>{ticket.resolvedDate && <div><dt>Resolved</dt><dd>{formatLocalDate(ticket.resolvedDate)}</dd></div>}{ticket.closedDate && <div><dt>Closed</dt><dd>{formatLocalDate(ticket.closedDate)}</dd></div>}</dl></aside>
       </div>
+      <div className="ticket-detail-section-stack">
       <TicketComments
         comments={ticket.comments}
         endpoint={`/api/${roleArea}/tickets/${encodeURIComponent(ticket.ticketReferenceNumber)}/comments`}
@@ -279,12 +282,9 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
         readOnlyMessage="Comments are read-only because this ticket is completed."
         onNotify={notify}
       />
-      <section className="panel dashboard-section">
-        <div className="panel__heading"><div><h2>Ticket History</h2><p>Read-only record of important ticket actions.</p></div></div>
-        {ticket.history.length === 0
-          ? <EmptyState title="No history yet" message="Ticket activity will appear here." />
-          : <div className="table-scroll"><table className="ticket-table"><thead><tr><th>Action</th><th>Performed By</th><th>Description</th><th>Date</th></tr></thead><tbody>{ticket.history.map((item) => <tr key={item.id}><td><strong>{item.actionType}</strong></td><td>{item.performedByName}</td><td>{item.description ?? '—'}</td><td>{formatLocalDate(item.createdDate)}</td></tr>)}</tbody></table></div>}
-      </section>
+      <TicketActivityLog ticketReference={ticket.ticketReferenceNumber} />
+      <TicketHistorySection history={ticket.history} formatDate={formatLocalDate} />
+      </div>
       {duplicateDialogOpen && <>
         <button className="dialog-backdrop" type="button" aria-label="Close duplicate dialog" onClick={() => { if (!processingDuplicate) closeDuplicateDialog() }} />
         <section className="dialog dialog--duplicate" role="dialog" aria-modal="true" aria-labelledby="duplicate-title" aria-describedby="duplicate-description">

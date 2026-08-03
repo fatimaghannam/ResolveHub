@@ -11,6 +11,7 @@ import {
 import TicketComments from '../components/tickets/TicketComments.jsx'
 import TicketAttachments from '../components/tickets/TicketAttachments.jsx'
 import TicketActivityLog from '../components/tickets/TicketActivityLog.jsx'
+import TicketHistorySection from '../components/tickets/TicketHistorySection.jsx'
 import {
   closeAgentTicket,
   downloadAgentTicketAttachment,
@@ -209,10 +210,10 @@ function AgentTicketDetailsPage() {
   return (
     <>
       {toast && <div className="app-toast-region"><Toast key={toast.id} type={toast.type} title={toast.title} message={toast.message} onDismiss={dismissToast} /></div>}
-      <Link className="back-link back-link--top" to="/agent/tickets"><ArrowLeft size={18} aria-hidden="true" />Back to Assigned Tickets</Link>
-      <section className="page-heading page-heading--action">
-        <div><span className="eyebrow">{formatTicketReference(ticket)}</span><h2>{ticket.title}</h2><p>Created {formatLocalDate(ticket.createdDate)}</p></div>
-        <div className="heading-actions">
+      <section className="ticket-details-header-grid">
+        <Link className="back-link ticket-details-header__back" to="/agent/tickets"><ArrowLeft size={18} aria-hidden="true" />Back to Assigned Tickets</Link>
+        <div className="page-heading ticket-details-header__identity"><span className="eyebrow">{formatTicketReference(ticket)}</span><h2>{ticket.title}</h2><p>Created {formatLocalDate(ticket.createdDate)}</p></div>
+        <div className="heading-actions ticket-details-header__actions">
           {canStart && <button className="button button--primary" type="button" onClick={startProgress} disabled={Boolean(saving)}>{saving === 'progress' ? 'Starting…' : 'Start Work'}</button>}
           {ticket.statusName === 'In Progress' && <button className="button button--secondary" type="button" onClick={() => setDialog('pending')} disabled={Boolean(saving)}>{saving === 'pending' ? 'Moving to Pending…' : 'Mark as Pending'}</button>}
           {ticket.statusName === 'Pending' && <button className="button button--primary" type="button" onClick={resumeWork} disabled={Boolean(saving)}>{saving === 'resume' ? 'Resuming…' : 'Resume Work'}</button>}
@@ -245,6 +246,7 @@ function AgentTicketDetailsPage() {
           </dl>
         </aside>
       </div>
+      <div className="ticket-detail-section-stack">
       <TicketComments
         comments={ticket.comments}
         endpoint={`/api/agent/tickets/${encodeURIComponent(ticket.ticketReferenceNumber)}/comments`}
@@ -256,13 +258,8 @@ function AgentTicketDetailsPage() {
         onNotify={notify}
       />
       <TicketActivityLog ticketReference={ticket.ticketReferenceNumber} />
-      <details className="panel dashboard-section ticket-history-collapsible">
-        <summary>Ticket History <span>{ticket.history.length} records · Legacy view</span></summary>
-        <section className="ticket-history-collapsible__body">
-        <div className="panel__heading"><div><h2>Ticket History</h2><p>Read-only lifecycle and activity record.</p></div></div>
-        <div className="table-scroll"><table className="ticket-table"><thead><tr><th>Action</th><th>Performed By</th><th>Description</th><th>Date</th></tr></thead><tbody>{ticket.history.map((item) => <tr key={item.id}><td><strong>{item.actionType}</strong></td><td>{item.performedByName}</td><td>{item.description ?? '—'}</td><td>{formatLocalDate(item.createdDate)}</td></tr>)}</tbody></table></div>
-        </section>
-      </details>
+      <TicketHistorySection history={ticket.history} formatDate={formatLocalDate} />
+      </div>
       {dialog && <>
         <button className="dialog-backdrop" type="button" aria-label="Close dialog" onClick={() => { if (!saving) setDialog(null) }} />
         <section className="dialog" role="dialog" aria-modal="true" aria-labelledby="agent-action-title" aria-describedby="agent-action-description">

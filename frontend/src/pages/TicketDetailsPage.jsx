@@ -6,6 +6,7 @@ import Toast from '../components/common/Toast.jsx'
 import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
 import TicketAttachments from '../components/tickets/TicketAttachments.jsx'
 import TicketComments from '../components/tickets/TicketComments.jsx'
+import TicketHistorySection from '../components/tickets/TicketHistorySection.jsx'
 import {
   cancelTicket,
   downloadAttachment,
@@ -145,6 +146,7 @@ function TicketDetailsPage() {
           <dl><div><dt>Status</dt><dd><TicketStatusBadge value={ticket.statusName} /></dd></div><div><dt>Priority</dt><dd><TicketPriorityBadge value={ticket.priorityName} /></dd></div><div><dt>Category</dt><dd>{ticket.categoryName}</dd></div><div><dt>Created by</dt><dd>{ticket.createdByName}</dd></div><div><dt>Assigned to</dt><dd>{ticket.assignedToName ?? 'Unassigned'}</dd></div>{ticket.resolvedDate && <div><dt>Resolved</dt><dd>{formatLocalDateTime(ticket.resolvedDate)}</dd></div>}{ticket.closedDate && <div><dt>Closed</dt><dd>{formatLocalDateTime(ticket.closedDate)}</dd></div>}<div><dt>Last updated</dt><dd><time dateTime={ticket.updatedDate} title="Displayed in your local time">{formatLocalDateTime(ticket.updatedDate)}</time></dd></div></dl>
         </aside>
       </div>
+      <div className="ticket-detail-section-stack">
       <TicketComments
         comments={ticket.comments}
         endpoint={`/api/tickets/${id}/comments`}
@@ -153,7 +155,8 @@ function TicketDetailsPage() {
         readOnlyMessage="Comments are read-only because this ticket is completed."
         onNotify={notify}
       />
-      {ticket.history.length > 0 && <section className="panel dashboard-section"><div className="panel__heading"><div><h2>Ticket History</h2><p>Updates recorded for this support request.</p></div></div><div className="table-scroll"><table className="ticket-table"><thead><tr><th>Action</th><th>Performed By</th><th>Description</th><th>Date</th></tr></thead><tbody>{ticket.history.map((item) => <tr key={item.id}><td><strong>{item.actionType}</strong></td><td>{item.performedByName}</td><td>{item.description ?? '—'}</td><td>{formatLocalDateTime(item.createdDate)}</td></tr>)}</tbody></table></div></section>}
+      <TicketHistorySection history={ticket.history} formatDate={formatLocalDateTime} />
+      </div>
       {dialogOpen && <div className="dialog-backdrop"><div className="dialog" role="dialog" aria-modal="true" aria-labelledby="details-cancel-title" aria-describedby="details-cancel-description"><h2 id="details-cancel-title">Cancel {formatTicketReference(ticket)}?</h2><p id="details-cancel-description">The ticket will be removed from your active list.</p><label><span>Reason (optional)</span><textarea maxLength="500" value={reason} onChange={(e) => setReason(e.target.value)} /></label><div className="dialog__actions"><button autoFocus type="button" className="button button--secondary" onClick={() => setDialogOpen(false)} disabled={saving}>Keep Ticket</button><button type="button" className="button button--danger" onClick={confirmCancel} disabled={saving}>{saving ? 'Cancelling…' : 'Confirm Cancellation'}</button></div></div></div>}
     </>
   )
