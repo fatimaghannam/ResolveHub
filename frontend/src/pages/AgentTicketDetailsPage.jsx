@@ -207,7 +207,6 @@ function AgentTicketDetailsPage() {
         readOnlyMessage={ticket.assignedAgentName
           ? 'Comments are read-only because this ticket is completed.'
           : null}
-        formatTimestamp={formatLocalDate}
         onNotify={notify}
       />
       <section className="panel dashboard-section">

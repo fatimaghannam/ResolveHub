@@ -151,7 +151,6 @@ function TicketDetailsPage() {
         canViewPrivate
         canComment={!ticket.closedDate && !ticket.cancelledDate && ticket.statusName !== 'Duplicate'}
         readOnlyMessage="Comments are read-only because this ticket is completed."
-        formatTimestamp={formatLocalDateTime}
         onNotify={notify}
       />
       {ticket.history.length > 0 && <section className="panel dashboard-section"><div className="panel__heading"><div><h2>Ticket History</h2><p>Updates recorded for this support request.</p></div></div><div className="table-scroll"><table className="ticket-table"><thead><tr><th>Action</th><th>Performed By</th><th>Description</th><th>Date</th></tr></thead><tbody>{ticket.history.map((item) => <tr key={item.id}><td><strong>{item.actionType}</strong></td><td>{item.performedByName}</td><td>{item.description ?? '—'}</td><td>{formatLocalDateTime(item.createdDate)}</td></tr>)}</tbody></table></div></section>}

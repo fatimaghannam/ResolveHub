@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ResolveHub.Api.Entities;
 
 namespace ResolveHub.Api.Data;
@@ -16,6 +17,17 @@ public sealed class ApplicationDbContext
         IdentityRoleClaim<int>,
         IdentityUserToken<int>>
 {
+    // SQL Server datetime2 preserves UTC clock ticks but not DateTime.Kind. Marking
+    // values as UTC when materializing makes System.Text.Json emit an unambiguous Z
+    // without altering historical values already stored as UTC.
+    private static readonly ValueConverter<DateTime, DateTime> UtcDateTimeConverter =
+        new(value => value, value => DateTime.SpecifyKind(value, DateTimeKind.Utc));
+
+    private static readonly ValueConverter<DateTime?, DateTime?> NullableUtcDateTimeConverter =
+        new(value => value, value => value.HasValue
+            ? DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)
+            : value);
+
     public ApplicationDbContext(
         DbContextOptions<ApplicationDbContext> options)
         : base(options)
@@ -296,9 +308,12 @@ public sealed class ApplicationDbContext
             entity.HasKey(comment => comment.ID);
             entity.Property(comment => comment.ID).UseIdentityColumn();
             entity.Property(comment => comment.Content).HasMaxLength(5000).IsRequired();
-            entity.Property(comment => comment.CreatedDate).HasColumnType("datetime2");
-            entity.Property(comment => comment.UpdatedDate).HasColumnType("datetime2");
-            entity.Property(comment => comment.DeletedDate).HasColumnType("datetime2");
+            entity.Property(comment => comment.CreatedDate)
+                .HasConversion(UtcDateTimeConverter).HasColumnType("datetime2");
+            entity.Property(comment => comment.UpdatedDate)
+                .HasConversion(NullableUtcDateTimeConverter).HasColumnType("datetime2");
+            entity.Property(comment => comment.DeletedDate)
+                .HasConversion(NullableUtcDateTimeConverter).HasColumnType("datetime2");
             entity.Property(comment => comment.Visibility)
                 .HasConversion<string>().HasMaxLength(20);
             entity.Property(comment => comment.IsEdited).HasDefaultValue(false);
@@ -337,6 +352,8 @@ public sealed class ApplicationDbContext
             entity.Property(item => item.StoredFileName).HasMaxLength(255).IsRequired();
             entity.Property(item => item.FilePath).HasMaxLength(500).IsRequired();
             entity.Property(item => item.ContentType).HasMaxLength(150).IsRequired();
+            entity.Property(item => item.UploadedDate)
+                .HasConversion(UtcDateTimeConverter).HasColumnType("datetime2");
             entity.HasIndex(item => item.TicketCommentID);
             entity.HasOne(item => item.TicketComment).WithMany(comment => comment.Attachments)
                 .HasForeignKey(item => item.TicketCommentID).OnDelete(DeleteBehavior.Cascade);

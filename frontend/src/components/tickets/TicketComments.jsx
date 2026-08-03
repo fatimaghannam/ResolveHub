@@ -21,6 +21,7 @@ import {
   replyToComment,
   downloadCommentAttachment,
 } from '../../services/commentService.js'
+import { formatLocalDateTime, parseApiUtcDate } from '../../utils/dateTime.js'
 
 const MAX_COMMENT_LENGTH = 5000
 const COMMENT_PAGE_SIZE = 5
@@ -38,8 +39,9 @@ function formatFileSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function relativeTimestamp(value, fallback) {
-  const date = new Date(value)
+function relativeTimestamp(value) {
+  const date = parseApiUtcDate(value)
+  if (!date || Number.isNaN(date.getTime())) return '—'
   const now = new Date()
   const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const startDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
@@ -50,7 +52,7 @@ function relativeTimestamp(value, fallback) {
   }).format(date)
   if (dayDifference === 0) return `Today at ${time}`
   if (dayDifference === 1) return `Yesterday at ${time}`
-  return fallback(value)
+  return formatLocalDateTime(value)
 }
 
 function VisibilityBadge({ visibility }) {
@@ -158,7 +160,7 @@ function ReplyComposer({ comment, busy, onCancel, onSubmit }) {
   </form>
 }
 
-function CommentCard({ comment, replies, formatTimestamp, onReply, onEdit, onDelete, onDownload }) {
+function CommentCard({ comment, replies, onReply, onEdit, onDelete, onDownload }) {
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState(comment.content)
   const [replying, setReplying] = useState(false)
@@ -190,12 +192,12 @@ function CommentCard({ comment, replies, formatTimestamp, onReply, onEdit, onDel
   if (comment.isDeleted) return <div className="comment-thread comment-thread--deleted">
     <article className="comment-deleted-placeholder">
       <span className="comment-avatar comment-avatar--deleted" aria-hidden="true">{initials(comment.authorName)}</span>
-      <div><p><strong>{comment.authorName}</strong><span aria-hidden="true"> · </span><time dateTime={comment.createdDate}>{relativeTimestamp(comment.createdDate, formatTimestamp)}</time></p><em>{replies.length > 0 ? 'Original comment deleted' : 'Comment deleted'}</em></div>
+      <div><p><strong>{comment.authorName}</strong><span aria-hidden="true"> · </span><time dateTime={comment.createdDate} title={formatLocalDateTime(comment.createdDate)}>{relativeTimestamp(comment.createdDate)}</time></p><em>{replies.length > 0 ? 'Original comment deleted' : 'Comment deleted'}</em></div>
     </article>
     {replies.length > 0 && <div className="comment-replies" aria-label={`Replies to deleted comment by ${comment.authorName}`}>
       {displayedReplies.map((reply, index) => <div key={reply.id} className="comment-reply-row">
         {index === 1 && hiddenReplyCount > 0 && !repliesExpanded && <button type="button" className="comment-replies-toggle comment-replies-toggle--between" onClick={() => setRepliesExpanded(true)}><ChevronDown size={14} />View {hiddenReplyCount} more {hiddenReplyCount === 1 ? 'reply' : 'replies'}</button>}
-        <CommentCard comment={reply} replies={[]} formatTimestamp={formatTimestamp} onReply={onReply} onEdit={onEdit} onDelete={onDelete} onDownload={onDownload} />
+        <CommentCard comment={reply} replies={[]} onReply={onReply} onEdit={onEdit} onDelete={onDelete} onDownload={onDownload} />
       </div>)}
       {repliesExpanded && replies.length > 2 && <button type="button" className="comment-replies-toggle" onClick={() => setRepliesExpanded(false)}><ChevronUp size={14} />Hide replies</button>}
     </div>}
@@ -212,7 +214,7 @@ function CommentCard({ comment, replies, formatTimestamp, onReply, onEdit, onDel
             {comment.isTicketCreator && <span className="comment-context-badge">Ticket Creator</span>}
             {comment.isAssignedAgent && <span className="comment-context-badge comment-context-badge--agent">Assigned Agent</span>}
           </div>
-          <time dateTime={comment.createdDate}>{relativeTimestamp(comment.createdDate, formatTimestamp)}{comment.isEdited && !comment.isDeleted && <span> · edited</span>}</time>
+          <time dateTime={comment.createdDate} title={formatLocalDateTime(comment.createdDate)}>{relativeTimestamp(comment.createdDate)}{comment.isEdited && !comment.isDeleted && <span> · edited</span>}</time>
         </div>
         <div className="comment-card__controls">
           <VisibilityBadge visibility={comment.visibility} />
@@ -233,23 +235,23 @@ function CommentCard({ comment, replies, formatTimestamp, onReply, onEdit, onDel
     {replies.length > 0 && <div className="comment-replies" aria-label={`Replies to ${comment.authorName}`}>
       {displayedReplies.map((reply, index) => <div key={reply.id} className="comment-reply-row">
         {index === 1 && hiddenReplyCount > 0 && !repliesExpanded && <button type="button" className="comment-replies-toggle comment-replies-toggle--between" onClick={() => setRepliesExpanded(true)} aria-label={`View ${hiddenReplyCount} more replies`}><ChevronDown size={14} />View {hiddenReplyCount} more {hiddenReplyCount === 1 ? 'reply' : 'replies'}</button>}
-        <CommentCard comment={reply} replies={[]} formatTimestamp={formatTimestamp} onReply={onReply} onEdit={onEdit} onDelete={onDelete} onDownload={onDownload} />
+        <CommentCard comment={reply} replies={[]} onReply={onReply} onEdit={onEdit} onDelete={onDelete} onDownload={onDownload} />
       </div>)}
       {repliesExpanded && replies.length > 2 && <button type="button" className="comment-replies-toggle" onClick={() => setRepliesExpanded(false)} aria-label={`Hide replies to ${comment.authorName}`}><ChevronUp size={14} />Hide replies</button>}
     </div>}
   </div>
 }
 
-function DeletedCommentsGroup({ comments, formatTimestamp }) {
+function DeletedCommentsGroup({ comments }) {
   const [expanded, setExpanded] = useState(false)
   if (comments.length === 1)
-    return <CommentCard comment={comments[0]} replies={[]} formatTimestamp={formatTimestamp} />
+    return <CommentCard comment={comments[0]} replies={[]} />
   return <div className="deleted-comments-group">
     <button type="button" className="deleted-comments-group__toggle" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
       {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
       {comments.length} deleted comments
     </button>
-    {expanded && <div className="deleted-comments-group__items">{comments.map((comment) => <CommentCard key={comment.id} comment={comment} replies={[]} formatTimestamp={formatTimestamp} />)}</div>}
+    {expanded && <div className="deleted-comments-group__items">{comments.map((comment) => <CommentCard key={comment.id} comment={comment} replies={[]} />)}</div>}
   </div>
 }
 
@@ -324,7 +326,7 @@ function CommentComposer({ canViewPrivate, onSubmit }) {
   </form>
 }
 
-function TicketComments({ comments: initialComments = [], endpoint, canViewPrivate, canComment, readOnlyMessage, formatTimestamp, onNotify }) {
+function TicketComments({ comments: initialComments = [], endpoint, canViewPrivate, canComment, readOnlyMessage, onNotify }) {
   const [expanded, setExpanded] = useState(false)
   const [contentMounted, setContentMounted] = useState(false)
   const [comments, setComments] = useState(initialComments)
@@ -518,7 +520,7 @@ function TicketComments({ comments: initialComments = [], endpoint, canViewPriva
       {contentMounted && <div className="comments-collapsible__inner" inert={!expanded}>
     <CommentFilters selected={filter} counts={counts} canViewPrivate={canViewPrivate} onChange={changeFilter} />
     {!loading && !loadError && <p className="comments-summary">Showing {comments.length} of {pageInfo.totalVisibleComments} visible comments</p>}
-    {loading && page === 1 ? <CommentSkeletons /> : loadError ? <div className="comments-load-error" role="alert"><strong>Comments could not be loaded.</strong><span>{loadError}</span><button type="button" onClick={() => setLoadVersion((value) => value + 1)}>Try again</button></div> : roots.length === 0 ? <div className="comments-empty"><MessageSquare size={22} /><strong>{emptyTitle}</strong><span>Start the conversation with an update or question.</span></div> : <div className="comments-list">{timelineGroups.map((group) => group.type === 'deleted' ? <DeletedCommentsGroup key={`deleted-${group.comments[0].id}`} comments={group.comments} formatTimestamp={formatTimestamp} /> : <CommentCard key={group.comment.id} comment={group.comment} replies={repliesFor(group.comment.id)} formatTimestamp={formatTimestamp} onReply={reply} onEdit={edit} onDelete={setDeleteTarget} onDownload={(commentId, attachment) => downloadCommentAttachment(endpoint, commentId, attachment).catch((error) => notify('error', 'Unable to Download File', error.message))} />)}</div>}
+    {loading && page === 1 ? <CommentSkeletons /> : loadError ? <div className="comments-load-error" role="alert"><strong>Comments could not be loaded.</strong><span>{loadError}</span><button type="button" onClick={() => setLoadVersion((value) => value + 1)}>Try again</button></div> : roots.length === 0 ? <div className="comments-empty"><MessageSquare size={22} /><strong>{emptyTitle}</strong><span>Start the conversation with an update or question.</span></div> : <div className="comments-list">{timelineGroups.map((group) => group.type === 'deleted' ? <DeletedCommentsGroup key={`deleted-${group.comments[0].id}`} comments={group.comments} /> : <CommentCard key={group.comment.id} comment={group.comment} replies={repliesFor(group.comment.id)} onReply={reply} onEdit={edit} onDelete={setDeleteTarget} onDownload={(commentId, attachment) => downloadCommentAttachment(endpoint, commentId, attachment).catch((error) => notify('error', 'Unable to Download File', error.message))} />)}</div>}
     {pageInfo.hasMore && <div className="comments-load-more"><button type="button" className="button button--secondary" onClick={() => setPage((value) => value + 1)} disabled={loading}>{loading ? 'Loading…' : 'Load more comments'}</button></div>}
     <div ref={latestRef}>{canComment ? <CommentComposer canViewPrivate={canViewPrivate} onSubmit={create} /> : readOnlyMessage && <p className="comments-read-only">{readOnlyMessage}</p>}</div>
     {showBackToLatest && <button type="button" className="comments-back-latest" onClick={() => latestRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })}><ChevronDown size={15} />Back to latest</button>}

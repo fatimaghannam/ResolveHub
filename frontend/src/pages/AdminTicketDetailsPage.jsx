@@ -277,7 +277,6 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
         canViewPrivate={false}
         canComment={!['Closed', 'Cancelled', 'Duplicate'].includes(ticket.statusName)}
         readOnlyMessage="Comments are read-only because this ticket is completed."
-        formatTimestamp={formatLocalDate}
         onNotify={notify}
       />
       <section className="panel dashboard-section">
