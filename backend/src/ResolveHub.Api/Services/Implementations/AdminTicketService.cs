@@ -392,6 +392,28 @@ public sealed class AdminTicketService(
                 .SingleAsync(token);
             var now = DateTime.UtcNow;
             var previousAgentId = ticket.AssignedToUserAccountID;
+            var assignmentNames = await dbContext.Users.AsNoTracking()
+                .Where(user => user.Id == previousAgentId || user.Id == agentUserId)
+                .ToDictionaryAsync(user => user.Id,
+                    user => user.FirstName + " " + user.LastName, token);
+            var previousAgentName = previousAgentId.HasValue &&
+                assignmentNames.TryGetValue(previousAgentId.Value, out var previousName)
+                    ? previousName : null;
+            var assignedAgentName = agentUserId.HasValue &&
+                assignmentNames.TryGetValue(agentUserId.Value, out var assignedName)
+                    ? assignedName : null;
+            if (previousAgentId.HasValue)
+            {
+                var openSession = await dbContext.TicketWorkSessions.SingleOrDefaultAsync(
+                    item => item.TicketID == ticket.ID && item.EndedAt == null, token);
+                if (openSession is not null)
+                {
+                    openSession.EndedAt = now;
+                    openSession.DurationMinutes = Math.Max(0,
+                        (int)Math.Floor((now - openSession.StartedAt).TotalMinutes));
+                    openSession.EndedReason = "Reassigned";
+                }
+            }
             ticket.AssignedToUserAccountID = agentUserId;
             if (ticket.TicketStatus.Name is
                 TicketStatusNames.Open or TicketStatusNames.Assigned)
@@ -405,15 +427,17 @@ public sealed class AdminTicketService(
                 TicketID = ticket.ID,
                 PerformedByUserAccountID = administratorId,
                 ActionType = agentUserId.HasValue
-                    ? TicketHistoryActionNames.TicketAssigned
+                    ? previousAgentId.HasValue
+                        ? TicketHistoryActionNames.TicketReassigned
+                        : TicketHistoryActionNames.TicketAssigned
                     : "Ticket Unassigned",
-                OldValue = previousAgentId?.ToString(),
-                NewValue = agentUserId?.ToString(),
+                OldValue = previousAgentName,
+                NewValue = assignedAgentName,
                 Description =
                     previousAgentId.HasValue && agentUserId.HasValue
-                        ? "Ticket reassigned to another IT Support Agent."
+                        ? $"Ticket reassigned to {assignedAgentName}."
                         : agentUserId.HasValue
-                            ? "Ticket assigned to an IT Support Agent."
+                            ? $"Ticket assigned to {assignedAgentName}."
                             : "Ticket assignment removed.",
                 CreatedDate = now
             });
@@ -519,7 +543,7 @@ public sealed class AdminTicketService(
                 CreatedDate = now
             });
         }
-        else
+        else if (!approve)
         {
             review.Status = DuplicateReviewStatusNames.Rejected;
             review.ReviewedByUserAccountID = administratorId;

@@ -165,7 +165,7 @@ function AdminTicketsPage({ roleArea = 'admin' }) {
       {data &&
       <section className="panel">
         <div className="results-count">{data.totalItems} ticket{data.totalItems === 1 ? '' : 's'}</div>
-        {rows.length === 0 ? <EmptyState title="No tickets found" message="Try changing or clearing the current filters." /> : <div className="table-scroll admin-ticket-table-wrap"><table className="ticket-table admin-ticket-table">
+        {rows.length === 0 ? <EmptyState title="No tickets found." message="Try changing or clearing the current filters." /> : <div className="table-scroll admin-ticket-table-wrap"><table className="ticket-table admin-ticket-table">
           <colgroup>
             <col className="admin-ticket-col--number" />
             <col className="admin-ticket-col--title" />

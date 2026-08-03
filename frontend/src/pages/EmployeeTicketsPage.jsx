@@ -241,7 +241,7 @@ function EmployeeTicketsPage({ roleArea = 'employee' }) {
       {!error && !data && <LoadingState message="Loading tickets…" />}
       {data && <section className="panel">
         <div className="results-count">{data.totalItems} ticket{data.totalItems === 1 ? '' : 's'}</div>
-        {data.items.length === 0 ? <EmptyState title="No tickets found" message="Try changing your filters or create a new support ticket." /> : (
+        {data.items.length === 0 ? <EmptyState title="No tickets found." message="Try changing your filters or create a new support ticket." /> : (
           <div className="table-scroll"><table className="ticket-table">
             <thead><tr><th>Ticket Number</th><th>Title</th><th>Category</th><th>Priority</th><th>Status</th><th>Assigned To</th><th>Created</th><th>Actions</th></tr></thead>
             <tbody>{data.items.map((ticket) => <tr key={ticket.id}>

@@ -16,15 +16,7 @@ const source = dataMode === 'demo' ? demoData : productionData
 
 export const {
   adminActivity,
-  adminNotifications,
-  adminStatistics,
   categoryData,
-  monthlyTicketTrend,
-  ticketsByCategory,
-  ticketMockData,
-  ticketStatusChartData,
-  unassignedTickets,
-  userOverview,
   usersMockData,
 } = source
 

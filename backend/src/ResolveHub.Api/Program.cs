@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -323,6 +324,7 @@ builder.Services.AddScoped<
     IPasswordResetService,
     PasswordResetService>();
 builder.Services.AddScoped<ITicketService, TicketService>();
+builder.Services.AddScoped<ITicketActivityService, TicketActivityService>();
 builder.Services.AddScoped<ITicketAttachmentService, TicketAttachmentService>();
 builder.Services.AddScoped<ITicketDraftService, TicketDraftService>();
 builder.Services.AddScoped<ITicketCommentService, TicketCommentService>();
@@ -333,6 +335,15 @@ builder.Services.AddScoped<IManagerTicketService, ManagerTicketService>();
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    var databaseTarget = new SqlConnectionStringBuilder(connectionString);
+    app.Logger.LogInformation(
+        "ResolveHub database target: Server={DatabaseServer}; Database={DatabaseName}",
+        databaseTarget.DataSource,
+        databaseTarget.InitialCatalog);
+}
 
 if (!app.Environment.IsEnvironment("Testing"))
 {

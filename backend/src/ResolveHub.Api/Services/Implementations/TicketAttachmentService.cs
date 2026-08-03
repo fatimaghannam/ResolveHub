@@ -74,6 +74,7 @@ public sealed class TicketAttachmentService(
                 81920, FileOptions.Asynchronous))
                 await file.CopyToAsync(stream, cancellationToken);
 
+            var occurredAt = DateTime.UtcNow;
             var attachment = new TicketAttachment
             {
                 TicketID = ticketId,
@@ -83,9 +84,19 @@ public sealed class TicketAttachmentService(
                 FilePath = relativePath,
                 ContentType = file.ContentType,
                 FileSizeBytes = file.Length,
-                UploadedDate = DateTime.UtcNow
+                UploadedDate = occurredAt
             };
             dbContext.TicketAttachments.Add(attachment);
+            dbContext.TicketHistory.Add(new TicketHistory
+            {
+                TicketID = ticketId,
+                PerformedByUserAccountID = userId,
+                ActionType = TicketHistoryActionNames.AttachmentUploaded,
+                NewValue = originalName,
+                Description = $"Uploaded attachment {originalName}.",
+                CreatedDate = occurredAt
+            });
+            ticket.UpdatedDate = occurredAt;
             await dbContext.SaveChangesAsync(cancellationToken);
             return new(TicketOperationStatus.Success,
                 new TicketAttachmentDto(attachment.ID, attachment.FileName,

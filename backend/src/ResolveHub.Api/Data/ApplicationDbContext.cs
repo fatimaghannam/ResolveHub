@@ -44,6 +44,7 @@ public sealed class ApplicationDbContext
     public DbSet<TicketComment> TicketComments => Set<TicketComment>();
     public DbSet<TicketCommentAttachment> TicketCommentAttachments => Set<TicketCommentAttachment>();
     public DbSet<TicketHistory> TicketHistory => Set<TicketHistory>();
+    public DbSet<TicketWorkSession> TicketWorkSessions => Set<TicketWorkSession>();
     public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
     public DbSet<TicketAssignmentRequest> TicketAssignmentRequests =>
         Set<TicketAssignmentRequest>();
@@ -67,6 +68,7 @@ public sealed class ApplicationDbContext
         ConfigureTicketComment(builder);
         ConfigureTicketCommentAttachment(builder);
         ConfigureTicketHistory(builder);
+        ConfigureTicketWorkSession(builder);
         ConfigureActivityLog(builder);
         ConfigureTicketAssignmentRequest(builder);
         ConfigureDuplicateReview(builder);
@@ -376,6 +378,8 @@ public sealed class ApplicationDbContext
             entity.Property(history => history.NewValue).HasMaxLength(500);
             entity.Property(history => history.Description).HasMaxLength(1000);
             entity.Property(history => history.CreatedDate).HasColumnType("datetime2");
+            entity.Property(history => history.WorkDurationMinutes);
+            entity.HasIndex(history => history.PerformedByUserAccountID);
             entity.HasIndex(history => new { history.TicketID, history.CreatedDate });
             entity.HasOne(history => history.Ticket)
                 .WithMany(ticket => ticket.History)
@@ -385,6 +389,27 @@ public sealed class ApplicationDbContext
                 .WithMany(user => user.TicketHistoryEntries)
                 .HasForeignKey(history => history.PerformedByUserAccountID)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureTicketWorkSession(ModelBuilder builder)
+    {
+        builder.Entity<TicketWorkSession>(entity =>
+        {
+            entity.ToTable("TicketWorkSession");
+            entity.HasKey(item => item.ID);
+            entity.Property(item => item.ID).UseIdentityColumn();
+            entity.Property(item => item.StartedAt).HasConversion(UtcDateTimeConverter).HasColumnType("datetime2");
+            entity.Property(item => item.EndedAt).HasConversion(NullableUtcDateTimeConverter).HasColumnType("datetime2");
+            entity.Property(item => item.CreatedDate).HasConversion(UtcDateTimeConverter).HasColumnType("datetime2");
+            entity.Property(item => item.EndedReason).HasMaxLength(100);
+            entity.HasIndex(item => new { item.TicketID, item.StartedAt });
+            entity.HasIndex(item => new { item.ITAgentUserAccountID, item.StartedAt });
+            entity.HasIndex(item => item.TicketID).HasFilter("[EndedAt] IS NULL").IsUnique();
+            entity.HasOne(item => item.Ticket).WithMany(ticket => ticket.WorkSessions)
+                .HasForeignKey(item => item.TicketID).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.ITAgentUserAccount).WithMany(user => user.TicketWorkSessions)
+                .HasForeignKey(item => item.ITAgentUserAccountID).OnDelete(DeleteBehavior.Restrict);
         });
     }
 

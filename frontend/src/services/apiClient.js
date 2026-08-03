@@ -1,4 +1,5 @@
 import { clearStoredAuth, getStoredAuth } from './authStorage.js'
+import { notifyTicketActivityChanged } from './ticketActivityEvents.js'
 
 export class ApiError extends Error {
   constructor(message, status = 0, details = null) {
@@ -21,7 +22,11 @@ export async function apiRequest(path, options = {}) {
 
   let response
   try {
-    response = await fetch(path, { ...fetchOptions, headers })
+    response = await fetch(path, {
+      ...fetchOptions,
+      cache: fetchOptions.cache ?? 'no-store',
+      headers,
+    })
   } catch (error) {
     if (error.name === 'AbortError') {
       throw error
@@ -65,6 +70,11 @@ export async function apiRequest(path, options = {}) {
       response.status,
       body,
     )
+  }
+
+  const method = (fetchOptions.method || 'GET').toUpperCase()
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+    notifyTicketActivityChanged(path)
   }
 
   return body

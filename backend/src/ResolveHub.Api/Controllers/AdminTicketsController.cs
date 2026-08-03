@@ -33,6 +33,7 @@ public sealed class AdminTicketsController(
         Ok(await service.GetAgentsAsync(token));
 
     [HttpGet("tickets")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public async Task<ActionResult<PagedResultDto<AdminTicketListItemDto>>> Tickets(
         [FromQuery] AdminTicketFilterDto filter, CancellationToken token) =>
         Ok(await service.GetTicketsAsync(filter, token));

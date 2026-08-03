@@ -257,7 +257,7 @@ function AgentTicketsPage({ view = 'assigned' }) {
             <div className="results-count">{data.totalItems} {noun} ticket{data.totalItems === 1 ? '' : 's'}</div>
             {data.items.length === 0 ? (
               <EmptyState
-                title={hasActiveFilters ? 'No tickets match the selected filters' : `No ${noun} tickets found`}
+                title={hasActiveFilters ? 'No tickets match the selected filters' : 'No tickets found.'}
                 message={hasActiveFilters ? 'Try changing or clearing the current filters.' : `${title} will appear here.`}
               />
             ) : (

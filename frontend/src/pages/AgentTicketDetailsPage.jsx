@@ -10,6 +10,7 @@ import {
 } from '../components/tickets/TicketBadges.jsx'
 import TicketComments from '../components/tickets/TicketComments.jsx'
 import TicketAttachments from '../components/tickets/TicketAttachments.jsx'
+import TicketActivityLog from '../components/tickets/TicketActivityLog.jsx'
 import {
   closeAgentTicket,
   downloadAgentTicketAttachment,
@@ -209,10 +210,14 @@ function AgentTicketDetailsPage() {
           : null}
         onNotify={notify}
       />
-      <section className="panel dashboard-section">
+      <TicketActivityLog ticketReference={ticket.ticketReferenceNumber} />
+      <details className="panel dashboard-section ticket-history-collapsible">
+        <summary>Ticket History <span>{ticket.history.length} records · Legacy view</span></summary>
+        <section className="ticket-history-collapsible__body">
         <div className="panel__heading"><div><h2>Ticket History</h2><p>Read-only lifecycle and activity record.</p></div></div>
         <div className="table-scroll"><table className="ticket-table"><thead><tr><th>Action</th><th>Performed By</th><th>Description</th><th>Date</th></tr></thead><tbody>{ticket.history.map((item) => <tr key={item.id}><td><strong>{item.actionType}</strong></td><td>{item.performedByName}</td><td>{item.description ?? '—'}</td><td>{formatLocalDate(item.createdDate)}</td></tr>)}</tbody></table></div>
-      </section>
+        </section>
+      </details>
       {dialog && <>
         <button className="dialog-backdrop" type="button" aria-label="Close dialog" onClick={() => { if (!saving) setDialog(null) }} />
         <section className="dialog" role="dialog" aria-modal="true" aria-labelledby="agent-action-title" aria-describedby="agent-action-description">

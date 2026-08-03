@@ -11,6 +11,7 @@ public sealed class TicketHistory
     public string? Description { get; set; }
     public DateTime CreatedDate { get; set; }
     public bool IsInternal { get; set; }
+    public int? WorkDurationMinutes { get; set; }
 
     public Ticket Ticket { get; set; } = null!;
     public UserAccount PerformedByUserAccount { get; set; } = null!;

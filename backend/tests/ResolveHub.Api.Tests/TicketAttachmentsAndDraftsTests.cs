@@ -36,10 +36,15 @@ public sealed class TicketAttachmentsAndDraftsTests
             $"/api/tickets/{ticket.Id}/attachments/{attachment!.Id}/download");
         var forbidden = await otherClient.GetAsync(
             $"/api/tickets/{ticket.Id}/attachments/{attachment.Id}/download");
+        var activity = await ownerClient.GetFromJsonAsync<List<TicketActivityDto>>(
+            $"/api/tickets/{ticket.TicketReferenceNumber}/activity");
 
         Assert.Equal(HttpStatusCode.Created, upload.StatusCode);
         Assert.Equal(HttpStatusCode.OK, download.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, forbidden.StatusCode);
+        Assert.Contains(activity!, item =>
+            item.ActivityType == TicketHistoryActionNames.AttachmentUploaded &&
+            item.NewValue == "diagnostic.log");
     }
 
     [Theory]

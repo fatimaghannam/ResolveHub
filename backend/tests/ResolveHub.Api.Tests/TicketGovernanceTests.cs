@@ -215,6 +215,8 @@ public sealed class TicketGovernanceTests
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         Assert.True(await db.TicketHistory.AnyAsync(item => item.TicketID == duplicate.Id &&
             item.ActionType == TicketHistoryActionNames.DuplicateReviewApproved));
+        Assert.False(await db.TicketHistory.AnyAsync(item => item.TicketID == duplicate.Id &&
+            item.ActionType == TicketHistoryActionNames.DuplicateReviewRejected));
         Assert.True(await db.ActivityLogs.AnyAsync(item =>
             item.EntityID == duplicate.TicketReferenceNumber &&
             item.ActionType == TicketHistoryActionNames.DuplicateReviewApproved));

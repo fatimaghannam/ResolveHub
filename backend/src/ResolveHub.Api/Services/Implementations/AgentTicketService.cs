@@ -242,19 +242,46 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
         var actorName = await GetAgentNameAsync(agentId, token);
         var workStarted = oldStatus == TicketStatusNames.Assigned &&
             target.Name == TicketStatusNames.InProgress;
+        var workResumed = oldStatus == TicketStatusNames.Pending &&
+            target.Name == TicketStatusNames.InProgress;
+        var workPaused = oldStatus == TicketStatusNames.InProgress &&
+            target.Name == TicketStatusNames.Pending;
+        int? recordedMinutes = null;
+        if (workStarted || workResumed)
+        {
+            var hasOpenSession = await dbContext.TicketWorkSessions.AnyAsync(
+                item => item.TicketID == ticket.ID && item.EndedAt == null, token);
+            if (hasOpenSession)
+                return new(TicketOperationStatus.Conflict,
+                    Message: "Work is already active for this ticket.");
+            dbContext.TicketWorkSessions.Add(new TicketWorkSession
+            {
+                TicketID = ticket.ID,
+                ITAgentUserAccountID = agentId,
+                StartedAt = now,
+                CreatedDate = now
+            });
+        }
+        else if (workPaused)
+        {
+            recordedMinutes = await CloseOpenWorkSessionAsync(
+                ticket.ID, now, TicketStatusNames.Pending, token);
+        }
+        var workAction = workStarted ? TicketHistoryActionNames.TicketWorkStarted
+            : workResumed ? TicketHistoryActionNames.WorkResumed
+            : workPaused ? TicketHistoryActionNames.WorkPaused
+            : TicketHistoryActionNames.StatusChanged;
         AddHistory(ticket.ID, agentId,
-            workStarted
-                ? TicketHistoryActionNames.TicketWorkStarted
-                : TicketHistoryActionNames.StatusChanged,
+            workAction,
             oldStatus, target.Name,
             workStarted
                 ? $"Ticket work started by {actorName}."
                 : NullIfWhiteSpace(request.Reason),
             false, now);
+        if (recordedMinutes.HasValue)
+            dbContext.ChangeTracker.Entries<TicketHistory>().Last().Entity.WorkDurationMinutes = recordedMinutes;
         AddActivity(ticket, agentId,
-            workStarted
-                ? TicketHistoryActionNames.TicketWorkStarted
-                : TicketHistoryActionNames.StatusChanged,
+            workAction,
             oldStatus, target.Name,
             workStarted
                 ? $"Ticket work started by {actorName}."
@@ -297,9 +324,12 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
         ticket.ResolvedDate = now;
         ticket.UpdatedDate = now;
         var actorName = await GetAgentNameAsync(agentId, token);
+        var recordedMinutes = await CloseOpenWorkSessionAsync(
+            ticket.ID, now, TicketStatusNames.Resolved, token);
         AddHistory(ticket.ID, agentId, TicketHistoryActionNames.TicketResolved,
             oldStatus, TicketStatusNames.Resolved, $"Ticket resolved by {actorName}.",
             false, now);
+        dbContext.ChangeTracker.Entries<TicketHistory>().Last().Entity.WorkDurationMinutes = recordedMinutes;
         AddActivity(ticket, agentId, TicketHistoryActionNames.TicketResolved,
             oldStatus, TicketStatusNames.Resolved,
             $"Ticket resolved by {actorName}.", now);
@@ -594,6 +624,20 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
                 ? query.OrderByDescending(x => x.AssignedDate ?? x.CreatedDate).ThenByDescending(x => x.CreatedDate)
                 : query.OrderBy(x => x.AssignedDate ?? x.CreatedDate).ThenBy(x => x.CreatedDate)
         };
+    }
+
+    private async Task<int?> CloseOpenWorkSessionAsync(
+        int ticketId, DateTime endedAt, string reason, CancellationToken token)
+    {
+        var session = await dbContext.TicketWorkSessions.SingleOrDefaultAsync(
+            item => item.TicketID == ticketId && item.EndedAt == null, token);
+        if (session is null) return null;
+        var elapsed = endedAt - session.StartedAt;
+        var minutes = Math.Max(0, (int)Math.Floor(elapsed.TotalMinutes));
+        session.EndedAt = endedAt;
+        session.DurationMinutes = minutes;
+        session.EndedReason = reason;
+        return minutes;
     }
 
     private static IQueryable<AgentTicketListItemDto> ProjectList(IQueryable<Ticket> query) =>
