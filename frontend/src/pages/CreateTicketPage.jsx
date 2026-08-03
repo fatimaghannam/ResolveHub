@@ -15,7 +15,7 @@ function CreateTicketPage({ roleArea = 'employee' }) {
   const isManagement = roleArea === 'admin' || roleArea === 'manager'
 
   return (
-    <div className="create-ticket-page">
+    <div className="ticket-form-page">
       <section className="page-heading">
         <h2>Create Support Ticket</h2>
         <p>Provide clear details so the IT support team can understand and resolve the issue efficiently.</p>

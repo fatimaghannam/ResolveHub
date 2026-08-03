@@ -45,7 +45,7 @@ function EditTicketPage({ roleArea = 'employee' }) {
   if (!ticket.canEdit) return <div className="state-panel"><h2>Ticket is read-only</h2><p>This ticket can no longer be edited because work has already started.</p><button className="button button--secondary" onClick={() => navigate(ticketPath)}>Back to Ticket</button></div>
 
   return (
-    <>
+    <div className="ticket-form-page">
       <section className="page-heading"><h2>Edit {formatTicketReference(ticket)}</h2><p>Update the issue information while the ticket is still open and unassigned.</p></section>
       <TicketForm
         mode="edit"
@@ -82,7 +82,7 @@ function EditTicketPage({ roleArea = 'employee' }) {
           })
         }}
       />
-    </>
+    </div>
   )
 }
 
