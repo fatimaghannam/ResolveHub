@@ -3,11 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import Pagination from '../components/common/Pagination.jsx'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
 import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
-import {
-  getAgentTicketHistoryList,
-  getAssignedTickets,
-  getOpenTickets,
-} from '../services/agentTicketService.js'
+import { getAssignedTickets, getOpenTickets } from '../services/agentTicketService.js'
 import { getCategories, getPriorities, getStatuses } from '../services/ticketService.js'
 import { formatLocalDate } from '../utils/dateTime.js'
 import {
@@ -70,7 +66,6 @@ function getApiFilters(filters) {
 const viewContent = {
   assigned: ['Assigned Tickets', 'Review and manage the support requests assigned to you.', 'assigned'],
   open: ['Open Tickets', 'Review unassigned requests and ask a Manager for assignment.', 'open'],
-  history: ['Ticket History', 'Review tickets you previously completed.', 'completed'],
 }
 
 function AgentTicketsPage({ view = 'assigned' }) {
@@ -127,11 +122,7 @@ function AgentTicketsPage({ view = 'assigned' }) {
     const controller = new AbortController()
     setData(null)
     setError('')
-    const loadTickets = view === 'open'
-      ? getOpenTickets
-      : view === 'history'
-        ? getAgentTicketHistoryList
-        : getAssignedTickets
+    const loadTickets = view === 'open' ? getOpenTickets : getAssignedTickets
     loadTickets(getApiFilters(filters), controller.signal)
       .then((result) => {
         if (!controller.signal.aborted) setData(result)
