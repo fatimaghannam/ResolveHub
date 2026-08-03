@@ -131,7 +131,29 @@ public sealed record AgentTicketDetailsDto(
     bool CanRequestAssignment,
     string? AssignmentRequestStatus,
     string? OriginalTicketReference,
-    string? OriginalTicketTitle);
+    string? OriginalTicketTitle)
+{
+    public CurrentTicketPendingDto? CurrentPending { get; init; }
+}
+
+public sealed record CurrentTicketPendingDto(
+    int Id, string ReasonCode, string ReasonText, string? AdditionalNote,
+    int SetByUserAccountId, string SetByName, DateTime PendingSince);
+
+public sealed record AgentTicketWorkflowResultDto(
+    AgentTicketDetailsDto Ticket, TicketActivitySummaryDto ActivitySummary);
+
+public sealed class MarkTicketPendingRequestDto
+{
+    [Required, StringLength(50)]
+    public string ReasonCode { get; init; } = string.Empty;
+
+    [StringLength(300)]
+    public string? CustomReason { get; init; }
+
+    [StringLength(1000)]
+    public string? AdditionalNote { get; init; }
+}
 
 public sealed record TicketAssignmentRequestDto(
     int Id,

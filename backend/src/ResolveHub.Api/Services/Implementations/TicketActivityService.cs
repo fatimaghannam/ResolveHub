@@ -72,6 +72,12 @@ public sealed class TicketActivityService(ApplicationDbContext dbContext)
             .Select(item => new { item.ITAgentUserAccountID,
                 Name = item.ITAgentUserAccount.FirstName + " " + item.ITAgentUserAccount.LastName,
                 item.StartedAt, item.EndedAt, item.DurationMinutes }).ToListAsync(token);
+        var pendingPeriods = await dbContext.TicketPendingRecords.AsNoTracking()
+            .Where(item => item.TicketID == access.TicketId)
+            .Select(item => new
+            {
+                item.ReasonText, item.CreatedDate, item.ResumedDate
+            }).ToListAsync(token);
         var total = sessions.Sum(item => SessionMinutes(
             item.StartedAt, item.EndedAt, item.DurationMinutes, now));
         var history = dbContext.TicketHistory.AsNoTracking().Where(item => item.TicketID == access.TicketId);
@@ -98,7 +104,18 @@ public sealed class TicketActivityService(ApplicationDbContext dbContext)
             await publicComments.CountAsync(token), access.Level == ActivityAccess.Internal ? await privateComments.CountAsync(token) : null,
             await dbContext.TicketAttachments.CountAsync(x => x.TicketID == access.TicketId, token),
             await history.CountAsync(x => x.ActionType == TicketHistoryActionNames.TicketReopened, token),
-            breakdown, await history.CountAsync(x => access.Level == ActivityAccess.Internal || !x.IsInternal, token));
+            breakdown, await history.CountAsync(x => access.Level == ActivityAccess.Internal || !x.IsInternal, token),
+            pendingPeriods.Count,
+            sessions.Count,
+            pendingPeriods.Sum(item => Math.Max(0, (int)Math.Floor(
+                ((item.ResumedDate ?? now) - item.CreatedDate).TotalMinutes))),
+            pendingPeriods.Where(item => item.ResumedDate == null)
+                .Select(item => item.ReasonText).SingleOrDefault(),
+            pendingPeriods.Where(item => item.ResumedDate == null)
+                .Select(item => (DateTime?)AsUtc(item.CreatedDate)).SingleOrDefault(),
+            pendingPeriods.Where(item => item.ResumedDate != null)
+                .OrderByDescending(item => item.ResumedDate)
+                .Select(item => AsUtc(item.ResumedDate)).FirstOrDefault());
         return new(TicketOperationStatus.Success, summary);
     }
 

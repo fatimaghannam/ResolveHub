@@ -9,7 +9,9 @@ using ResolveHub.Api.Services.Models;
 
 namespace ResolveHub.Api.Services.Implementations;
 
-public sealed class AgentTicketService(ApplicationDbContext dbContext)
+public sealed class AgentTicketService(
+    ApplicationDbContext dbContext,
+    ITicketActivityService activityService)
     : IAgentTicketService
 {
     private static readonly string[] ActiveStatuses =
@@ -138,6 +140,15 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
                 .Where(ticket => ticket.TicketReferenceNumber == ticketReference), agentId)
             .SingleOrDefaultAsync(token);
         if (details is null) return null;
+        var currentPending = await dbContext.TicketPendingRecords.AsNoTracking()
+            .Where(item => item.TicketID == details.Id && item.ResumedDate == null)
+            .Select(item => new CurrentTicketPendingDto(
+                item.ID, item.ReasonCode, item.ReasonText, item.AdditionalNote,
+                item.CreatedByUserAccountID,
+                item.CreatedByUserAccount.FirstName + " " +
+                    item.CreatedByUserAccount.LastName,
+                item.CreatedDate))
+            .SingleOrDefaultAsync(token);
         var ownsAssignment = await dbContext.Tickets.AsNoTracking().AnyAsync(ticket =>
             ticket.ID == details.Id && ticket.AssignedToUserAccountID == agentId, token);
         var transitions = ownsAssignment
@@ -153,6 +164,7 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
             : null;
         return details with
         {
+            CurrentPending = currentPending,
             AllowedStatusTransitions = transitions,
             CanChangeStatus = transitions.Count > 0,
             CanComment = ownsAssignment && details.StatusName is not
@@ -233,6 +245,12 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
         if (!IsTransitionAllowed(ticket.TicketStatus.Name, target.Name))
             return new(TicketOperationStatus.Conflict,
                 Message: $"A ticket cannot move from {ticket.TicketStatus.Name} to {target.Name}.");
+        if ((ticket.TicketStatus.Name == TicketStatusNames.InProgress &&
+             target.Name == TicketStatusNames.Pending) ||
+            (ticket.TicketStatus.Name == TicketStatusNames.Pending &&
+             target.Name == TicketStatusNames.InProgress))
+            return new(TicketOperationStatus.Invalid,
+                Message: "Use the dedicated pause or resume work action for this transition.");
 
         var oldStatus = ticket.TicketStatus.Name;
         var now = DateTime.UtcNow;
@@ -292,6 +310,195 @@ public sealed class AgentTicketService(ApplicationDbContext dbContext)
         if (result is not null) return result;
         return new(TicketOperationStatus.Success,
             await GetTicketAsync(agentId, ticketReference, token));
+    }
+
+    public async Task<TicketServiceResult<AgentTicketWorkflowResultDto>> MarkPendingAsync(
+        int agentId, string ticketReference, MarkTicketPendingRequestDto request,
+        CancellationToken token)
+    {
+        var code = request.ReasonCode?.Trim();
+        var customReason = NullIfWhiteSpace(request.CustomReason);
+        var note = NullIfWhiteSpace(request.AdditionalNote);
+        if (!TicketPendingReasons.TryGetLabel(code, out var label))
+            return new(TicketOperationStatus.Invalid,
+                Message: "Select a valid pending reason.");
+        if (code == TicketPendingReasons.Other)
+        {
+            if (customReason is null)
+                return new(TicketOperationStatus.Invalid,
+                    Message: "Enter a reason when Other is selected.");
+            if (customReason.Length > 300)
+                return new(TicketOperationStatus.Invalid,
+                    Message: "The custom pending reason cannot exceed 300 characters.");
+            label = customReason;
+        }
+        if (note?.Length > 1000)
+            return new(TicketOperationStatus.Invalid,
+                Message: "The additional note cannot exceed 1000 characters.");
+
+        await using var transaction = dbContext.Database.IsRelational()
+            ? await dbContext.Database.BeginTransactionAsync(token)
+            : null;
+        try
+        {
+            var ticket = await dbContext.Tickets.Include(item => item.TicketStatus)
+                .SingleOrDefaultAsync(item =>
+                    item.TicketReferenceNumber == ticketReference && !item.IsDeleted, token);
+            if (ticket is null) return new(TicketOperationStatus.NotFound);
+            if (ticket.AssignedToUserAccountID != agentId)
+                return new(TicketOperationStatus.Forbidden,
+                    Message: "Only the assigned IT Support Agent may pause work.");
+            if (ticket.TicketStatus.Name == TicketStatusNames.Pending)
+                return new(TicketOperationStatus.Conflict,
+                    Message: "This ticket is already pending.");
+            if (ticket.TicketStatus.Name != TicketStatusNames.InProgress)
+                return new(TicketOperationStatus.Invalid,
+                    Message: "Only an In Progress ticket can be marked as Pending.");
+
+            var session = await dbContext.TicketWorkSessions.SingleOrDefaultAsync(
+                item => item.TicketID == ticket.ID && item.EndedAt == null, token);
+            if (session is null)
+                return new(TicketOperationStatus.Conflict,
+                    Message: "No active work session exists for this ticket.");
+            if (await dbContext.TicketPendingRecords.AnyAsync(
+                    item => item.TicketID == ticket.ID && item.ResumedDate == null, token))
+                return new(TicketOperationStatus.Conflict,
+                    Message: "An unresolved pending period already exists.");
+
+            var pendingStatusId = await dbContext.TicketStatuses
+                .Where(item => item.Name == TicketStatusNames.Pending && item.IsActive)
+                .Select(item => item.ID).SingleAsync(token);
+            var now = DateTime.UtcNow;
+            var duration = Math.Max(0,
+                (int)Math.Floor((now - session.StartedAt).TotalMinutes));
+            session.EndedAt = now;
+            session.DurationMinutes = duration;
+            session.EndedReason = TicketStatusNames.Pending;
+            var sessionNumber = await dbContext.TicketWorkSessions.CountAsync(
+                item => item.TicketID == ticket.ID, token);
+            dbContext.TicketPendingRecords.Add(new TicketPendingRecord
+            {
+                TicketID = ticket.ID,
+                WorkSessionID = session.ID,
+                ReasonCode = code!,
+                ReasonText = label,
+                AdditionalNote = note,
+                CreatedByUserAccountID = agentId,
+                CreatedDate = now
+            });
+            ticket.TicketStatusID = pendingStatusId;
+            ticket.UpdatedDate = now;
+            var description = $"Ticket moved to Pending. Reason: {label}. " +
+                $"Session #{sessionNumber} paused after {duration} minute(s)." +
+                (note is null ? string.Empty : $" Note: {note}");
+            AddHistory(ticket.ID, agentId, TicketHistoryActionNames.WorkPaused,
+                TicketStatusNames.InProgress, TicketStatusNames.Pending,
+                description, false, now);
+            dbContext.ChangeTracker.Entries<TicketHistory>().Last()
+                .Entity.WorkDurationMinutes = duration;
+            AddActivity(ticket, agentId, TicketHistoryActionNames.WorkPaused,
+                TicketStatusNames.InProgress, TicketStatusNames.Pending,
+                description, now);
+            await dbContext.SaveChangesAsync(token);
+            if (transaction is not null) await transaction.CommitAsync(token);
+            var details = await GetTicketAsync(agentId, ticketReference, token);
+            var summary = await activityService.GetSummaryAsync(
+                agentId, ticketReference, token);
+            return new(TicketOperationStatus.Success,
+                new(details!, summary.Value!));
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            if (transaction is not null) await transaction.RollbackAsync(token);
+            return new(TicketOperationStatus.Conflict,
+                Message: "The ticket changed while work was being paused. Reload and try again.");
+        }
+        catch (DbUpdateException)
+        {
+            if (transaction is not null) await transaction.RollbackAsync(token);
+            return new(TicketOperationStatus.Conflict,
+                Message: "The pending action conflicts with another ticket update.");
+        }
+    }
+
+    public async Task<TicketServiceResult<AgentTicketWorkflowResultDto>> ResumeWorkAsync(
+        int agentId, string ticketReference, CancellationToken token)
+    {
+        await using var transaction = dbContext.Database.IsRelational()
+            ? await dbContext.Database.BeginTransactionAsync(token)
+            : null;
+        try
+        {
+            var ticket = await dbContext.Tickets.Include(item => item.TicketStatus)
+                .SingleOrDefaultAsync(item =>
+                    item.TicketReferenceNumber == ticketReference && !item.IsDeleted, token);
+            if (ticket is null) return new(TicketOperationStatus.NotFound);
+            if (ticket.AssignedToUserAccountID != agentId)
+                return new(TicketOperationStatus.Forbidden,
+                    Message: "Only the assigned IT Support Agent may resume work.");
+            if (ticket.TicketStatus.Name == TicketStatusNames.InProgress)
+                return new(TicketOperationStatus.Conflict,
+                    Message: "Work is already active for this ticket.");
+            if (ticket.TicketStatus.Name != TicketStatusNames.Pending)
+                return new(TicketOperationStatus.Invalid,
+                    Message: "Only a Pending ticket can resume work.");
+            if (await dbContext.TicketWorkSessions.AnyAsync(
+                    item => item.TicketID == ticket.ID && item.EndedAt == null, token))
+                return new(TicketOperationStatus.Conflict,
+                    Message: "An active work session already exists.");
+            var pending = await dbContext.TicketPendingRecords
+                .Where(item => item.TicketID == ticket.ID && item.ResumedDate == null)
+                .OrderByDescending(item => item.CreatedDate)
+                .SingleOrDefaultAsync(token);
+            if (pending is null)
+                return new(TicketOperationStatus.Conflict,
+                    Message: "No unresolved pending period exists for this ticket.");
+
+            var inProgressStatusId = await dbContext.TicketStatuses
+                .Where(item => item.Name == TicketStatusNames.InProgress && item.IsActive)
+                .Select(item => item.ID).SingleAsync(token);
+            var now = DateTime.UtcNow;
+            pending.ResumedDate = now;
+            pending.ResumedByUserAccountID = agentId;
+            var sessionNumber = await dbContext.TicketWorkSessions.CountAsync(
+                item => item.TicketID == ticket.ID, token) + 1;
+            dbContext.TicketWorkSessions.Add(new TicketWorkSession
+            {
+                TicketID = ticket.ID,
+                ITAgentUserAccountID = agentId,
+                StartedAt = now,
+                CreatedDate = now
+            });
+            ticket.TicketStatusID = inProgressStatusId;
+            ticket.UpdatedDate = now;
+            var actorName = await GetAgentNameAsync(agentId, token);
+            var description = $"Work resumed by {actorName}. Session #{sessionNumber} started.";
+            AddHistory(ticket.ID, agentId, TicketHistoryActionNames.WorkResumed,
+                TicketStatusNames.Pending, TicketStatusNames.InProgress,
+                description, false, now);
+            AddActivity(ticket, agentId, TicketHistoryActionNames.WorkResumed,
+                TicketStatusNames.Pending, TicketStatusNames.InProgress,
+                description, now);
+            await dbContext.SaveChangesAsync(token);
+            if (transaction is not null) await transaction.CommitAsync(token);
+            var details = await GetTicketAsync(agentId, ticketReference, token);
+            var summary = await activityService.GetSummaryAsync(
+                agentId, ticketReference, token);
+            return new(TicketOperationStatus.Success,
+                new(details!, summary.Value!));
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            if (transaction is not null) await transaction.RollbackAsync(token);
+            return new(TicketOperationStatus.Conflict,
+                Message: "The ticket changed while work was being resumed. Reload and try again.");
+        }
+        catch (DbUpdateException)
+        {
+            if (transaction is not null) await transaction.RollbackAsync(token);
+            return new(TicketOperationStatus.Conflict,
+                Message: "The resume action conflicts with another ticket update.");
+        }
     }
 
     public async Task<TicketServiceResult<AgentTicketDetailsDto>> ResolveAsync(

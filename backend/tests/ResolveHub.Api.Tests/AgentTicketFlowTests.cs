@@ -426,6 +426,72 @@ public sealed class AgentTicketFlowTests
             Assert.Matches(@"^RH-\d{4}-\d{4,}$", ticket.TicketReferenceNumber));
     }
 
+    [Fact]
+    public async Task AssignedAgent_PausesResumesAndResolves_WithDistinctWorkSessions()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        await factory.SeedTicketLookupsAsync();
+        var employee = await factory.CreateUserAsync(
+            "pending-owner@test.local", Password);
+        var agent = await factory.CreateUserAsync(
+            "pending-agent@test.local", Password, RoleNames.ITSupportAgent);
+        using var employeeClient = await LoginAsync(factory, employee.Email!);
+        using var agentClient = await LoginAsync(factory, agent.Email!);
+        var ticket = await CreateTicketAsync(factory, employeeClient,
+            "Pending work-session lifecycle");
+        await factory.SetTicketStateAsync(
+            ticket.Id, TicketStatusNames.Assigned, agent.Id);
+
+        var start = await agentClient.PatchAsJsonAsync(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/status",
+            new { statusId = await LookupIdAsync(
+                factory, "status", TicketStatusNames.InProgress) });
+        start.EnsureSuccessStatusCode();
+
+        var pause = await agentClient.PostAsJsonAsync(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/pending",
+            new
+            {
+                reasonCode = TicketPendingReasons.EmployeeResponse,
+                additionalNote = "Requested confirmation from the employee."
+            });
+        var paused = await pause.Content
+            .ReadFromJsonAsync<AgentTicketWorkflowResultDto>();
+        var resolveWhilePending = await agentClient.PostAsJsonAsync(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/resolve",
+            new { resolutionSummary = "This must not resolve while pending." });
+        var resume = await agentClient.PostAsync(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/resume-work", null);
+        var resumed = await resume.Content
+            .ReadFromJsonAsync<AgentTicketWorkflowResultDto>();
+        var resolve = await agentClient.PostAsJsonAsync(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/resolve",
+            new { resolutionSummary = "Employee confirmed the solution after work resumed." });
+        var summary = await agentClient.GetFromJsonAsync<TicketActivitySummaryDto>(
+            $"/api/tickets/{ticket.TicketReferenceNumber}/activity-summary");
+        var timeline = await agentClient.GetFromJsonAsync<List<TicketActivityDto>>(
+            $"/api/tickets/{ticket.TicketReferenceNumber}/activity?descending=false");
+
+        Assert.Equal(HttpStatusCode.OK, pause.StatusCode);
+        Assert.Equal(TicketStatusNames.Pending, paused!.Ticket.StatusName);
+        Assert.NotNull(paused.Ticket.CurrentPending);
+        Assert.False(paused.ActivitySummary.IsWorkSessionActive);
+        Assert.Equal(HttpStatusCode.Conflict, resolveWhilePending.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, resume.StatusCode);
+        Assert.Equal(TicketStatusNames.InProgress, resumed!.Ticket.StatusName);
+        Assert.Null(resumed.Ticket.CurrentPending);
+        Assert.True(resumed.ActivitySummary.IsWorkSessionActive);
+        Assert.Equal(HttpStatusCode.OK, resolve.StatusCode);
+        Assert.Equal(2, summary!.TotalWorkSessions);
+        Assert.Equal(1, summary.PendingPeriodCount);
+        Assert.False(summary.IsWorkSessionActive);
+        Assert.True(summary.TotalWorkMinutes >= 0);
+        Assert.Single(timeline!, item =>
+            item.ActivityType == TicketHistoryActionNames.WorkPaused);
+        Assert.Single(timeline!, item =>
+            item.ActivityType == TicketHistoryActionNames.WorkResumed);
+    }
+
     private static async Task<HttpClient> LoginAsync(
         ResolveHubApiFactory factory, string email)
     {

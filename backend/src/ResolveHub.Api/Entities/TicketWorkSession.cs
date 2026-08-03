@@ -13,4 +13,5 @@ public sealed class TicketWorkSession
 
     public Ticket Ticket { get; set; } = null!;
     public UserAccount ITAgentUserAccount { get; set; } = null!;
+    public ICollection<TicketPendingRecord> PendingRecords { get; set; } = [];
 }

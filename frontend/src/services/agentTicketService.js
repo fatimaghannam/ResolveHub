@@ -32,6 +32,17 @@ export const resolveAgentTicket = (ticketReference, request) =>
     body: JSON.stringify(request),
   })
 
+export const markAgentTicketPending = (ticketReference, request) =>
+  apiRequest(`/api/agent/tickets/${encodeURIComponent(ticketReference)}/pending`, {
+    method: 'POST',
+    body: JSON.stringify(request),
+  })
+
+export const resumeAgentTicketWork = (ticketReference) =>
+  apiRequest(`/api/agent/tickets/${encodeURIComponent(ticketReference)}/resume-work`, {
+    method: 'POST',
+  })
+
 export const closeAgentTicket = (ticketReference, request = {}) =>
   apiRequest(`/api/agent/tickets/${encodeURIComponent(ticketReference)}/close`, {
     method: 'POST',

@@ -72,6 +72,17 @@ public sealed class AgentTicketsController(
         CancellationToken token) =>
         Result(await service.ResolveAsync(GetUserId(), ticketReference, request, token));
 
+    [HttpPost("{ticketReference}/pending")]
+    public async Task<ActionResult<AgentTicketWorkflowResultDto>> MarkPending(
+        string ticketReference, MarkTicketPendingRequestDto request,
+        CancellationToken token) => WorkflowResult(await service.MarkPendingAsync(
+            GetUserId(), ticketReference, request, token));
+
+    [HttpPost("{ticketReference}/resume-work")]
+    public async Task<ActionResult<AgentTicketWorkflowResultDto>> ResumeWork(
+        string ticketReference, CancellationToken token) => WorkflowResult(
+            await service.ResumeWorkAsync(GetUserId(), ticketReference, token));
+
     [HttpPost("{ticketReference}/close")]
     public async Task<ActionResult<AgentTicketDetailsDto>> Close(
         string ticketReference, CloseTicketRequestDto request,
@@ -173,6 +184,17 @@ public sealed class AgentTicketsController(
 
     private ActionResult<AgentTicketDetailsDto> Result(
         TicketServiceResult<AgentTicketDetailsDto> result) =>
+        result.Status switch
+        {
+            TicketOperationStatus.Success => Ok(result.Value),
+            TicketOperationStatus.NotFound => NotFound(),
+            TicketOperationStatus.Forbidden => StatusCode(403, new { message = result.Message }),
+            TicketOperationStatus.Conflict => Conflict(new { message = result.Message }),
+            _ => BadRequest(new { message = result.Message })
+        };
+
+    private ActionResult<AgentTicketWorkflowResultDto> WorkflowResult(
+        TicketServiceResult<AgentTicketWorkflowResultDto> result) =>
         result.Status switch
         {
             TicketOperationStatus.Success => Ok(result.Value),

@@ -21,4 +21,10 @@ public sealed record TicketActivitySummaryDto(
     int AssignmentCount, int StatusChangeCount, int PublicCommentCount,
     int? PrivateCommentCount, int AttachmentCount, int ReopenCount,
     IReadOnlyCollection<AgentWorkTimeDto> WorkTimeByAgent,
-    int TotalActivities);
+    int TotalActivities,
+    int PendingPeriodCount,
+    int TotalWorkSessions,
+    int TotalPendingMinutes,
+    string? CurrentPendingReason,
+    DateTime? CurrentPendingSince,
+    DateTime? LatestWorkResumedAt);

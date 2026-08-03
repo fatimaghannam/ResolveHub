@@ -45,6 +45,7 @@ public sealed class ApplicationDbContext
     public DbSet<TicketCommentAttachment> TicketCommentAttachments => Set<TicketCommentAttachment>();
     public DbSet<TicketHistory> TicketHistory => Set<TicketHistory>();
     public DbSet<TicketWorkSession> TicketWorkSessions => Set<TicketWorkSession>();
+    public DbSet<TicketPendingRecord> TicketPendingRecords => Set<TicketPendingRecord>();
     public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
     public DbSet<TicketAssignmentRequest> TicketAssignmentRequests =>
         Set<TicketAssignmentRequest>();
@@ -69,6 +70,7 @@ public sealed class ApplicationDbContext
         ConfigureTicketCommentAttachment(builder);
         ConfigureTicketHistory(builder);
         ConfigureTicketWorkSession(builder);
+        ConfigureTicketPendingRecord(builder);
         ConfigureActivityLog(builder);
         ConfigureTicketAssignmentRequest(builder);
         ConfigureDuplicateReview(builder);
@@ -410,6 +412,34 @@ public sealed class ApplicationDbContext
                 .HasForeignKey(item => item.TicketID).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(item => item.ITAgentUserAccount).WithMany(user => user.TicketWorkSessions)
                 .HasForeignKey(item => item.ITAgentUserAccountID).OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureTicketPendingRecord(ModelBuilder builder)
+    {
+        builder.Entity<TicketPendingRecord>(entity =>
+        {
+            entity.ToTable("TicketPendingRecord");
+            entity.HasKey(item => item.ID);
+            entity.Property(item => item.ID).UseIdentityColumn();
+            entity.Property(item => item.ReasonCode).HasMaxLength(50).IsRequired();
+            entity.Property(item => item.ReasonText).HasMaxLength(300).IsRequired();
+            entity.Property(item => item.AdditionalNote).HasMaxLength(1000);
+            entity.Property(item => item.CreatedDate)
+                .HasConversion(UtcDateTimeConverter).HasColumnType("datetime2");
+            entity.Property(item => item.ResumedDate)
+                .HasConversion(NullableUtcDateTimeConverter).HasColumnType("datetime2");
+            entity.HasIndex(item => new { item.TicketID, item.CreatedDate });
+            entity.HasIndex(item => item.TicketID)
+                .HasFilter("[ResumedDate] IS NULL").IsUnique();
+            entity.HasOne(item => item.Ticket).WithMany(ticket => ticket.PendingRecords)
+                .HasForeignKey(item => item.TicketID).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.WorkSession).WithMany(session => session.PendingRecords)
+                .HasForeignKey(item => item.WorkSessionID).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.CreatedByUserAccount).WithMany()
+                .HasForeignKey(item => item.CreatedByUserAccountID).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.ResumedByUserAccount).WithMany()
+                .HasForeignKey(item => item.ResumedByUserAccountID).OnDelete(DeleteBehavior.Restrict);
         });
     }
 

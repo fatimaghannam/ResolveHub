@@ -18,6 +18,11 @@ public interface IAgentTicketService
     Task<TicketServiceResult<AgentTicketDetailsDto>> UpdateStatusAsync(
         int agentId, string ticketReference,
         UpdateAgentTicketStatusRequestDto request, CancellationToken token);
+    Task<TicketServiceResult<AgentTicketWorkflowResultDto>> MarkPendingAsync(
+        int agentId, string ticketReference,
+        MarkTicketPendingRequestDto request, CancellationToken token);
+    Task<TicketServiceResult<AgentTicketWorkflowResultDto>> ResumeWorkAsync(
+        int agentId, string ticketReference, CancellationToken token);
     Task<TicketServiceResult<AgentTicketDetailsDto>> ResolveAsync(
         int agentId, string ticketReference,
         ResolveTicketRequestDto request, CancellationToken token);
