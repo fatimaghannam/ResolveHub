@@ -123,8 +123,12 @@ public sealed class TicketActivityService(ApplicationDbContext dbContext)
         int userId, string ticketReference, CancellationToken token)
     {
         var normalizedReference = ticketReference.Trim();
-        var role = await dbContext.Users.Where(x => x.Id == userId)
-            .SelectMany(x => x.UserAccountRoles).Select(x => x.Role.Name).FirstOrDefaultAsync(token);
+        var roles = await dbContext.Users.Where(x => x.Id == userId)
+            .SelectMany(x => x.UserAccountRoles).Select(x => x.Role.Name!)
+            .ToListAsync(token);
+        var isAdministrator = roles.Contains(RoleNames.Admin);
+        var isManager = roles.Contains(RoleNames.Manager);
+        var isAgent = roles.Contains(RoleNames.ITSupportAgent);
         var ticket = await dbContext.Tickets.AsNoTracking()
             .Where(item => item.TicketReferenceNumber == normalizedReference)
             .Select(item => new { item.ID, item.CreatedByUserAccountID, item.AssignedToUserAccountID,
@@ -132,17 +136,17 @@ public sealed class TicketActivityService(ApplicationDbContext dbContext)
                 CreatorDepartmentId = item.CreatedByUserAccount.DepartmentID })
             .SingleOrDefaultAsync(token);
         if (ticket is null) return new(ActivityAccess.NotFound, 0);
-        var userDepartmentId = role == RoleNames.Manager
+        var userDepartmentId = isManager
             ? await dbContext.Users.Where(item => item.Id == userId)
                 .Select(item => item.DepartmentID).SingleAsync(token)
             : null;
         var visible = ticket.CreatedByUserAccountID == userId ||
-            ticket.AssignedToUserAccountID == userId || role == RoleNames.Admin ||
-            (role == RoleNames.ITSupportAgent && !ticket.IsDeleted &&
+            ticket.AssignedToUserAccountID == userId || isAdministrator ||
+            (isAgent && !ticket.IsDeleted &&
                 ticket.AssignedToUserAccountID == null && ticket.Status == TicketStatusNames.Open) ||
-            (role == RoleNames.Manager && ticket.CreatorDepartmentId == userDepartmentId);
+            (isManager && ticket.CreatorDepartmentId == userDepartmentId);
         if (!visible) return new(ActivityAccess.Forbidden, ticket.ID);
-        return new(role is RoleNames.Admin or RoleNames.Manager or RoleNames.ITSupportAgent
+        return new(isAdministrator || isManager || isAgent
             ? ActivityAccess.Internal : ActivityAccess.Public, ticket.ID);
     }
 

@@ -1,9 +1,12 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.DependencyInjection;
 using ResolveHub.Api.Constants;
 using ResolveHub.Api.DTOs.Auth;
 using ResolveHub.Api.DTOs.Tickets;
+using ResolveHub.Api.Entities;
 using Xunit;
 
 namespace ResolveHub.Api.Tests;
@@ -74,6 +77,60 @@ public sealed class TicketActivityEndpointTests
             (await otherClient.GetAsync($"/api/tickets/{ticket.TicketReferenceNumber}/activity")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound,
             (await ownerClient.GetAsync("/api/tickets/RH-2099-9999/activity")).StatusCode);
+    }
+
+    [Fact]
+    public async Task MultiRoleAdministrator_CanReadCompleteActivityForEveryTicket()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        await factory.SeedTicketLookupsAsync();
+        var owner = await factory.CreateUserAsync("activity-admin-owner@test.local", Password);
+        var administrator = await factory.CreateUserAsync(
+            "activity-multirole-admin@test.local", Password, RoleNames.Employee);
+        var agent = await factory.CreateUserAsync(
+            "activity-admin-agent@test.local", Password, RoleNames.ITSupportAgent);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<UserAccount>>();
+            var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<Role>>();
+            if (!await roleManager.RoleExistsAsync(RoleNames.Admin))
+                Assert.True((await roleManager.CreateAsync(new Role
+                    { Name = RoleNames.Admin, IsActive = true, IsSystemRole = true })).Succeeded);
+            var trackedAdministrator = await userManager.FindByIdAsync(
+                administrator.Id.ToString());
+            Assert.NotNull(trackedAdministrator);
+            Assert.True((await userManager.AddToRoleAsync(
+                trackedAdministrator!, RoleNames.Admin)).Succeeded);
+        }
+        using var ownerClient = await LoginAsync(factory, owner.Email!);
+        using var adminClient = await LoginAsync(factory, administrator.Email!);
+        using var agentClient = await LoginAsync(factory, agent.Email!);
+        var lookups = await factory.GetTicketLookupIdsAsync();
+        var create = await ownerClient.PostAsJsonAsync("/api/tickets", new
+        {
+            title = "Administrator activity visibility ticket",
+            description = "A ticket used to verify complete read-only Administrator activity access.",
+            ticketCategoryId = lookups.CategoryId,
+            ticketPriorityId = lookups.PriorityId
+        });
+        create.EnsureSuccessStatusCode();
+        var ticket = (await create.Content.ReadFromJsonAsync<TicketDetailsDto>())!;
+
+        var adminTimelineResponse = await adminClient.GetAsync(
+            $"/api/tickets/{ticket.TicketReferenceNumber}/activity");
+        var adminSummaryResponse = await adminClient.GetAsync(
+            $"/api/tickets/{ticket.TicketReferenceNumber}/activity-summary");
+        var agentTimelineResponse = await agentClient.GetAsync(
+            $"/api/tickets/{ticket.TicketReferenceNumber}/activity");
+
+        Assert.Equal(HttpStatusCode.OK, adminTimelineResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, adminSummaryResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, agentTimelineResponse.StatusCode);
+        var adminTimeline = (await adminTimelineResponse.Content
+            .ReadFromJsonAsync<IReadOnlyCollection<TicketActivityDto>>())!;
+        var agentTimeline = (await agentTimelineResponse.Content
+            .ReadFromJsonAsync<IReadOnlyCollection<TicketActivityDto>>())!;
+        Assert.Equal(agentTimeline.Select(item => item.Id), adminTimeline.Select(item => item.Id));
     }
 
     private static async Task<HttpClient> LoginAsync(
