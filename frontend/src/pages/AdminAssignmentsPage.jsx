@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { ClipboardCheck, Inbox } from 'lucide-react'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
 import Toast from '../components/common/Toast.jsx'
 import { TicketPriorityBadge } from '../components/tickets/TicketBadges.jsx'
@@ -33,11 +34,18 @@ const initialWorkloadFilters = {
   workload: '',
   sortBy: 'name-asc',
 }
+
+function AssignmentEmptyState({ type = 'requests', title, message }) {
+  const Icon = type === 'tickets' ? Inbox : ClipboardCheck
+  return <div className="assignment-empty-state"><span className="assignment-empty-state__icon" aria-hidden="true"><Icon size={24} /></span><h3>{title}</h3><p>{message}</p></div>
+}
 const emptyAgentWorkloads = []
+const emptyUnassignedTickets = []
 
 function AdminAssignmentsPage({ roleArea = 'admin' }) {
   const [searchParams] = useSearchParams()
   const selectedReference = searchParams.get('ticket')
+  const unassignedSectionRef = useRef(null)
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [reload, setReload] = useState(0)
@@ -180,14 +188,17 @@ function AdminAssignmentsPage({ roleArea = 'admin' }) {
     try {
       setAssigning(ticket.ticketReferenceNumber)
       const assign = roleArea === 'manager' ? assignManagerTicket : assignAdminTicket
-      await assign(ticket.ticketReferenceNumber, agentUserId)
+      const createdRequest = await assign(ticket.ticketReferenceNumber, agentUserId)
+      if (roleArea === 'manager' && createdRequest) {
+        setAssignmentRequests((current) => [createdRequest, ...current.filter((request) => request.id !== createdRequest.id)])
+      }
       setReload((value) => value + 1)
       setToast({
         id: Date.now(),
         type: 'success',
         title: roleArea === 'manager' ? 'Assignment Requested' : 'Ticket Assigned',
         message: roleArea === 'manager'
-          ? 'Assignment request submitted for administrator approval.'
+          ? 'Assignment request submitted for Administrator approval.'
           : `${ticket.ticketReferenceNumber} assigned to ${agent.name}.`,
       })
     } catch (requestError) {
@@ -202,7 +213,7 @@ function AdminAssignmentsPage({ roleArea = 'admin' }) {
     }
   }
 
-  const unassignedTickets = data?.unassignedTickets ?? []
+  const unassignedTickets = data?.unassignedTickets ?? emptyUnassignedTickets
   const agentWorkloads = data?.agentWorkloads ?? emptyAgentWorkloads
   const selectedAgent = (ticketReferenceNumber) => {
     const userId = Number(selections[ticketReferenceNumber])
@@ -211,6 +222,17 @@ function AdminAssignmentsPage({ roleArea = 'admin' }) {
   const pendingByTicket = useMemo(() => new Map(assignmentRequests
     .filter((request) => request.status === 'Pending')
     .map((request) => [request.ticketReferenceNumber, request])), [assignmentRequests])
+  const visibleAssignmentRequests = useMemo(() => roleArea === 'manager'
+    ? assignmentRequests.filter((request) => request.status === 'Pending')
+    : assignmentRequests, [assignmentRequests, roleArea])
+  const availableUnassignedTickets = useMemo(() => unassignedTickets
+    .filter((ticket) => !pendingByTicket.has(ticket.ticketReferenceNumber)),
+  [pendingByTicket, unassignedTickets])
+  useEffect(() => {
+    if (!selectedReference || !availableUnassignedTickets.some((ticket) =>
+      ticket.ticketReferenceNumber === selectedReference)) return
+    unassignedSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [availableUnassignedTickets, selectedReference])
   const filteredAgentWorkloads = useMemo(() => {
     if (roleArea !== 'admin') return agentWorkloads
     const search = workloadFilters.search.trim().toLowerCase()
@@ -271,17 +293,35 @@ function AdminAssignmentsPage({ roleArea = 'admin' }) {
       {error && <ErrorState message={error} onRetry={() => setReload((value) => value + 1)} />}
       {!error && !data && <LoadingState message="Loading ticket assignments…" />}
       {data && <>
-      <section className="panel dashboard-section">
-        <div className="panel__heading"><div><h2>{roleArea === 'manager' ? 'My Assignment Requests' : 'Assignment Approvals'}</h2><p>{roleArea === 'manager' ? 'Track requests submitted for Administrator approval.' : 'Approve or reject assignment requests submitted by Managers.'}</p></div></div>
+      <section className="panel dashboard-section assignment-management-section">
+        <div className="panel__heading assignment-section-heading"><div><h2>{roleArea === 'manager' ? 'My Assignment Requests' : 'Assignment Approvals'}</h2><p>{roleArea === 'manager' ? 'Track requests submitted for Administrator approval.' : 'Approve or reject assignment requests submitted by Managers.'}</p></div><span className="assignment-section-count">{visibleAssignmentRequests.length} {visibleAssignmentRequests.length === 1 ? 'request' : 'requests'}</span></div>
         {assignmentRequestError
           ? <div className="inline-alert inline-alert--error" role="alert"><strong>Assignment requests could not be loaded.</strong><span>{assignmentRequestError}</span><button className="table-action" type="button" onClick={() => setReload((value) => value + 1)}>Try again</button></div>
-          : assignmentRequests.length === 0
-          ? <EmptyState title="No assignment requests" message={roleArea === 'manager' ? 'You have not submitted any assignment requests.' : 'There are currently no requests awaiting Administrator approval.'} />
-          : <div className="table-scroll"><table className="ticket-table"><thead><tr><th>Ticket</th><th>Title</th><th>Requested Agent</th>{roleArea === 'admin' && <><th>Workload</th><th>Requested By</th></>}<th>Requested</th><th>Status</th><th>Action</th></tr></thead><tbody>{assignmentRequests.map((request) => <tr key={request.id}><td><strong>{request.ticketReferenceNumber}</strong></td><td>{request.ticketTitle}</td><td>{request.requestedAgentName || 'Unavailable'}</td>{roleArea === 'admin' && <><td>{request.requestedAgentActiveTicketCount}/{request.requestedAgentMaxActiveTickets}</td><td>{request.requestedByName}</td></>}<td>{formatLocalDate(request.requestedDate)}</td><td><span className={`badge assignment-request-status assignment-request-status--${request.status.toLowerCase()}`}>{request.status}</span></td><td><div className="table-actions">{roleArea === 'admin' && request.status === 'Pending' && <><button className="table-action" type="button" disabled={Boolean(reviewingRequest)} onClick={() => reviewRequest(request, 'approve')}>Approve</button><button className="table-action table-action--danger" type="button" disabled={Boolean(reviewingRequest)} onClick={() => setRejectingRequest(request)}>Reject</button></>}<Link className="table-action" to={`/${roleArea}/tickets/${request.ticketReferenceNumber}`}>View Ticket</Link></div></td></tr>)}</tbody></table></div>}
+          : visibleAssignmentRequests.length === 0
+          ? <AssignmentEmptyState title="No assignment requests" message={roleArea === 'manager' ? 'Requests you submit for Administrator approval will appear here.' : 'There are currently no requests awaiting Administrator approval.'} />
+          : <div className="table-scroll assignment-requests-table-wrap"><table className={`ticket-table assignment-requests-table ${roleArea === 'admin' ? 'assignment-approvals-table' : ''}`}>
+            <colgroup><col className="request-col--ticket" /><col className="request-col--agent" />{roleArea === 'admin' && <><col className="request-col--workload" /><col className="request-col--requester" /></>}<col className="request-col--date" />{roleArea === 'manager' && <col className="request-col--status" />}<col className="request-col--action" /></colgroup>
+            <thead><tr><th>Ticket</th><th>Requested Agent</th>{roleArea === 'admin' && <><th>Workload</th><th>Requested By</th></>}<th>Requested Date</th>{roleArea === 'manager' && <th>Status</th>}<th>Actions</th></tr></thead>
+            <tbody>{visibleAssignmentRequests.map((request) => {
+              const approving = reviewingRequest === `${request.id}-approve`
+              const rejecting = reviewingRequest === `${request.id}-reject`
+              const rowBusy = approving || rejecting
+              return <tr key={request.id}>
+              <td><span className="assignment-ticket-identity"><strong>{request.ticketTitle}</strong><small>{request.ticketReferenceNumber}</small></span></td>
+              <td><span className="assignment-agent-name">{request.requestedAgentName || 'Unavailable'}</span></td>
+              {roleArea === 'admin' && <><td className="assignment-workload">{request.requestedAgentActiveTicketCount}/{request.requestedAgentMaxActiveTickets}</td><td>{request.requestedByName}</td></>}
+              <td className="assignment-date">{formatLocalDate(request.requestedDate)}</td>
+              {roleArea === 'manager' && <td><span className={`badge assignment-request-status assignment-request-status--${request.status.toLowerCase()}`}>{request.status === 'Pending' ? 'Pending Approval' : request.status}</span></td>}
+              <td><div className="table-actions assignment-request-actions">{roleArea === 'admin' && request.status === 'Pending' && <><button className="button button--primary button--compact assignment-approval-action" type="button" disabled={Boolean(reviewingRequest)} onClick={() => reviewRequest(request, 'approve')}>{approving ? 'Approving…' : 'Approve'}</button><button className="button button--danger-outline button--compact assignment-approval-action" type="button" disabled={Boolean(reviewingRequest)} onClick={() => setRejectingRequest(request)}>{rejecting ? 'Rejecting…' : 'Reject'}</button></>}<Link className={`${roleArea === 'admin' ? 'table-action assignment-approval-view-link' : 'button button--secondary button--compact assignment-approval-action'}${rowBusy ? ' assignment-action--disabled' : ''}`} to={`/${roleArea}/tickets/${request.ticketReferenceNumber}`} aria-disabled={rowBusy || undefined} tabIndex={rowBusy ? -1 : undefined} onClick={(event) => { if (rowBusy) event.preventDefault() }}>View Ticket</Link></div></td>
+            </tr>
+            })}</tbody>
+          </table></div>}
       </section>
-      <section className="panel dashboard-section">
-        <div className="panel__heading"><div><h2>Unassigned Tickets</h2></div></div>
-        {unassignedTickets.length === 0 ? <EmptyState title="No unassigned tickets" message="All current tickets have an assigned agent." /> : <div className="table-scroll assignment-table-wrap"><table className="ticket-table admin-assignment-table admin-assignments-page-table">
+      <section className="panel dashboard-section assignment-management-section" ref={unassignedSectionRef}>
+        <div className="panel__heading assignment-table-heading"><h2>Unassigned Tickets</h2></div>
+        {availableUnassignedTickets.length === 0
+          ? <AssignmentEmptyState type="tickets" title="No unassigned tickets" message="All current tickets have an assigned agent." />
+          : <div className="table-scroll assignment-table-wrap"><table className="ticket-table admin-assignment-table admin-assignments-page-table">
           <colgroup>
             <col className="assignments-col--number" />
             <col className="assignments-col--title" />
@@ -292,14 +332,14 @@ function AdminAssignmentsPage({ roleArea = 'admin' }) {
             <col className="assignments-col--action" />
           </colgroup>
           <thead><tr><th>Ticket Number</th><th>Title</th><th>Requester</th><th>Priority</th><th>Created</th><th>Assign To</th><th>Action</th></tr></thead>
-          <tbody>{unassignedTickets.map((ticket) => <tr className={selectedReference === ticket.ticketReferenceNumber ? 'table-row--highlighted' : ''} key={ticket.id}>
+          <tbody>{availableUnassignedTickets.map((ticket) => <tr key={ticket.id}>
             <td className="assignments-ticket-number"><strong>{ticket.ticketReferenceNumber}</strong></td>
             <td><span className="assignments-ticket-title" title={ticket.title}>{ticket.title}</span></td>
             <td className="assignments-requester" title={ticket.requesterName}>{ticket.requesterName}</td>
             <td><TicketPriorityBadge value={ticket.priorityName} /></td>
             <td className="assignments-created">{formatLocalDate(ticket.createdDate)}</td>
-            <td>{pendingByTicket.has(ticket.ticketReferenceNumber) ? <span><span className="badge assignment-request-status assignment-request-status--pending">Pending Approval</span><small className="assignment-request-agent">{pendingByTicket.get(ticket.ticketReferenceNumber).requestedAgentName}</small></span> : <><label className="sr-only" htmlFor={`agent-${ticket.id}`}>Assign {ticket.ticketReferenceNumber} to</label><select className="assignment-agent-select" id={`agent-${ticket.id}`} value={selections[ticket.ticketReferenceNumber] ?? ''} onChange={(event) => setSelections({ ...selections, [ticket.ticketReferenceNumber]: event.target.value })}><option value="">Select agent</option>{agentWorkloads.map((agent) => <option value={agent.userId} key={agent.userId} disabled={agent.isAtCapacity}>{agent.name}</option>)}</select></>}</td>
-            <td><button className="button button--primary button--compact assignment-submit" type="button" disabled={pendingByTicket.has(ticket.ticketReferenceNumber) || !selectedAgent(ticket.ticketReferenceNumber) || selectedAgent(ticket.ticketReferenceNumber)?.isAtCapacity || Boolean(assigning)} onClick={() => assignTicket(ticket)}>{pendingByTicket.has(ticket.ticketReferenceNumber) ? 'Pending Approval' : assigning === ticket.ticketReferenceNumber ? roleArea === 'manager' ? 'Submitting…' : 'Assigning…' : roleArea === 'manager' ? 'Request Assignment' : 'Assign'}</button></td>
+            <td><label className="sr-only" htmlFor={`agent-${ticket.id}`}>Assign {ticket.ticketReferenceNumber} to</label><select className="assignment-agent-select" id={`agent-${ticket.id}`} value={selections[ticket.ticketReferenceNumber] ?? ''} onChange={(event) => setSelections({ ...selections, [ticket.ticketReferenceNumber]: event.target.value })}><option value="">Select agent</option>{agentWorkloads.map((agent) => <option value={agent.userId} key={agent.userId} disabled={agent.isAtCapacity}>{agent.name}</option>)}</select></td>
+            <td><button className="button button--primary button--compact assignment-submit" type="button" disabled={!selectedAgent(ticket.ticketReferenceNumber) || selectedAgent(ticket.ticketReferenceNumber)?.isAtCapacity || Boolean(assigning)} onClick={() => assignTicket(ticket)}>{assigning === ticket.ticketReferenceNumber ? roleArea === 'manager' ? 'Submitting…' : 'Assigning…' : 'Assign'}</button></td>
           </tr>)}</tbody>
         </table></div>}
       </section>
