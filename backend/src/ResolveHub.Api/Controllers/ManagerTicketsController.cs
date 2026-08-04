@@ -14,6 +14,7 @@ namespace ResolveHub.Api.Controllers;
 [Authorize(Roles = RoleNames.Manager)]
 public sealed class ManagerTicketsController(
     IManagerTicketService service,
+    IAssignmentApprovalService assignmentApprovalService,
     ITicketCommentService commentService) : ControllerBase
 {
     [HttpGet("dashboard")]
@@ -38,15 +39,16 @@ public sealed class ManagerTicketsController(
         [FromQuery] AdminTicketFilterDto filter, CancellationToken token) =>
         Ok(await service.GetAssignmentsAsync(filter, token));
 
-    [HttpPost("tickets/{ticketReference}/assign")]
-    public async Task<IActionResult> Assign(
+    [HttpPost("tickets/{ticketReference}/assignment-requests")]
+    public async Task<IActionResult> RequestAssignment(
         string ticketReference, AssignTicketRequestDto request, CancellationToken token)
     {
-        var result = await service.AssignAsync(
+        var result = await assignmentApprovalService.CreateAsync(
             UserId, ticketReference, request.AgentUserId, token);
         return result.Status switch
         {
-            TicketOperationStatus.Success => NoContent(),
+            TicketOperationStatus.Success => Created(
+                $"/api/manager/assignment-requests/{result.Value!.Id}", result.Value),
             TicketOperationStatus.NotFound => NotFound(),
             TicketOperationStatus.Forbidden => StatusCode(403, new { message = result.Message }),
             TicketOperationStatus.Conflict => Conflict(new { message = result.Message }),
@@ -54,22 +56,17 @@ public sealed class ManagerTicketsController(
         };
     }
 
+    [HttpPost("tickets/{ticketReference}/assign")]
+    public IActionResult DirectAssignment(string ticketReference) =>
+        StatusCode(403, new
+        {
+            message = "Managers must submit assignment requests for Administrator approval."
+        });
+
     [HttpGet("assignment-requests")]
     public async Task<ActionResult<IReadOnlyCollection<TicketAssignmentRequestDto>>>
         AssignmentRequests(CancellationToken token) =>
-        Ok(await service.GetAssignmentRequestsAsync(token));
-
-    [HttpPost("assignment-requests/{requestId:int}/approve")]
-    public async Task<IActionResult> ApproveAssignmentRequest(
-        int requestId, CancellationToken token) =>
-        ReviewResult(await service.ReviewAssignmentRequestAsync(
-            UserId, requestId, true, token));
-
-    [HttpPost("assignment-requests/{requestId:int}/reject")]
-    public async Task<IActionResult> RejectAssignmentRequest(
-        int requestId, CancellationToken token) =>
-        ReviewResult(await service.ReviewAssignmentRequestAsync(
-            UserId, requestId, false, token));
+        Ok(await assignmentApprovalService.GetManagerRequestsAsync(UserId, token));
 
     [HttpPost("tickets/{ticketReference}/comments")]
     [Consumes("application/json")]

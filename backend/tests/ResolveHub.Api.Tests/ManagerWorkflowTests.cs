@@ -112,6 +112,8 @@ public sealed class ManagerWorkflowTests
         await factory.SeedTicketLookupsAsync();
         var manager = await factory.CreateUserAsync(
             "assignment-manager@resolvehub.test", Password, RoleNames.Manager);
+        var administrator = await factory.CreateUserAsync(
+            "assignment-admin@resolvehub.test", Password, RoleNames.Admin);
         var employee = await factory.CreateUserAsync(
             "assignment-requester@resolvehub.test", Password, RoleNames.Employee);
         var activeAgent = await factory.CreateUserAsync(
@@ -123,20 +125,26 @@ public sealed class ManagerWorkflowTests
             "assignment-non-agent@resolvehub.test", Password,
             RoleNames.Employee);
         using var managerClient = await LoginAsync(factory, manager.Email!);
+        using var adminClient = await LoginAsync(factory, administrator.Email!);
         using var employeeClient = await LoginAsync(factory, employee.Email!);
         var ticket = await CreateTicketAsync(factory, employeeClient);
 
         var dashboard = await managerClient.GetFromJsonAsync<ManagerDashboardDto>(
             "/api/manager/dashboard");
         var invalid = await managerClient.PostAsJsonAsync(
-            $"/api/manager/tickets/{ticket.TicketReferenceNumber}/assign",
+            $"/api/manager/tickets/{ticket.TicketReferenceNumber}/assignment-requests",
             new { agentUserId = inactiveAgent.Id });
         var invalidRole = await managerClient.PostAsJsonAsync(
-            $"/api/manager/tickets/{ticket.TicketReferenceNumber}/assign",
+            $"/api/manager/tickets/{ticket.TicketReferenceNumber}/assignment-requests",
             new { agentUserId = nonAgent.Id });
         var assigned = await managerClient.PostAsJsonAsync(
-            $"/api/manager/tickets/{ticket.TicketReferenceNumber}/assign",
+            $"/api/manager/tickets/{ticket.TicketReferenceNumber}/assignment-requests",
             new { agentUserId = activeAgent.Id });
+        var assignmentRequest = (await assigned.Content
+            .ReadFromJsonAsync<TicketAssignmentRequestDto>())!;
+        var approved = await adminClient.PostAsJsonAsync(
+            $"/api/admin/assignment-requests/{assignmentRequest.Id}/approve",
+            new { reason = (string?)null });
         var snapshot = await factory.GetTicketSnapshotAsync(ticket.Id);
 
         Assert.NotNull(dashboard);
@@ -145,7 +153,8 @@ public sealed class ManagerWorkflowTests
             item => item.TicketReferenceNumber == ticket.TicketReferenceNumber);
         Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, invalidRole.StatusCode);
-        Assert.Equal(HttpStatusCode.NoContent, assigned.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, assigned.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, approved.StatusCode);
         Assert.Equal(activeAgent.Id, snapshot.AssignedToUserAccountID);
     }
 

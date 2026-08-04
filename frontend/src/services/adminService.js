@@ -31,6 +31,15 @@ export const reviewAdminDuplicate = (reviewId, decision, internalNote = null) =>
     body: JSON.stringify({ internalNote }),
   })
 
+export const getAdminAssignmentRequests = (signal) =>
+  apiRequest('/api/admin/assignment-requests', { signal })
+
+export const reviewAdminAssignmentRequest = (requestId, decision, reason = null) =>
+  apiRequest(`/api/admin/assignment-requests/${requestId}/${decision}`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  })
+
 export const markAdminTicketDuplicate = (ticketReference, request) =>
   apiRequest(`/api/admin/tickets/${encodeURIComponent(ticketReference)}/mark-duplicate`, {
     method: 'POST',

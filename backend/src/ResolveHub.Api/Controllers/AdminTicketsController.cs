@@ -14,6 +14,7 @@ namespace ResolveHub.Api.Controllers;
 [Authorize(Roles = RoleNames.Admin)]
 public sealed class AdminTicketsController(
     IAdminTicketService service,
+    IAssignmentApprovalService assignmentApprovalService,
     ITicketCommentService commentService)
     : ControllerBase
 {
@@ -21,6 +22,28 @@ public sealed class AdminTicketsController(
     public async Task<ActionResult<AdminAssignmentOverviewDto>> GetAssignments(
         [FromQuery] AdminTicketFilterDto filter, CancellationToken token) =>
         Ok(await service.GetAssignmentsAsync(filter, token));
+
+    [HttpGet("assignment-requests")]
+    public async Task<ActionResult<IReadOnlyCollection<TicketAssignmentRequestDto>>>
+        AssignmentRequests(CancellationToken token) =>
+        Ok(await assignmentApprovalService.GetPendingAdminRequestsAsync(token));
+
+    [HttpPost("assignment-requests/{requestId:int}/{decision}")]
+    public async Task<IActionResult> ReviewAssignmentRequest(
+        int requestId, string decision, [FromBody] ReviewAssignmentRequestDto? request,
+        CancellationToken token)
+    {
+        if (decision is not ("approve" or "reject")) return BadRequest();
+        var result = await assignmentApprovalService.ReviewAsync(GetUserId(), requestId,
+            decision == "approve", request?.Reason, token);
+        return result.Status switch
+        {
+            TicketOperationStatus.Success => NoContent(),
+            TicketOperationStatus.NotFound => NotFound(),
+            TicketOperationStatus.Conflict => Conflict(new { message = result.Message }),
+            _ => BadRequest(new { message = result.Message })
+        };
+    }
 
     [HttpGet("dashboard")]
     public async Task<ActionResult<AdminDashboardSummaryDto>> GetDashboard(

@@ -223,7 +223,9 @@ public sealed class AgentTicketService(
         await dbContext.SaveChangesAsync(token);
         return new(TicketOperationStatus.Success,
             new(request.ID, ticket.ID, ticket.TicketReferenceNumber, ticket.Title,
-                agentId, agentName, request.Status, now, null, null, null));
+                agentId, agentName, null, null, 0,
+                TicketWorkloadRules.MaxActiveTicketsPerAgent,
+                request.Status, now, null, null, null, null));
     }
 
     public async Task<TicketServiceResult<AgentTicketDetailsDto>> UpdateStatusAsync(

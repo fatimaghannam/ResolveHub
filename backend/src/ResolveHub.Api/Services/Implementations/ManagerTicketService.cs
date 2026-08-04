@@ -163,12 +163,17 @@ public sealed class ManagerTicketService(
                 item.Ticket.Title, item.RequestedByUserAccountID,
                 item.RequestedByUserAccount.FirstName + " " +
                     item.RequestedByUserAccount.LastName,
+                item.RequestedAgentUserAccountID,
+                item.RequestedAgentUserAccount == null ? null :
+                    item.RequestedAgentUserAccount.FirstName + " " +
+                    item.RequestedAgentUserAccount.LastName,
+                0, TicketWorkloadRules.MaxActiveTicketsPerAgent,
                 item.Status, item.RequestedDate,
                 item.ReviewedByUserAccountID,
                 item.ReviewedByUserAccount == null ? null :
                     item.ReviewedByUserAccount.FirstName + " " +
                     item.ReviewedByUserAccount.LastName,
-                item.ReviewedDate))
+                item.ReviewedDate, item.ReviewReason))
             .ToListAsync(token);
 
     public async Task<TicketServiceResult<bool>> ReviewAssignmentRequestAsync(

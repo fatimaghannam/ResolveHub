@@ -162,11 +162,22 @@ public sealed record TicketAssignmentRequestDto(
     string TicketTitle,
     int RequestedByUserAccountId,
     string RequestedByName,
+    int? RequestedAgentUserAccountId,
+    string? RequestedAgentName,
+    int RequestedAgentActiveTicketCount,
+    int RequestedAgentMaxActiveTickets,
     string Status,
     DateTime RequestedDate,
     int? ReviewedByUserAccountId,
     string? ReviewedByName,
-    DateTime? ReviewedDate);
+    DateTime? ReviewedDate,
+    string? ReviewReason);
+
+public sealed class ReviewAssignmentRequestDto
+{
+    [StringLength(500)]
+    public string? Reason { get; init; }
+}
 
 public sealed class UpdateAgentTicketStatusRequestDto
 {

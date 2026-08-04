@@ -13,7 +13,7 @@ export const getManagerAssignments = (filters = {}, signal) =>
   apiRequest(`/api/manager/assignments${toQueryString(filters)}`, { signal })
 
 export const assignManagerTicket = (ticketReference, agentUserId) =>
-  apiRequest(`/api/manager/tickets/${encodeURIComponent(ticketReference)}/assign`, {
+  apiRequest(`/api/manager/tickets/${encodeURIComponent(ticketReference)}/assignment-requests`, {
     method: 'POST',
     body: JSON.stringify({ agentUserId }),
   })
@@ -26,11 +26,6 @@ export const getManagerActivity = (signal) =>
 
 export const getManagerAssignmentRequests = (signal) =>
   apiRequest('/api/manager/assignment-requests', { signal })
-
-export const reviewManagerAssignmentRequest = (requestId, decision) =>
-  apiRequest(`/api/manager/assignment-requests/${requestId}/${decision}`, {
-    method: 'POST',
-  })
 
 export const addManagerTicketComment = (ticketReference, message) =>
   apiRequest(`/api/manager/tickets/${encodeURIComponent(ticketReference)}/comments`, {

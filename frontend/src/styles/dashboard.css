@@ -592,8 +592,29 @@ html:has(.dashboard-shell) { scroll-padding-top: 98px; }
 .admin-ticket-table .row-actions { align-items: center; white-space: nowrap; }
 .admin-dashboard-assignment-table { table-layout: fixed; }.admin-dashboard-assignment-table .assignment-col--number { width: 14%; }.admin-dashboard-assignment-table .assignment-col--title { width: 29%; }.admin-dashboard-assignment-table .assignment-col--requester { width: 14%; }.admin-dashboard-assignment-table .assignment-col--category { width: 12%; }.admin-dashboard-assignment-table .assignment-col--priority { width: 10%; }.admin-dashboard-assignment-table .assignment-col--created { width: 13%; }.admin-dashboard-assignment-table .assignment-col--action { width: 8%; }.admin-dashboard-assignment-table th, .admin-dashboard-assignment-table td { padding-inline: 10px; }.admin-dashboard-assignment-table td { vertical-align: middle; }.admin-dashboard-assignment-table td:first-child strong { white-space: nowrap; }.assignment-title { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; line-height: 1.4; overflow-wrap: anywhere; }.admin-dashboard-assignment-table .button--compact { min-height: 34px; padding: 6px 11px; white-space: nowrap; font-size: .8rem; }
 .admin-assignments-page-table { table-layout: fixed; }.admin-assignments-page-table .assignments-col--number { width: 12%; }.admin-assignments-page-table .assignments-col--title { width: 30%; }.admin-assignments-page-table .assignments-col--requester { width: 12%; }.admin-assignments-page-table .assignments-col--priority { width: 9%; }.admin-assignments-page-table .assignments-col--created { width: 10%; }.admin-assignments-page-table .assignments-col--agent { width: 17%; }.admin-assignments-page-table .assignments-col--action { width: 10%; }.admin-assignments-page-table th, .admin-assignments-page-table td { padding: 12px 9px; vertical-align: middle; }.assignments-ticket-number, .assignments-created { white-space: nowrap; }.assignments-ticket-title { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; line-height: 1.4; overflow-wrap: anywhere; }.assignments-requester { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.assignment-agent-select { width: 100%; max-width: 160px; height: 35px; box-sizing: border-box; padding: 6px 28px 6px 9px; border: 1px solid #cbd7e4; border-radius: 8px; color: var(--ink); background: white; font: inherit; font-size: .8rem; }.assignment-agent-select:focus-visible { outline: 3px solid rgba(36,120,206,.22); outline-offset: 1px; border-color: var(--blue); }.assignment-submit { min-height: 35px; max-width: 100%; padding: 6px 11px; white-space: nowrap; font-size: .8rem; }
+.assignment-request-status--pending { color:#875000; border-color:#efd397; background:#fff3db; }.assignment-request-status--approved { color:#176b47; border-color:#b9dfcb; background:#eaf7f0; }.assignment-request-status--rejected { color:#9b2c25; border-color:#efc3be; background:#fff0ef; }.assignment-request-agent { display:block; margin-top:5px; color:var(--muted); font-size:.7rem; }
 @media (min-width: 1101px) {
-  .admin-assignments-page-table { width: 100%; min-width: 0; }
+  .assignment-table-wrap { overflow-x: visible; }
+  .admin-assignments-page-table { width: 100%; min-width: 0; table-layout: fixed; }
+  .admin-assignments-page-table .assignments-col--number { width: 120px; }
+  .admin-assignments-page-table .assignments-col--title { width: auto; }
+  .admin-assignments-page-table .assignments-col--requester { width: 110px; }
+  .admin-assignments-page-table .assignments-col--priority { width: 85px; }
+  .admin-assignments-page-table .assignments-col--created { width: 105px; }
+  .admin-assignments-page-table .assignments-col--agent { width: 170px; }
+  .admin-assignments-page-table .assignments-col--action { width: 150px; }
+  .admin-assignments-page-table th,
+  .admin-assignments-page-table td { padding-inline: 8px; }
+  .admin-assignments-page-table th:nth-child(1),
+  .admin-assignments-page-table td:nth-child(1),
+  .admin-assignments-page-table th:nth-child(4),
+  .admin-assignments-page-table td:nth-child(4),
+  .admin-assignments-page-table th:nth-child(5),
+  .admin-assignments-page-table td:nth-child(5),
+  .admin-assignments-page-table th:nth-child(7),
+  .admin-assignments-page-table td:nth-child(7) { white-space: nowrap; }
+  .admin-assignments-page-table .assignment-agent-select { max-width: none; }
+  .admin-assignments-page-table .assignment-submit { width: 100%; }
   .admin-users-table { width: 100%; min-width: 0; }
   .admin-users-table-wrap { overflow: visible; }
 }

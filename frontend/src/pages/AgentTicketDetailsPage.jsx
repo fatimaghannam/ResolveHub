@@ -17,7 +17,6 @@ import {
   downloadAgentTicketAttachment,
   getAgentTicketDetails,
   markAgentTicketPending,
-  requestAgentTicketAssignment,
   resumeAgentTicketWork,
   resolveAgentTicket,
   updateAgentTicketStatus,
@@ -83,24 +82,6 @@ function AgentTicketDetailsPage() {
       notify('success', 'Work Started', `${ticket.ticketReferenceNumber} is now in progress.`)
     } catch (requestError) {
       notify('error', 'Unable to Update Ticket', requestError.message)
-    } finally {
-      setSaving('')
-    }
-  }
-
-  async function requestAssignment() {
-    if (saving) return
-    try {
-      setSaving('request')
-      await requestAgentTicketAssignment(ticket.ticketReferenceNumber)
-      setTicket((current) => ({
-        ...current,
-        canRequestAssignment: false,
-        assignmentRequestStatus: 'Pending',
-      }))
-      notify('success', 'Assignment Requested', 'A Manager will review your request.')
-    } catch (requestError) {
-      notify('error', 'Request Failed', requestError.message)
     } finally {
       setSaving('')
     }
@@ -219,7 +200,6 @@ function AgentTicketDetailsPage() {
           {ticket.statusName === 'Pending' && <button className="button button--primary" type="button" onClick={resumeWork} disabled={Boolean(saving)}>{saving === 'resume' ? 'Resuming…' : 'Resume Work'}</button>}
           {ticket.canResolve && <button className="button button--primary" type="button" onClick={() => setDialog('resolve')} disabled={Boolean(saving)}>{saving === 'resolve' ? 'Resolving…' : 'Mark as Resolved'}</button>}
           {ticket.canClose && <button className="button button--primary" type="button" onClick={() => setDialog('close')} disabled={Boolean(saving)}>Close Ticket</button>}
-          {ticket.canRequestAssignment && <button className="button button--primary" type="button" onClick={requestAssignment} disabled={Boolean(saving)}>{saving === 'request' ? 'Requesting…' : 'Request Assignment'}</button>}
           {ticket.assignmentRequestStatus === 'Pending' && <PendingApprovalBadge />}
         </div>
       </section>

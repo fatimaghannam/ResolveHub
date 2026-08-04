@@ -330,13 +330,19 @@ public sealed class TicketGovernanceTests
 
         var fifth = await CreateTicketAsync(factory, employeeClient, "Fifth active");
         var fifthResponse = await managerClient.PostAsJsonAsync(
-            $"/api/manager/tickets/{fifth.TicketReferenceNumber}/assign",
+            $"/api/manager/tickets/{fifth.TicketReferenceNumber}/assignment-requests",
             new { agentUserId = agent.Id });
+        var fifthRequest = (await fifthResponse.Content
+            .ReadFromJsonAsync<TicketAssignmentRequestDto>())!;
+        var fifthApproval = await adminClient.PostAsJsonAsync(
+            $"/api/admin/assignment-requests/{fifthRequest.Id}/approve",
+            new { reason = (string?)null });
         var workloads = await adminClient.GetFromJsonAsync<
             IReadOnlyCollection<AdminAgentWorkloadDto>>("/api/admin/users/agents");
         var workload = Assert.Single(workloads!, item => item.UserId == agent.Id);
 
-        Assert.Equal(HttpStatusCode.NoContent, fifthResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, fifthResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, fifthApproval.StatusCode);
         Assert.Equal(5, workload.ActiveTicketCount);
         Assert.Equal(5, workload.MaxActiveTickets);
         Assert.Equal(0, workload.RemainingCapacity);

@@ -136,6 +136,7 @@ public sealed class ApplicationDbContext
             entity.Property(item => item.Status).HasMaxLength(20).IsRequired();
             entity.Property(item => item.RequestedDate).HasColumnType("datetime2");
             entity.Property(item => item.ReviewedDate).HasColumnType("datetime2");
+            entity.Property(item => item.ReviewReason).HasMaxLength(500);
             entity.HasIndex(item => new
             {
                 item.TicketID,
@@ -150,6 +151,10 @@ public sealed class ApplicationDbContext
             entity.HasOne(item => item.RequestedByUserAccount)
                 .WithMany(user => user.AssignmentRequestsMade)
                 .HasForeignKey(item => item.RequestedByUserAccountID)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.RequestedAgentUserAccount)
+                .WithMany(user => user.AssignmentRequestsReceived)
+                .HasForeignKey(item => item.RequestedAgentUserAccountID)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(item => item.ReviewedByUserAccount)
                 .WithMany(user => user.AssignmentRequestsReviewed)

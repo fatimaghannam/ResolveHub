@@ -18,7 +18,7 @@ public sealed class AssignmentRequestWorkflowTests
     private const string Password = "ValidPassword1!";
 
     [Fact]
-    public async Task OpenTicket_RequestApproval_RestrictsVisibilityAndRecordsHistory()
+    public async Task ManagerRequest_AdminApproval_AssignsOnlyAfterApprovalAndRecordsAudit()
     {
         await using var factory = new ResolveHubApiFactory();
         await factory.SeedTicketLookupsAsync();
@@ -26,47 +26,131 @@ public sealed class AssignmentRequestWorkflowTests
             "request-manager@resolvehub.test", Password, RoleNames.Manager);
         var employee = await factory.CreateUserAsync(
             "request-owner@resolvehub.test", Password, RoleNames.Employee);
-        var requestingAgent = await factory.CreateUserAsync(
+        var requestedAgent = await factory.CreateUserAsync(
             "request-agent@resolvehub.test", Password, RoleNames.ITSupportAgent);
-        var otherAgent = await factory.CreateUserAsync(
-            "other-agent@resolvehub.test", Password, RoleNames.ITSupportAgent);
+        var admin = await factory.CreateUserAsync(
+            "request-admin@resolvehub.test", Password, RoleNames.Admin);
         using var employeeClient = await LoginAsync(factory, employee.Email!);
-        using var requestingClient = await LoginAsync(factory, requestingAgent.Email!);
-        using var otherClient = await LoginAsync(factory, otherAgent.Email!);
+        using var agentClient = await LoginAsync(factory, requestedAgent.Email!);
         using var managerClient = await LoginAsync(factory, manager.Email!);
+        using var adminClient = await LoginAsync(factory, admin.Email!);
         var ticket = await CreateTicketAsync(factory, employeeClient);
 
-        var before = await requestingClient.GetFromJsonAsync<
-            PagedResultDto<AgentTicketListItemDto>>("/api/agent/tickets/open");
-        Assert.Contains(before!.Items,
-            item => item.TicketReferenceNumber == ticket.TicketReferenceNumber);
-
-        var requested = await requestingClient.PostAsync(
-            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/assignment-requests",
-            null);
+        var forbiddenAgentRequest = await agentClient.PostAsync(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/assignment-requests", null);
+        Assert.Equal(HttpStatusCode.Forbidden, forbiddenAgentRequest.StatusCode);
+        var requested = await managerClient.PostAsJsonAsync(
+            $"/api/manager/tickets/{ticket.TicketReferenceNumber}/assignment-requests",
+            new { agentUserId = requestedAgent.Id });
         Assert.Equal(HttpStatusCode.Created, requested.StatusCode);
-        var requests = await managerClient.GetFromJsonAsync<
-            IReadOnlyCollection<TicketAssignmentRequestDto>>(
-                "/api/manager/assignment-requests");
-        var request = Assert.Single(requests!);
-        Assert.Equal(requestingAgent.Id, request.RequestedByUserAccountId);
+        var request = (await requested.Content.ReadFromJsonAsync<TicketAssignmentRequestDto>())!;
+        Assert.Equal(requestedAgent.Id, request.RequestedAgentUserAccountId);
+        Assert.Equal(manager.Id, request.RequestedByUserAccountId);
+        Assert.Equal(HttpStatusCode.Forbidden, (await managerClient.PostAsJsonAsync(
+            $"/api/manager/tickets/{ticket.TicketReferenceNumber}/assign",
+            new { agentUserId = requestedAgent.Id })).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await managerClient.PostAsJsonAsync(
+            $"/api/manager/tickets/{ticket.TicketReferenceNumber}/assignment-requests",
+            new { agentUserId = requestedAgent.Id })).StatusCode);
 
-        var approve = await managerClient.PostAsync(
-            $"/api/manager/assignment-requests/{request.Id}/approve", null);
+        using (var beforeScope = factory.Services.CreateScope())
+        {
+            var beforeDb = beforeScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var storedTicket = await beforeDb.Tickets.SingleAsync(item => item.ID == ticket.Id);
+            Assert.Null(storedTicket.AssignedToUserAccountID);
+            Assert.Equal(TicketStatusNames.Open, (await beforeDb.TicketStatuses
+                .SingleAsync(item => item.ID == storedTicket.TicketStatusID)).Name);
+        }
+        var requests = await adminClient.GetFromJsonAsync<
+            IReadOnlyCollection<TicketAssignmentRequestDto>>(
+                "/api/admin/assignment-requests");
+        Assert.Equal(request.Id, Assert.Single(requests!).Id);
+        Assert.Equal(HttpStatusCode.Forbidden, (await managerClient.PostAsync(
+            $"/api/admin/assignment-requests/{request.Id}/approve", null)).StatusCode);
+
+        var approve = await adminClient.PostAsJsonAsync(
+            $"/api/admin/assignment-requests/{request.Id}/approve", new { reason = (string?)null });
         Assert.Equal(HttpStatusCode.NoContent, approve.StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await requestingClient.GetAsync(
-            $"/api/agent/tickets/{ticket.TicketReferenceNumber}")).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await otherClient.GetAsync(
+        Assert.Equal(HttpStatusCode.OK, (await agentClient.GetAsync(
             $"/api/agent/tickets/{ticket.TicketReferenceNumber}")).StatusCode);
 
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var assigned = await db.Tickets.Include(item => item.TicketStatus)
+            .SingleAsync(item => item.ID == ticket.Id);
+        Assert.Equal(requestedAgent.Id, assigned.AssignedToUserAccountID);
+        Assert.Equal(TicketStatusNames.Assigned, assigned.TicketStatus.Name);
         var actions = await db.TicketHistory
             .Where(item => item.TicketID == ticket.Id)
             .Select(item => item.ActionType).ToListAsync();
         Assert.Contains(TicketHistoryActionNames.AssignmentRequested, actions);
         Assert.Contains(TicketHistoryActionNames.AssignmentRequestApproved, actions);
         Assert.Contains(TicketHistoryActionNames.TicketAssigned, actions);
+        Assert.True(await db.UserNotifications.AnyAsync(item =>
+            item.UserAccountID == manager.Id && item.Title == "Assignment Request Approved"));
+        Assert.True(await db.UserNotifications.AnyAsync(item =>
+            item.UserAccountID == requestedAgent.Id && item.Title == "Ticket Assigned"));
+    }
+
+    [Fact]
+    public async Task Approval_RechecksCapacity_AndRejectionPreservesUnassignedTicket()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        await factory.SeedTicketLookupsAsync();
+        var manager = await factory.CreateUserAsync(
+            "capacity-manager@resolvehub.test", Password, RoleNames.Manager);
+        var employee = await factory.CreateUserAsync(
+            "capacity-owner@resolvehub.test", Password, RoleNames.Employee);
+        var agent = await factory.CreateUserAsync(
+            "capacity-agent@resolvehub.test", Password, RoleNames.ITSupportAgent);
+        var admin = await factory.CreateUserAsync(
+            "capacity-admin@resolvehub.test", Password, RoleNames.Admin);
+        using var employeeClient = await LoginAsync(factory, employee.Email!);
+        using var managerClient = await LoginAsync(factory, manager.Email!);
+        using var adminClient = await LoginAsync(factory, admin.Email!);
+        var requestedTicket = await CreateTicketAsync(factory, employeeClient);
+        var requestResponse = await managerClient.PostAsJsonAsync(
+            $"/api/manager/tickets/{requestedTicket.TicketReferenceNumber}/assignment-requests",
+            new { agentUserId = agent.Id });
+        requestResponse.EnsureSuccessStatusCode();
+        var request = (await requestResponse.Content
+            .ReadFromJsonAsync<TicketAssignmentRequestDto>())!;
+
+        for (var index = 0; index < TicketWorkloadRules.MaxActiveTicketsPerAgent; index++)
+        {
+            var capacityTicket = await CreateTicketAsync(factory, employeeClient);
+            Assert.Equal(HttpStatusCode.NoContent, (await adminClient.PostAsJsonAsync(
+                $"/api/admin/tickets/{capacityTicket.TicketReferenceNumber}/assign",
+                new { agentUserId = agent.Id })).StatusCode);
+        }
+
+        var approval = await adminClient.PostAsJsonAsync(
+            $"/api/admin/assignment-requests/{request.Id}/approve",
+            new { reason = (string?)null });
+        Assert.Equal(HttpStatusCode.Conflict, approval.StatusCode);
+        using (var pendingScope = factory.Services.CreateScope())
+        {
+            var pendingDb = pendingScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            Assert.Equal(AssignmentRequestStatusNames.Pending,
+                (await pendingDb.TicketAssignmentRequests.SingleAsync(item => item.ID == request.Id)).Status);
+            Assert.Null((await pendingDb.Tickets.SingleAsync(item =>
+                item.ID == requestedTicket.Id)).AssignedToUserAccountID);
+        }
+
+        var rejection = await adminClient.PostAsJsonAsync(
+            $"/api/admin/assignment-requests/{request.Id}/reject",
+            new { reason = "Agent capacity changed before approval." });
+        Assert.Equal(HttpStatusCode.NoContent, rejection.StatusCode);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var rejected = await db.TicketAssignmentRequests.SingleAsync(item => item.ID == request.Id);
+        Assert.Equal(AssignmentRequestStatusNames.Rejected, rejected.Status);
+        Assert.Equal("Agent capacity changed before approval.", rejected.ReviewReason);
+        Assert.Null((await db.Tickets.SingleAsync(item =>
+            item.ID == requestedTicket.Id)).AssignedToUserAccountID);
+        Assert.True(await db.UserNotifications.AnyAsync(item =>
+            item.UserAccountID == manager.Id && item.Title == "Assignment Request Rejected" &&
+            item.Message.Contains("Agent capacity changed")));
     }
 
     [Fact]
