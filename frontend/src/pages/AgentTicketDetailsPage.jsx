@@ -21,7 +21,7 @@ import {
   resolveAgentTicket,
   updateAgentTicketStatus,
 } from '../services/agentTicketService.js'
-import { formatLocalDate } from '../utils/dateTime.js'
+import { formatLocalDate, formatLocalDateTime } from '../utils/dateTime.js'
 import { formatTicketReference } from '../utils/ticketReference.js'
 
 function AgentTicketDetailsPage() {
@@ -219,10 +219,10 @@ function AgentTicketDetailsPage() {
             <div><dt>Category</dt><dd>{ticket.categoryName}</dd></div>
             <div><dt>Priority</dt><dd><TicketPriorityBadge value={ticket.priorityName} /></dd></div>
             <div><dt>Status</dt><dd><TicketStatusBadge value={ticket.statusName} /></dd></div>
-            <div><dt>Created</dt><dd>{formatLocalDate(ticket.createdDate)}</dd></div>
-            <div><dt>Resolved</dt><dd>{ticket.resolvedDate ? formatLocalDate(ticket.resolvedDate) : '—'}</dd></div>
-            {ticket.closedDate && <div><dt>Closed</dt><dd>{formatLocalDate(ticket.closedDate)}</dd></div>}
             <div><dt>Assigned agent</dt><dd>{ticket.assignedAgentName ?? 'Unassigned'}</dd></div>
+            <div><dt>Created</dt><dd><time dateTime={ticket.createdDate} title="Displayed in your local time">{formatLocalDateTime(ticket.createdDate)}</time></dd></div>
+            {ticket.resolvedDate && <div><dt>Resolved</dt><dd><time dateTime={ticket.resolvedDate} title="Displayed in your local time">{formatLocalDateTime(ticket.resolvedDate)}</time></dd></div>}
+            {ticket.closedDate && <div><dt>Closed</dt><dd><time dateTime={ticket.closedDate} title="Displayed in your local time">{formatLocalDateTime(ticket.closedDate)}</time></dd></div>}
           </dl>
         </aside>
       </div>

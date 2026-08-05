@@ -14,7 +14,7 @@ import {
   reviewAdminDuplicate,
 } from '../services/adminService.js'
 import { getManagerTicket, reportManagerDuplicate } from '../services/managerService.js'
-import { formatLocalDate } from '../utils/dateTime.js'
+import { formatLocalDate, formatLocalDateTime } from '../utils/dateTime.js'
 import { downloadAttachment } from '../services/ticketService.js'
 
 function getDirectDuplicateError(error) {
@@ -271,7 +271,7 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
           <p className="ticket-description">{ticket.description}</p>
           <TicketAttachments attachments={ticket.attachments} onDownload={downloadTicketAttachment} />
         </section>
-        <aside className="panel details-side"><h2>Ticket Information</h2><dl><div><dt>Requester</dt><dd>{ticket.requesterName}</dd></div><div><dt>Category</dt><dd>{ticket.categoryName}</dd></div><div><dt>Priority</dt><dd><TicketPriorityBadge value={ticket.priorityName} /></dd></div><div><dt>Status</dt><dd><TicketStatusBadge value={ticket.statusName} /></dd></div>{ticket.originalTicketReference && <div><dt>Original Ticket</dt><dd><Link to={`/${roleArea}/tickets/${ticket.originalTicketReference}`}>{ticket.originalTicketReference}</Link></dd></div>}<div><dt>Assigned agent</dt><dd>{ticket.assignedAgentName ?? 'Unassigned'}</dd></div>{ticket.resolvedDate && <div><dt>Resolved</dt><dd>{formatLocalDate(ticket.resolvedDate)}</dd></div>}{ticket.closedDate && <div><dt>Closed</dt><dd>{formatLocalDate(ticket.closedDate)}</dd></div>}</dl></aside>
+        <aside className="panel details-side"><h2>Ticket Information</h2><dl><div><dt>Requester</dt><dd>{ticket.requesterName}</dd></div><div><dt>Category</dt><dd>{ticket.categoryName}</dd></div><div><dt>Priority</dt><dd><TicketPriorityBadge value={ticket.priorityName} /></dd></div><div><dt>Status</dt><dd><TicketStatusBadge value={ticket.statusName} /></dd></div>{ticket.originalTicketReference && <div><dt>Original Ticket</dt><dd><Link to={`/${roleArea}/tickets/${ticket.originalTicketReference}`}>{ticket.originalTicketReference}</Link></dd></div>}<div><dt>Assigned agent</dt><dd>{ticket.assignedAgentName ?? 'Unassigned'}</dd></div><div><dt>Created</dt><dd><time dateTime={ticket.createdDate} title="Displayed in your local time">{formatLocalDateTime(ticket.createdDate)}</time></dd></div>{ticket.resolvedDate && <div><dt>Resolved</dt><dd><time dateTime={ticket.resolvedDate} title="Displayed in your local time">{formatLocalDateTime(ticket.resolvedDate)}</time></dd></div>}{ticket.closedDate && <div><dt>Closed</dt><dd><time dateTime={ticket.closedDate} title="Displayed in your local time">{formatLocalDateTime(ticket.closedDate)}</time></dd></div>}</dl></aside>
       </div>
       <div className="ticket-detail-section-stack">
       <TicketComments
