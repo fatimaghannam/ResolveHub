@@ -66,6 +66,10 @@ public sealed class SystemAuditLogService(ApplicationDbContext dbContext) : ISys
         var userTargetIds = rows.Where(row => row.EntityType == "UserAccount")
             .Select(row => int.TryParse(row.EntityID, out var id) ? id : 0)
             .Where(id => id > 0).Distinct().ToArray();
+        var assignmentUserIds = rows.Where(row => row.ActionType is "Ticket Assigned" or "Ticket Reassigned" or "Ticket Unassigned")
+            .SelectMany(row => new[] { ParseId(row.OldValue), ParseId(row.NewValue) })
+            .Where(id => id > 0);
+        userTargetIds = userTargetIds.Concat(assignmentUserIds).Distinct().ToArray();
         var userTargets = await dbContext.Users.AsNoTracking()
             .Where(user => userTargetIds.Contains(user.Id))
             .ToDictionaryAsync(user => user.Id,
@@ -76,13 +80,16 @@ public sealed class SystemAuditLogService(ApplicationDbContext dbContext) : ISys
             var targetName = row.EntityType == "UserAccount" &&
                 int.TryParse(row.EntityID, out var userId) && userTargets.TryGetValue(userId, out var name)
                     ? name : row.EntityID;
+            var oldValue = HumanizeValue(row.ActionType, row.OldValue, userTargets);
+            var newValue = HumanizeValue(row.ActionType, row.NewValue, userTargets);
             return new SystemAuditRecordDto(row.ID, row.CreatedDate,
                 row.PerformedByUserAccountID,
                 $"{row.PerformerFirstName} {row.PerformerLastName}".Trim(),
                 row.PerformerEmail ?? "", roleByUser.GetValueOrDefault(row.PerformedByUserAccountID, "Unknown"),
-                row.ActionType, Category(row.ActionType, row.EntityType), row.EntityType,
-                row.EntityID, targetName, row.Description, "Successful",
-                row.OldValue, row.NewValue, RelatedUrl(row.EntityType, row.EntityID), null);
+                row.ActionType, Category(row.ActionType, row.EntityType), FriendlyEntityType(row.EntityType),
+                row.EntityID, targetName, FriendlyDescription(row.ActionType, targetName,
+                    row.Description, oldValue, newValue), "Successful",
+                oldValue, newValue, RelatedUrl(row.EntityType, row.EntityID), null);
         }).ToList();
 
         return new(items, page, pageSize, totalItems,
@@ -121,5 +128,44 @@ public sealed class SystemAuditLogService(ApplicationDbContext dbContext) : ISys
         "UserAccount" when int.TryParse(entityId, out _) => $"/admin/users/{entityId}",
         "Ticket" => $"/admin/tickets/{Uri.EscapeDataString(entityId)}",
         _ => null
+    };
+
+    private static int ParseId(string? value) => int.TryParse(value, out var id) ? id : 0;
+
+    private static string FriendlyEntityType(string entityType) => entityType switch
+    {
+        "UserAccount" => "User Account",
+        "UserAccountRole" => "User Role",
+        "TicketCategory" => "Ticket Category",
+        "SystemConfiguration" => "System Configuration",
+        _ => string.Concat(entityType.Select((character, index) =>
+            index > 0 && char.IsUpper(character) ? $" {character}" : character.ToString()))
+    };
+
+    private static string? HumanizeValue(string action, string? value,
+        IReadOnlyDictionary<int, string> users)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        if (action.Contains("User", StringComparison.OrdinalIgnoreCase) &&
+            bool.TryParse(value, out var enabled)) return enabled ? "Active" : "Inactive";
+        if ((action is "Ticket Assigned" or "Ticket Reassigned" or "Ticket Unassigned") &&
+            int.TryParse(value, out var userId)) return users.GetValueOrDefault(userId);
+        if (value is "1" or "0") return null;
+        return value;
+    }
+
+    private static string FriendlyDescription(string action, string entityName,
+        string storedDescription, string? oldValue, string? newValue) => action switch
+    {
+        "User Created" => $"Created a {newValue ?? "new"} account for {entityName}.",
+        "User Invitation Resent" => $"Resent the account invitation to {entityName}.",
+        "User Deactivated" => $"{entityName}'s account was deactivated.",
+        "User Reactivated" => $"{entityName}'s account was activated.",
+        "Ticket Assigned" when newValue is not null => $"Assigned {entityName} to {newValue}.",
+        "Ticket Reassigned" when newValue is not null && oldValue is not null =>
+            $"Reassigned {entityName} from {oldValue} to {newValue}.",
+        "Ticket Reassigned" when newValue is not null => $"Reassigned {entityName} to {newValue}.",
+        "Ticket Unassigned" when oldValue is not null => $"Removed {oldValue} from {entityName}.",
+        _ => storedDescription
     };
 }
