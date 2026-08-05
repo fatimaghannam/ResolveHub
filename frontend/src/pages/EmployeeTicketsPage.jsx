@@ -5,7 +5,7 @@ import { EmptyState, ErrorState, LoadingState } from '../components/common/State
 import Toast from '../components/common/Toast.jsx'
 import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
 import { cancelTicket, getCategories, getPriorities, getStatuses, getTickets } from '../services/ticketService.js'
-import { formatLocalDateTime } from '../utils/dateTime.js'
+import { formatLocalDate, formatLocalDateTime, formatLocalTime } from '../utils/dateTime.js'
 import {
   getLocalQuickDateRange,
   getUtcDateRange,
@@ -242,12 +242,12 @@ function EmployeeTicketsPage({ roleArea = 'employee' }) {
       {data && <section className="panel">
         <div className="results-count">{data.totalItems} ticket{data.totalItems === 1 ? '' : 's'}</div>
         {data.items.length === 0 ? <EmptyState title="No tickets found." message="Try changing your filters or create a new support ticket." /> : (
-          <div className="table-scroll"><table className="ticket-table">
-            <thead><tr><th>Ticket Number</th><th>Title</th><th>Category</th><th>Priority</th><th>Status</th><th>Assigned To</th><th>Created</th><th>Actions</th></tr></thead>
+          <div className="table-scroll my-tickets-table-wrap"><table className="ticket-table my-tickets-table">
+            <thead><tr><th className="my-tickets-col--number">Ticket Number</th><th className="my-tickets-col--title">Title</th><th className="my-tickets-col--category">Category</th><th className="my-tickets-col--priority">Priority</th><th className="my-tickets-col--status">Status</th><th className="my-tickets-col--agent">Assigned To</th><th className="my-tickets-col--created">Created</th><th className="my-tickets-col--actions">Actions</th></tr></thead>
             <tbody>{data.items.map((ticket) => <tr key={ticket.id}>
-              <td><strong>{formatTicketReference(ticket)}</strong></td><td>{ticket.title}</td><td>{ticket.categoryName}</td>
-              <td><TicketPriorityBadge value={ticket.priorityName} /></td><td><TicketStatusBadge value={ticket.statusName} /></td>
-              <td>{ticket.assignedToName ?? 'Unassigned'}</td><td>{formatLocalDateTime(ticket.createdDate)}</td>
+              <td className="my-tickets-col--number"><strong>{formatTicketReference(ticket)}</strong></td><td className="my-tickets-col--title">{ticket.title}</td><td className="my-tickets-col--category">{ticket.categoryName}</td>
+              <td className="my-tickets-col--priority"><TicketPriorityBadge value={ticket.priorityName} /></td><td className="my-tickets-col--status"><TicketStatusBadge value={ticket.statusName} /></td>
+              <td className="my-tickets-col--agent"><span>{ticket.assignedToName ?? 'Unassigned'}</span></td><td className="my-tickets-col--created"><time dateTime={ticket.createdDate} title={formatLocalDateTime(ticket.createdDate)}><span>{formatLocalDate(ticket.createdDate)}</span><span>{formatLocalTime(ticket.createdDate)}</span></time></td>
               <td><div className="row-actions"><Link to={detailsPath(ticket)}>View</Link>{ticket.canEdit && <Link to={editPath(ticket)}>Edit</Link>}{ticket.canDelete && <button onClick={() => setCancelTarget(ticket)}>Delete</button>}</div></td>
             </tr>)}</tbody>
           </table></div>

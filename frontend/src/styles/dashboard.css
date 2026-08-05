@@ -106,6 +106,24 @@ html:has(.dashboard-shell) { scroll-padding-top: 98px; }
 .ticket-summary-cell > small { margin-top: 3px; color: var(--muted); }
 .table-action, .row-actions a, .row-actions button { color: var(--blue); border: 0; background: none; font-weight: 700; text-decoration: none; cursor: pointer; }
 .row-actions { display: flex; gap: 10px; }.row-actions button:last-child { color: var(--danger); }
+
+.my-tickets-table-wrap { width:100%; overflow-x:visible; }
+.my-tickets-table { width:100%; min-width:0; table-layout:fixed; }
+.my-tickets-table th,
+.my-tickets-table td { padding:11px 7px; vertical-align:middle; }
+.my-tickets-table .my-tickets-col--number { width:14%; white-space:nowrap; }
+.my-tickets-table .my-tickets-col--title { width:auto; overflow-wrap:anywhere; }
+.my-tickets-table .my-tickets-col--category { width:10%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.my-tickets-table .my-tickets-col--priority { width:8%; text-align:center; }
+.my-tickets-table .my-tickets-col--status { width:10%; text-align:center; }
+.my-tickets-table .my-tickets-col--agent { width:14%; }
+.my-tickets-table .my-tickets-col--agent span { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.my-tickets-table .my-tickets-col--created { width:14%; }
+.my-tickets-table .my-tickets-col--created time { display:flex; flex-direction:column; gap:2px; line-height:1.25; }
+.my-tickets-table .my-tickets-col--created time span { white-space:nowrap; }
+.my-tickets-table .my-tickets-col--actions { width:12%; }
+.my-tickets-table .row-actions { align-items:center; flex-wrap:nowrap; white-space:nowrap; }
+.my-tickets-table .badge { white-space:nowrap; }
 .badge, .capacity-badge, .user-status { display: inline-flex; align-items: center; min-height: 25px; box-sizing: border-box; padding: 3px 9px; border: 1px solid transparent; border-radius: 999px; font-size: .73rem; font-weight: 750; line-height: 1.2; vertical-align: middle; white-space: nowrap; }
 .status-open { color: #145da0; background: #e8f2fc; }.status-assigned, .status-in-progress { color: #875000; background: #fff1d1; }.status-pending { color: #6f42a6; background: #f1eafa; }.status-resolved { color: #18794e; background: #e5f5ec; }.status-closed, .status-cancelled { color: #556274; background: #edf0f4; }.status-duplicate { color: #65408d; border-color: #d9c7eb; background: #f2ebf8; }
 .priority-low { color: #47637a; background: #edf3f7; }.priority-medium { color: #145da0; background: #e8f2fc; }.priority-high { color: #9a5b08; background: #fff0d2; }.priority-critical { color: #a92118; background: #fde9e7; }
