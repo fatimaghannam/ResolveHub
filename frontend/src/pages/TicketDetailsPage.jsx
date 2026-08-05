@@ -155,7 +155,7 @@ function TicketDetailsPage() {
         readOnlyMessage="Comments are read-only because this ticket is completed."
         onNotify={notify}
       />
-      <TicketHistorySection history={ticket.history} formatDate={formatLocalDateTime} />
+      <TicketHistorySection history={ticket.history} />
       </div>
       {dialogOpen && <div className="dialog-backdrop"><div className="dialog" role="dialog" aria-modal="true" aria-labelledby="details-cancel-title" aria-describedby="details-cancel-description"><h2 id="details-cancel-title">Cancel {formatTicketReference(ticket)}?</h2><p id="details-cancel-description">The ticket will be removed from your active list.</p><label><span>Reason (optional)</span><textarea maxLength="500" value={reason} onChange={(e) => setReason(e.target.value)} /></label><div className="dialog__actions"><button autoFocus type="button" className="button button--secondary" onClick={() => setDialogOpen(false)} disabled={saving}>Keep Ticket</button><button type="button" className="button button--danger" onClick={confirmCancel} disabled={saving}>{saving ? 'Cancelling…' : 'Confirm Cancellation'}</button></div></div></div>}
     </>

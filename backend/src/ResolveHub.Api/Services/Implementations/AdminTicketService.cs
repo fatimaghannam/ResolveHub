@@ -253,8 +253,7 @@ public sealed class AdminTicketService(
                             .FirstOrDefault() ?? string.Empty,
                         item.Content, item.CreatedDate, item.UpdatedDate, item.IsEdited,
                         item.Visibility.ToString())).ToList(),
-                ticket.History.Where(item => !item.IsInternal)
-                    .OrderByDescending(item => item.CreatedDate).Select(item =>
+                ticket.History.OrderByDescending(item => item.CreatedDate).Select(item =>
                     new TicketHistoryDto(item.ID, item.ActionType,
                         item.PerformedByUserAccount.FirstName + " " +
                         item.PerformedByUserAccount.LastName,

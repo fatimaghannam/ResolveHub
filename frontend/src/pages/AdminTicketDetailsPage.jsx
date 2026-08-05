@@ -283,7 +283,7 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
         onNotify={notify}
       />
       <TicketActivityLog ticketReference={ticket.ticketReferenceNumber} />
-      <TicketHistorySection history={ticket.history} formatDate={formatLocalDate} />
+      <TicketHistorySection history={ticket.history} />
       </div>
       {duplicateDialogOpen && <>
         <button className="dialog-backdrop" type="button" aria-label="Close duplicate dialog" onClick={() => { if (!processingDuplicate) closeDuplicateDialog() }} />

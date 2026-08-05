@@ -238,7 +238,7 @@ function AgentTicketDetailsPage() {
         onNotify={notify}
       />
       <TicketActivityLog ticketReference={ticket.ticketReferenceNumber} />
-      <TicketHistorySection history={ticket.history} formatDate={formatLocalDate} />
+      <TicketHistorySection history={ticket.history} />
       </div>
       {dialog && <>
         <button className="dialog-backdrop" type="button" aria-label="Close dialog" onClick={() => { if (!saving) setDialog(null) }} />

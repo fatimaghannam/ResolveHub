@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using ResolveHub.Api.Constants;
+using ResolveHub.Api.Data;
 using ResolveHub.Api.DTOs.Auth;
 using ResolveHub.Api.DTOs.Tickets;
 using ResolveHub.Api.Entities;
@@ -131,6 +132,67 @@ public sealed class TicketActivityEndpointTests
         var agentTimeline = (await agentTimelineResponse.Content
             .ReadFromJsonAsync<IReadOnlyCollection<TicketActivityDto>>())!;
         Assert.Equal(agentTimeline.Select(item => item.Id), adminTimeline.Select(item => item.Id));
+    }
+
+    [Fact]
+    public async Task AuthorizedRoleDetails_ReturnIdenticalNewestFirstTicketHistory()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        await factory.SeedTicketLookupsAsync();
+        var owner = await factory.CreateUserAsync("history-owner@test.local", Password);
+        var agent = await factory.CreateUserAsync(
+            "history-agent@test.local", Password, RoleNames.ITSupportAgent);
+        var manager = await factory.CreateUserAsync(
+            "history-manager@test.local", Password, RoleNames.Manager);
+        var administrator = await factory.CreateUserAsync(
+            "history-admin@test.local", Password, RoleNames.Admin);
+        using var ownerClient = await LoginAsync(factory, owner.Email!);
+        using var agentClient = await LoginAsync(factory, agent.Email!);
+        using var managerClient = await LoginAsync(factory, manager.Email!);
+        using var adminClient = await LoginAsync(factory, administrator.Email!);
+        var lookups = await factory.GetTicketLookupIdsAsync();
+        var create = await ownerClient.PostAsJsonAsync("/api/tickets", new
+        {
+            title = "Shared ticket history projection",
+            description = "A ticket used to verify identical history across authorized roles.",
+            ticketCategoryId = lookups.CategoryId,
+            ticketPriorityId = lookups.PriorityId
+        });
+        create.EnsureSuccessStatusCode();
+        var ticket = (await create.Content.ReadFromJsonAsync<TicketDetailsDto>())!;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            dbContext.TicketHistory.Add(new TicketHistory
+            {
+                TicketID = ticket.Id,
+                PerformedByUserAccountID = owner.Id,
+                ActionType = "Internal Official Change",
+                OldValue = "Open",
+                NewValue = "Reviewed",
+                Description = "Official history must be identical after ticket access is granted.",
+                CreatedDate = DateTime.UtcNow.AddMinutes(1),
+                IsInternal = true
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        var employeeDetails = (await ownerClient.GetFromJsonAsync<TicketDetailsDto>(
+            $"/api/tickets/{ticket.Id}"))!;
+        var agentDetails = (await agentClient.GetFromJsonAsync<AgentTicketDetailsDto>(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}"))!;
+        var managerDetails = (await managerClient.GetFromJsonAsync<AdminTicketDetailsDto>(
+            $"/api/manager/tickets/{ticket.TicketReferenceNumber}"))!;
+        var adminDetails = (await adminClient.GetFromJsonAsync<AdminTicketDetailsDto>(
+            $"/api/admin/tickets/{ticket.TicketReferenceNumber}"))!;
+
+        var expectedIds = employeeDetails.History.Select(item => item.Id).ToArray();
+        Assert.Equal(agentDetails.History.Select(item => item.Id), expectedIds);
+        Assert.Equal(managerDetails.History.Select(item => item.Id), expectedIds);
+        Assert.Equal(adminDetails.History.Select(item => item.Id), expectedIds);
+        Assert.Equal(employeeDetails.History
+            .OrderByDescending(item => item.CreatedDate).Select(item => item.Id), expectedIds);
+        Assert.Contains(employeeDetails.History, item => item.ActionType == "Internal Official Change");
     }
 
     private static async Task<HttpClient> LoginAsync(

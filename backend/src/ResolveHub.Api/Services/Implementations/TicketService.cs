@@ -472,8 +472,7 @@ public sealed class TicketService(ApplicationDbContext dbContext)
                     comment.Visibility.ToString()))
                 .ToList(),
             ticket.History
-                .Where(history => !history.IsInternal)
-                .OrderBy(history => history.CreatedDate)
+                .OrderByDescending(history => history.CreatedDate)
                 .Select(history => new TicketHistoryDto(
                     history.ID,
                     history.ActionType,

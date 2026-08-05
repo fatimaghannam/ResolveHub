@@ -660,7 +660,7 @@ public sealed class AgentTicketService(
         var ticketId = await OwnedTickets(agentId)
             .Where(ticket => ticket.TicketReferenceNumber == ticketReference)
             .Select(ticket => (int?)ticket.ID).SingleOrDefaultAsync(token);
-        return ticketId is null ? null : await ProjectHistory(ticketId.Value, true)
+        return ticketId is null ? null : await ProjectHistory(ticketId.Value)
             .ToListAsync(token);
     }
 
@@ -898,10 +898,7 @@ public sealed class AgentTicketService(
                     item.Content, item.CreatedDate, item.UpdatedDate, item.IsEdited,
                     item.Visibility.ToString())).ToList(),
             ticket.History
-                .Where(item => !item.IsInternal ||
-                    ticket.AssignedToUserAccountID == agentId ||
-                    ticket.CreatedByUserAccountID == agentId)
-                .OrderBy(item => item.CreatedDate)
+                .OrderByDescending(item => item.CreatedDate)
                 .Select(item => new TicketHistoryDto(
                     item.ID, item.ActionType,
                     item.PerformedByUserAccount.FirstName + " " +
@@ -930,11 +927,10 @@ public sealed class AgentTicketService(
                 item.Content, item.CreatedDate, item.UpdatedDate, item.IsEdited,
                 item.Visibility.ToString()));
 
-    private IQueryable<TicketHistoryDto> ProjectHistory(int ticketId, bool includeInternal) =>
+    private IQueryable<TicketHistoryDto> ProjectHistory(int ticketId) =>
         dbContext.TicketHistory.AsNoTracking()
-            .Where(item => item.TicketID == ticketId &&
-                (includeInternal || !item.IsInternal))
-            .OrderBy(item => item.CreatedDate)
+            .Where(item => item.TicketID == ticketId)
+            .OrderByDescending(item => item.CreatedDate)
             .Select(item => new TicketHistoryDto(
                 item.ID, item.ActionType,
                 item.PerformedByUserAccount.FirstName + " " +

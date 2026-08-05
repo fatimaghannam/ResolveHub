@@ -368,7 +368,16 @@ html:has(.dashboard-shell) { scroll-padding-top: 98px; }
 .ticket-history-collapsible .unified-collapsible__inner { border-top:1px solid #e3eaf1; background:#f9fbfd; }
 .ticket-history__content { padding:22px; }
 .ticket-history__content .table-scroll { overflow:auto; border:1px solid #e0e7ef; border-radius:10px; background:#fff; box-shadow:0 2px 8px rgba(25,45,70,.035); }
-.ticket-history__content .ticket-table { min-width:720px; margin:0; }
+.ticket-history__content .ticket-table { min-width:760px; margin:0; table-layout:fixed; }
+.ticket-history__content .ticket-table th:nth-child(1) { width:18%; }
+.ticket-history__content .ticket-table th:nth-child(2) { width:18%; }
+.ticket-history__content .ticket-table th:nth-child(4) { width:180px; }
+.ticket-history__content .ticket-table td { vertical-align:top; }
+.ticket-history__description { display:block; line-height:1.5; overflow-wrap:anywhere; }
+.ticket-history__change { width:fit-content; max-width:100%; display:inline-flex; align-items:center; gap:6px; margin-top:7px; padding:4px 7px; border-radius:7px; color:#64758a; background:#f2f6fa; font-size:.72rem; line-height:1.25; }
+.ticket-history__change span, .ticket-history__change strong { min-width:0; overflow-wrap:anywhere; }
+.ticket-history__change svg { flex:0 0 auto; color:#8a99aa; }
+.ticket-history__content time { color:#52657b; white-space:nowrap; }
 .ticket-history__content .ticket-table th:first-child,
 .ticket-history__content .ticket-table td:first-child { padding-left:16px; }
 .ticket-history__content .ticket-table th:last-child,
