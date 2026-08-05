@@ -76,12 +76,21 @@ public sealed class SystemAuditLogService(ApplicationDbContext dbContext) : ISys
             .Where(user => userTargetIds.Contains(user.Id))
             .ToDictionaryAsync(user => user.Id,
                 user => (user.FirstName + " " + user.LastName).Trim(), token);
+        var categoryTargetIds = rows.Where(row => row.EntityType is "TicketCategory" or "Category")
+            .Select(row => ParseId(row.EntityID)).Where(id => id > 0).Distinct().ToArray();
+        var categoryTargets = await dbContext.TicketCategories.AsNoTracking()
+            .Where(category => categoryTargetIds.Contains(category.ID))
+            .ToDictionaryAsync(category => category.ID, category => category.Name, token);
 
         var items = rows.Select(row =>
         {
             var targetName = row.EntityType == "UserAccount" &&
                 int.TryParse(row.EntityID, out var userId) && userTargets.TryGetValue(userId, out var name)
                     ? name : row.EntityID;
+            if (row.EntityType is "TicketCategory" or "Category" &&
+                int.TryParse(row.EntityID, out var categoryId) &&
+                categoryTargets.TryGetValue(categoryId, out var categoryName))
+                targetName = categoryName;
             var oldValue = HumanizeValue(row.ActionType, row.OldValue, userTargets);
             var newValue = HumanizeValue(row.ActionType, row.NewValue, userTargets);
             return new SystemAuditRecordDto(row.ID, row.CreatedDate,

@@ -123,6 +123,7 @@ public sealed class TicketService(ApplicationDbContext dbContext)
             request.Description,
             request.TicketCategoryId,
             request.TicketPriorityId,
+            null,
             cancellationToken);
         if (validation is not null)
             return new(TicketOperationStatus.Invalid, Message: validation);
@@ -228,6 +229,7 @@ public sealed class TicketService(ApplicationDbContext dbContext)
             request.Description,
             request.TicketCategoryId,
             request.TicketPriorityId,
+            ticket.TicketCategoryID,
             cancellationToken);
         if (validation is not null)
             return new(TicketOperationStatus.Invalid, Message: validation);
@@ -340,6 +342,7 @@ public sealed class TicketService(ApplicationDbContext dbContext)
         string description,
         int categoryId,
         int priorityId,
+        int? currentCategoryId,
         CancellationToken cancellationToken)
     {
         var trimmedTitle = title.Trim();
@@ -350,7 +353,8 @@ public sealed class TicketService(ApplicationDbContext dbContext)
             return "Description must be between 10 and 5000 characters.";
 
         var categoryExists = await dbContext.TicketCategories
-            .AnyAsync(item => item.ID == categoryId && item.IsActive, cancellationToken);
+            .AnyAsync(item => item.ID == categoryId &&
+                (item.IsActive || item.ID == currentCategoryId), cancellationToken);
         if (!categoryExists)
             return "Select a valid active category.";
         var priorityExists = await dbContext.TicketPriorities

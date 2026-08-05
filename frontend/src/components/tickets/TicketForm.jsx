@@ -140,6 +140,8 @@ function TicketForm({
     return <ErrorState message={loadingError} onRetry={() => setLookupRequest((value) => value + 1)} />
   }
   if (!lookups) return <LoadingState message="Loading ticket options…" />
+  const currentCategoryMissing = mode === 'edit' && values.ticketCategoryId &&
+    !lookups.categories.some((item) => Number(item.id) === Number(values.ticketCategoryId))
 
   return (
     <form className="ticket-form panel" onSubmit={submit} noValidate>
@@ -174,6 +176,7 @@ function TicketForm({
           <span>Category <b aria-hidden="true">*</b></span>
           <select value={values.ticketCategoryId} onChange={(event) => setValues({ ...values, ticketCategoryId: event.target.value })}>
             <option value="">Select category…</option>
+            {currentCategoryMissing && <option value={values.ticketCategoryId}>{values.ticketCategoryName} (Inactive)</option>}
             {lookups.categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
           <em>{errors.ticketCategoryId}</em>

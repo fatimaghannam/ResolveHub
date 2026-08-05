@@ -87,3 +87,17 @@ export const updateAdminUserStatus = (userId, isActive) =>
 
 export const getSystemAuditLog = (filters = {}, signal) =>
   apiRequest(`/api/admin/audit-log${toQueryString(filters)}`, { signal })
+
+export const getAdminCategories = (filters = {}, signal) =>
+  apiRequest(`/api/admin/categories${toQueryString(filters)}`, { signal })
+
+export const createAdminCategory = (request) =>
+  apiRequest('/api/admin/categories', { method: 'POST', body: JSON.stringify(request) })
+
+export const updateAdminCategory = (categoryId, request) =>
+  apiRequest(`/api/admin/categories/${categoryId}`, { method: 'PUT', body: JSON.stringify(request) })
+
+export const updateAdminCategoryStatus = (categoryId, isActive) =>
+  apiRequest(`/api/admin/categories/${categoryId}/status`, {
+    method: 'PATCH', body: JSON.stringify({ isActive }),
+  })

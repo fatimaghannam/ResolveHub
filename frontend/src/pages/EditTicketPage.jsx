@@ -49,7 +49,7 @@ function EditTicketPage({ roleArea = 'employee' }) {
       <section className="page-heading"><h2>Edit {formatTicketReference(ticket)}</h2><p>Update the issue information while the ticket is still open and unassigned.</p></section>
       <TicketForm
         mode="edit"
-        initialValues={{ title: ticket.title, description: ticket.description, ticketCategoryId: ticket.ticketCategoryId, ticketPriorityId: ticket.ticketPriorityId }}
+        initialValues={{ title: ticket.title, description: ticket.description, ticketCategoryId: ticket.ticketCategoryId, ticketCategoryName: ticket.categoryName, ticketPriorityId: ticket.ticketPriorityId }}
         existingAttachments={ticket.attachments}
         submitLabel="Save Changes"
         onCancel={() => navigate(ticketPath)}
