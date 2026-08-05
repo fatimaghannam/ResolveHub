@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
 import { getAdminUser } from '../services/adminService.js'
+import { accountStatusClassName, formatAccountStatus } from '../utils/accountStatus.js'
 import { formatLocalDateTime } from '../utils/dateTime.js'
 
 function AdminUserDetailsPage() {
@@ -36,7 +37,7 @@ function AdminUserDetailsPage() {
       <section className="page-heading"><h2>{user.firstName} {user.lastName}</h2><p>Read-only account details</p></section>
       <section className="panel profile-panel">
         <div className="admin-user-profile-heading"><span className="profile-avatar" aria-hidden="true">{initials}</span><div><h3>Profile</h3><p>{user.email}</p></div></div>
-        <dl className="profile-details"><div><dt>Full name</dt><dd>{user.firstName} {user.lastName}</dd></div><div><dt>Email</dt><dd>{user.email}</dd></div><div><dt>Role</dt><dd>{user.role}</dd></div><div><dt>Department</dt><dd>{user.department ?? '—'}</dd></div><div><dt>Status</dt><dd><span className={`user-status user-status--${user.status.toLowerCase().replaceAll(' ', '-')}`}>{user.status}</span></dd></div></dl>
+        <dl className="profile-details"><div><dt>Full name</dt><dd>{user.firstName} {user.lastName}</dd></div><div><dt>Email</dt><dd>{user.email}</dd></div><div><dt>Role</dt><dd>{user.role}</dd></div><div><dt>Department</dt><dd>{user.department ?? '—'}</dd></div><div><dt>Status</dt><dd><span className={`user-status user-status--${accountStatusClassName(user.status)}`}>{formatAccountStatus(user.status)}</span></dd></div></dl>
       </section>
       <section className="panel profile-panel"><h3>Account Information</h3><dl className="profile-details"><div><dt>Created</dt><dd>{formatLocalDateTime(user.createdDate)}</dd></div>{user.lastLoginDate && <div><dt>Last login</dt><dd>{formatLocalDateTime(user.lastLoginDate)}</dd></div>}<div><dt>Account ID</dt><dd>{user.id}</dd></div></dl></section>
     </>

@@ -48,11 +48,13 @@ export function resetPassword({
   token,
   newPassword,
   confirmPassword,
+  isAccountSetup = false,
 }) {
   return sendAuthRequest('/api/auth/reset-password', {
     email,
     token,
     newPassword,
     confirmPassword,
+    isAccountSetup,
   })
 }

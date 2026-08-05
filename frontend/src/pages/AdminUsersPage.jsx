@@ -4,6 +4,7 @@ import { MoreHorizontal, Plus } from 'lucide-react'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
 import Toast from '../components/common/Toast.jsx'
 import { createAdminUser, getAdminUserDepartments, getAdminUsers, resendAdminUserInvitation, updateAdminUserStatus } from '../services/adminService.js'
+import { accountStatusClassName, formatAccountStatus } from '../utils/accountStatus.js'
 import { formatLocalDate, formatLocalDateTime, formatLocalTime } from '../utils/dateTime.js'
 
 const emptyUserForm = { firstName: '', lastName: '', email: '', departmentId: '', role: 'Employee' }
@@ -62,6 +63,18 @@ function AdminUsersPage() {
       controller.abort()
     }
   }, [search, role, department, status, reload])
+
+  useEffect(() => {
+    function refreshWhenVisible() {
+      if (document.visibilityState === 'visible') setReload((value) => value + 1)
+    }
+    window.addEventListener('focus', refreshWhenVisible)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    return () => {
+      window.removeEventListener('focus', refreshWhenVisible)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+    }
+  }, [])
 
   function changeRole(event) {
     const value = event.target.value
@@ -158,8 +171,8 @@ function AdminUsersPage() {
         type: result.invitationSent ? 'success' : 'warning',
         title: 'User Created',
         message: result.invitationSent
-          ? 'User created and invitation sent successfully.'
-          : 'User created, but the invitation email could not be sent.',
+          ? 'User created with Pending status and invitation sent successfully.'
+          : 'User created with Pending status, but the invitation email could not be sent.',
       })
     } catch (requestError) {
       setFormError(requestError.message)
@@ -174,7 +187,7 @@ function AdminUsersPage() {
     try {
       setResendingId(user.id)
       await resendAdminUserInvitation(user.id)
-      setToast({ id: Date.now(), type: 'success', title: 'Invitation Sent', message: `A new invitation was sent to ${user.email}.` })
+      setToast({ id: Date.now(), type: 'success', title: 'Invitation Sent', message: `A new invitation was sent to the Pending account ${user.email}.` })
     } catch (requestError) {
       setToast({ id: Date.now(), type: 'error', title: 'Invitation Not Sent', message: requestError.message })
     } finally {
@@ -190,7 +203,7 @@ function AdminUsersPage() {
         <label className="filter-search"><span>Search</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name or email" /></label>
         <label><span>Role</span><select value={role} onChange={changeRole}><option value="">All</option>{['Employee', 'IT Support Agent', 'Manager', 'Administrator'].map((value) => <option key={value}>{value}</option>)}</select></label>
         {role === 'Manager' && <label><span>Department</span><select value={department} onChange={(event) => setDepartment(event.target.value)}><option value="">All Departments</option><option value="unassigned">Unassigned Department</option>{departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}
-        <label><span>Status</span><select value={status} onChange={(event) => setStatus(event.target.value)}><option value="">All</option><option>Pending Setup</option><option>Active</option><option>Inactive</option></select></label>
+        <label><span>Status</span><select value={status} onChange={(event) => setStatus(event.target.value)}><option value="">All</option><option>Pending</option><option>Active</option><option>Inactive</option></select></label>
         <button className="button button--secondary admin-user-filters__clear" type="button" onClick={clearFilters} disabled={!search && !role && !department && !status}>Clear</button>
       </section>
       {error && <ErrorState message={error} />}
@@ -216,14 +229,14 @@ function AdminUsersPage() {
               <td><span className="users-cell-ellipsis" title={user.email}>{user.email}</span></td>
               <td><span className="users-role" title={user.role}>{user.role}</span></td>
               <td><span className={`users-department${user.department ? '' : ' users-department--empty'}`} title={user.department ?? '—'}>{user.department ?? '—'}</span></td>
-              <td><span className={`user-status user-status--${user.status.toLowerCase().replaceAll(' ', '-')}`}>{user.status}</span></td>
+              <td><span className={`user-status user-status--${accountStatusClassName(user.status)}`}>{formatAccountStatus(user.status)}</span></td>
               <td className="users-created"><time dateTime={user.createdDate} title={formatLocalDateTime(user.createdDate)}><span>{formatLocalDate(user.createdDate)}</span><span>{formatLocalTime(user.createdDate)}</span></time></td>
               <td>
                 <details className="row-action-menu">
                   <summary aria-label={`Actions for ${user.firstName} ${user.lastName}`}><MoreHorizontal size={19} aria-hidden="true" /></summary>
                   <div className="row-action-menu__items">
                     <Link to={`/admin/users/${user.id}`}>View</Link>
-                    {user.status === 'Pending Setup' && <button type="button" onClick={(event) => resendInvitation(user, event)} disabled={resendingId !== null}>{resendingId === user.id ? 'Sending…' : 'Resend Invitation'}</button>}
+                    {formatAccountStatus(user.status) === 'Pending' && <button type="button" onClick={(event) => resendInvitation(user, event)} disabled={resendingId !== null}>{resendingId === user.id ? 'Sending…' : 'Resend Invitation'}</button>}
                     {currentAdministrator && user.status === 'Active'
                       ? <span className="row-action-menu__disabled" title="You cannot deactivate your own Administrator account.">Current account</span>
                       : <button type="button" onClick={(event) => requestStatusChange(user, event)}>{user.status === 'Active' ? 'Deactivate' : 'Activate'}</button>}

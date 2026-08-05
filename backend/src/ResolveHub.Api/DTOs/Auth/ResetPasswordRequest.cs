@@ -24,4 +24,6 @@ public sealed class ResetPasswordRequest
         ErrorMessage =
             "The new password and confirmation password do not match.")]
     public string ConfirmPassword { get; init; } = string.Empty;
+
+    public bool IsAccountSetup { get; init; }
 }

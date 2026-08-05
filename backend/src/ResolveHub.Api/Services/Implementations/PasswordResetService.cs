@@ -116,6 +116,15 @@ public sealed class PasswordResetService
             return InvalidTokenResult();
         }
 
+        var hasPassword = await _userManager.HasPasswordAsync(user);
+        if ((request.IsAccountSetup && hasPassword) ||
+            (!request.IsAccountSetup && !hasPassword))
+        {
+            _logger.LogWarning(
+                "Password operation rejected because the account state was not eligible.");
+            return InvalidTokenResult();
+        }
+
         string decodedToken;
 
         try

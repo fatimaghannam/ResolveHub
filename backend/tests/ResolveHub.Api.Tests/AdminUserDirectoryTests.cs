@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using ResolveHub.Api.Data;
@@ -112,7 +113,7 @@ public sealed class AdminUserDirectoryTests
         Assert.Equal("Jamie", created.FirstName);
         Assert.Equal("Rivera", created.LastName);
         Assert.Equal("Operations", created.Department);
-        Assert.Equal("Pending Setup", created.Status);
+        Assert.Equal("Pending ", created.Status);
         Assert.Single(factory.EmailSender.Messages);
         Assert.Contains("setup=true", factory.EmailSender.Messages.Single().ResetUrl);
         var details = await client.GetFromJsonAsync<AdminUserDetailsDto>(
@@ -138,6 +139,36 @@ public sealed class AdminUserDirectoryTests
             .SingleAsync(item => item.Id == created.Id);
         Assert.Null(stored.PasswordHash);
         Assert.True(stored.IsActive);
+
+        var pendingLogin = await client.PostAsJsonAsync("/api/auth/login", new
+        {
+            email = created.Email,
+            password = "NotSetYet1!"
+        });
+        Assert.Equal(HttpStatusCode.Forbidden, pendingLogin.StatusCode);
+        var invitationUri = new Uri(factory.EmailSender.Messages.Single().ResetUrl);
+        var invitationQuery = QueryHelpers.ParseQuery(invitationUri.Query);
+        var setupRequest = new
+        {
+            email = created.Email,
+            token = invitationQuery["token"].ToString(),
+            newPassword = "CreatedPassword1!",
+            confirmPassword = "CreatedPassword1!",
+            isAccountSetup = true
+        };
+        var setup = await client.PostAsJsonAsync("/api/auth/reset-password", setupRequest);
+        Assert.Equal(HttpStatusCode.OK, setup.StatusCode);
+        var reused = await client.PostAsJsonAsync("/api/auth/reset-password", setupRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, reused.StatusCode);
+        var activeDetails = await client.GetFromJsonAsync<AdminUserDetailsDto>(
+            $"/api/admin/users/{created.Id}");
+        Assert.Equal("Active", activeDetails!.Status);
+        var activeLogin = await client.PostAsJsonAsync("/api/auth/login", new
+        {
+            email = created.Email,
+            password = "CreatedPassword1!"
+        });
+        Assert.Equal(HttpStatusCode.OK, activeLogin.StatusCode);
 
         var missingDepartment = await client.PostAsJsonAsync("/api/admin/users", new
         {
@@ -180,6 +211,27 @@ public sealed class AdminUserDirectoryTests
                 .SingleAsync(item => item.Id == createdForRole.Id);
             Assert.Null(storedForRole.DepartmentID);
         }
+
+        factory.EmailSender.ExceptionToThrow = new InvalidOperationException("Provider failure");
+        var failedInvitationResponse = await client.PostAsJsonAsync("/api/admin/users", new
+        {
+            firstName = "Pending", lastName = "Invitation",
+            email = "pending.invitation@resolvehub.test",
+            role = RoleNames.Employee
+        });
+        Assert.Equal(HttpStatusCode.Created, failedInvitationResponse.StatusCode);
+        var failedInvitation = await failedInvitationResponse.Content
+            .ReadFromJsonAsync<CreateAdminUserResultDto>();
+        Assert.False(failedInvitation!.InvitationSent);
+        Assert.Equal("Pending", failedInvitation.User.Status);
+        Assert.NotNull(await factory.GetUserAsync("pending.invitation@resolvehub.test"));
+        factory.EmailSender.ExceptionToThrow = null;
+        var resend = await client.PostAsync(
+            $"/api/admin/users/{failedInvitation.User.Id}/resend-invitation", null);
+        Assert.Equal(HttpStatusCode.OK, resend.StatusCode);
+        var rapidResend = await client.PostAsync(
+            $"/api/admin/users/{failedInvitation.User.Id}/resend-invitation", null);
+        Assert.Equal(HttpStatusCode.Conflict, rapidResend.StatusCode);
     }
 
     [Fact]

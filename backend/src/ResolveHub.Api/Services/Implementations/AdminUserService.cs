@@ -36,7 +36,7 @@ public sealed class AdminUserService(
             !RoleNames.All.Contains(roleFilter, StringComparer.Ordinal))
             return new(TicketOperationStatus.Invalid, Message: "The selected role is invalid.");
         if (!string.IsNullOrEmpty(statusFilter) &&
-            statusFilter is not ("Active" or "Inactive" or "Pending Setup"))
+            statusFilter is not ("Active" or "Inactive" or "Pending"))
             return new(TicketOperationStatus.Invalid, Message: "The selected status is invalid.");
         if (hasDepartmentFilter && roleFilter != RoleNames.Manager)
             return new(TicketOperationStatus.Invalid,
@@ -62,7 +62,7 @@ public sealed class AdminUserService(
         if (statusFilter == "Active")
             query = query.Where(user => user.IsActive && user.PasswordHash != null);
         if (statusFilter == "Inactive") query = query.Where(user => !user.IsActive);
-        if (statusFilter == "Pending Setup")
+        if (statusFilter == "Pending")
             query = query.Where(user => user.IsActive && user.PasswordHash == null);
         if (filter.DepartmentId is not null)
             query = query.Where(user => user.DepartmentID == filter.DepartmentId);
@@ -225,7 +225,7 @@ public sealed class AdminUserService(
                     ["setup"] = "true"
                 });
             await emailSender.SendAccountInvitationEmailAsync(email,
-                $"{firstName} {lastName}", resetUrl, token);
+                $"{firstName} {lastName}", role, department?.Name, resetUrl, token);
             user.UpdatedDate = DateTime.UtcNow;
             await userManager.UpdateAsync(user);
         }
@@ -236,13 +236,13 @@ public sealed class AdminUserService(
             return new(TicketOperationStatus.Success,
                 new CreateAdminUserResultDto(
                     new AdminUserDetailsDto(user.Id, firstName, lastName, email, role,
-                        department?.Name, "Pending Setup", now, null), false));
+                        department?.Name, "Pending", now, null), false));
         }
 
         return new(TicketOperationStatus.Success,
             new CreateAdminUserResultDto(
                 new AdminUserDetailsDto(user.Id, firstName, lastName, email, role,
-                    department?.Name, "Pending Setup", now, null), true));
+                    department?.Name, "Pending", now, null), true));
     }
 
     public async Task<TicketServiceResult<bool>> ResendInvitationAsync(
@@ -252,7 +252,7 @@ public sealed class AdminUserService(
         if (user is null) return new(TicketOperationStatus.NotFound);
         if (!user.IsActive || await userManager.HasPasswordAsync(user))
             return new(TicketOperationStatus.Conflict,
-                Message: "Only Pending Setup accounts can receive an invitation.");
+                Message: "Only Pending accounts can receive an invitation.");
         if (user.UpdatedDate is not null && DateTime.UtcNow - user.UpdatedDate < TimeSpan.FromSeconds(60))
             return new(TicketOperationStatus.Conflict,
                 Message: "Please wait before sending another invitation.");
@@ -273,7 +273,13 @@ public sealed class AdminUserService(
                     ["setup"] = "true"
                 });
             await emailSender.SendAccountInvitationEmailAsync(user.Email!,
-                $"{user.FirstName} {user.LastName}", setupUrl, token);
+                $"{user.FirstName} {user.LastName}",
+                await GetPrimaryRoleAsync(user.Id, token),
+                user.DepartmentID is null
+                    ? null
+                    : await dbContext.Departments.Where(item => item.ID == user.DepartmentID)
+                        .Select(item => item.Name).SingleOrDefaultAsync(token),
+                setupUrl, token);
             user.UpdatedDate = DateTime.UtcNow;
             await userManager.UpdateAsync(user);
             dbContext.ActivityLogs.Add(new ActivityLog
@@ -296,7 +302,7 @@ public sealed class AdminUserService(
     }
 
     private static string AccountStatus(bool isActive, string? passwordHash) =>
-        !isActive ? "Inactive" : string.IsNullOrEmpty(passwordHash) ? "Pending Setup" : "Active";
+        !isActive ? "Inactive" : string.IsNullOrEmpty(passwordHash) ? "Pending" : "Active";
 
     private async Task<string> GetPrimaryRoleAsync(int userId, CancellationToken token)
     {

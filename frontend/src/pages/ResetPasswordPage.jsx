@@ -74,13 +74,14 @@ function ResetPasswordPage() {
         token,
         newPassword,
         confirmPassword,
+        isAccountSetup,
       })
       navigate('/login', {
         replace: true,
         state: {
           passwordResetMessage:
             isAccountSetup
-              ? 'Your password has been created successfully. You can now sign in.'
+              ? 'Your account has been set up successfully. You can now sign in.'
               : 'Your password has been reset successfully. Sign in using your new password.',
         },
       })

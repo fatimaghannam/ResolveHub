@@ -150,7 +150,9 @@ public sealed class AuthController : ControllerBase
             PasswordResetStatus.Success =>
                 Ok(
                     new AuthMessageResponse(
-                        "Your password has been reset successfully. You can now sign in with your new password.")),
+                        request.IsAccountSetup
+                            ? "Your account has been set up successfully. You can now sign in."
+                            : "Your password has been reset successfully. You can now sign in with your new password.")),
 
             PasswordResetStatus.PasswordPolicyFailure =>
                 BadRequest(
