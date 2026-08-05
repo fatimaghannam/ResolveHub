@@ -8,7 +8,7 @@ namespace ResolveHub.Api.Controllers;
 
 [ApiController]
 [Route("api/admin/audit-log")]
-[Authorize(Roles = RoleNames.Admin)]
+[Authorize(Roles = $"{RoleNames.Admin},{RoleNames.Manager}")]
 public sealed class AdminAuditLogController(ISystemAuditLogService service) : ControllerBase
 {
     [HttpGet]

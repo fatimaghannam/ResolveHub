@@ -92,6 +92,7 @@ function App() {
           <Route path="tickets/:ticketReference" element={<AdminTicketDetailsPage roleArea="manager" />} />
           <Route path="assignments" element={<AdminAssignmentsPage roleArea="manager" />} />
           <Route path="workload" element={<ManagerWorkloadPage />} />
+          <Route path="audit-log" element={<AdminActivityPage roleArea="manager" />} />
           <Route path="activity" element={<ManagerActivityPage />} />
           <Route path="notifications" element={<AdminNotificationsPage roleArea="manager" />} />
           <Route path="profile" element={<AdminProfilePage />} />
@@ -117,7 +118,7 @@ function App() {
           <Route path="users" element={<AdminUsersPage />} />
           <Route path="users/:userId" element={<AdminUserDetailsPage />} />
           <Route path="categories" element={<AdminCategoriesPage />} />
-          <Route path="audit-log" element={<AdminActivityPage />} />
+          <Route path="audit-log" element={<AdminActivityPage roleArea="admin" />} />
           <Route path="activity" element={<Navigate to="/admin/audit-log" replace />} />
           <Route path="notifications" element={<AdminNotificationsPage />} />
           <Route path="profile" element={<AdminProfilePage />} />
