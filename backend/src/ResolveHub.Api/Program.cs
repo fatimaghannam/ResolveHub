@@ -331,6 +331,7 @@ builder.Services.AddScoped<ITicketCommentService, TicketCommentService>();
 builder.Services.AddScoped<IAgentTicketService, AgentTicketService>();
 builder.Services.AddScoped<IAdminTicketService, AdminTicketService>();
 builder.Services.AddScoped<IAdminUserService, AdminUserService>();
+builder.Services.AddScoped<ISystemAuditLogService, SystemAuditLogService>();
 builder.Services.AddScoped<IManagerTicketService, ManagerTicketService>();
 builder.Services.AddScoped<IAssignmentApprovalService, AssignmentApprovalService>();
 builder.Services.AddAuthorization();

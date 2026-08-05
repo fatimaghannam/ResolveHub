@@ -117,7 +117,8 @@ function App() {
           <Route path="users" element={<AdminUsersPage />} />
           <Route path="users/:userId" element={<AdminUserDetailsPage />} />
           <Route path="categories" element={<AdminCategoriesPage />} />
-          <Route path="activity" element={<AdminActivityPage />} />
+          <Route path="audit-log" element={<AdminActivityPage />} />
+          <Route path="activity" element={<Navigate to="/admin/audit-log" replace />} />
           <Route path="notifications" element={<AdminNotificationsPage />} />
           <Route path="profile" element={<AdminProfilePage />} />
         </Route>

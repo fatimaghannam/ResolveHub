@@ -53,7 +53,7 @@ const adminNavigation = [
   { id: 'assignments', to: '/admin/assignments', label: 'Ticket Assignments', icon: ClipboardCheck },
   { id: 'users', to: '/admin/users', label: 'Users', icon: Users },
   { id: 'categories', to: '/admin/categories', label: 'Categories', icon: Tags },
-  { id: 'activity', to: '/admin/activity', label: 'Activity Logs', icon: FileClock },
+  { id: 'activity', to: '/admin/audit-log', label: 'System Audit Log', icon: FileClock },
   { id: 'notifications', to: '/admin/notifications', label: 'Notifications', icon: Bell },
   { id: 'profile', to: '/admin/profile', label: 'Profile', icon: CircleUserRound },
 ]
@@ -86,6 +86,7 @@ function isNavigationActive(id, pathname, roleArea) {
     return pathname.startsWith('/manager/tickets')
   }
   if (id === 'users' && roleArea === 'admin') return pathname.startsWith('/admin/users')
+  if (id === 'activity' && roleArea === 'admin') return pathname === '/admin/audit-log'
   if (id === 'tickets') {
     return (
       pathname === '/employee/tickets' ||
@@ -120,7 +121,7 @@ function getPageTitle(pathname, roleArea) {
       '/admin/assignments': 'Ticket Assignments',
       '/admin/users': 'Users',
       '/admin/categories': 'Ticket Categories',
-      '/admin/activity': 'Activity Logs',
+      '/admin/audit-log': 'System Audit Log',
       '/admin/notifications': 'Notifications',
       '/admin/profile': 'Profile',
     }

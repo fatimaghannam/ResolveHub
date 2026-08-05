@@ -84,3 +84,6 @@ export const updateAdminUserStatus = (userId, isActive) =>
     method: 'PATCH',
     body: JSON.stringify({ isActive }),
   })
+
+export const getSystemAuditLog = (filters = {}, signal) =>
+  apiRequest(`/api/admin/audit-log${toQueryString(filters)}`, { signal })
