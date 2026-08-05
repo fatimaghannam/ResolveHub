@@ -4,7 +4,7 @@ import { Link, useOutletContext } from 'react-router-dom'
 import { getDashboard } from '../services/ticketService.js'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
 import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
-import { formatLocalDate } from '../utils/dateTime.js'
+import { formatLocalDateTime } from '../utils/dateTime.js'
 import { formatTicketReference } from '../utils/ticketReference.js'
 
 function EmployeeDashboardPage() {
@@ -63,7 +63,7 @@ function EmployeeDashboardPage() {
                   <td><strong>{formatTicketReference(ticket)}</strong></td><td>{ticket.title}</td>
                   <td><TicketPriorityBadge value={ticket.priorityName} /></td>
                   <td><TicketStatusBadge value={ticket.statusName} /></td>
-                  <td>{formatLocalDate(ticket.createdDate)}</td>
+                  <td>{formatLocalDateTime(ticket.createdDate)}</td>
                   <td><Link className="table-action" to={`/employee/tickets/${ticket.id}`}>View</Link></td>
                 </tr>
               ))}</tbody>

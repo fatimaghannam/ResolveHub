@@ -21,7 +21,7 @@ import {
   replyToComment,
   downloadCommentAttachment,
 } from '../../services/commentService.js'
-import { formatLocalDateTime, parseApiUtcDate } from '../../utils/dateTime.js'
+import { formatLocalDateTime, formatLocalTime, parseApiUtcDate } from '../../utils/dateTime.js'
 
 const MAX_COMMENT_LENGTH = 5000
 const COMMENT_PAGE_SIZE = 5
@@ -46,10 +46,7 @@ function relativeTimestamp(value) {
   const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const startDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
   const dayDifference = Math.round((startToday - startDate) / 86400000)
-  const time = new Intl.DateTimeFormat(undefined, {
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(date)
+  const time = formatLocalTime(value)
   if (dayDifference === 0) return `Today at ${time}`
   if (dayDifference === 1) return `Yesterday at ${time}`
   return formatLocalDateTime(value)

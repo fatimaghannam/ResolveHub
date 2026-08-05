@@ -14,7 +14,7 @@ import {
   reviewAdminDuplicate,
 } from '../services/adminService.js'
 import { getManagerTicket, reportManagerDuplicate } from '../services/managerService.js'
-import { formatLocalDate, formatLocalDateTime } from '../utils/dateTime.js'
+import { formatLocalDateTime } from '../utils/dateTime.js'
 import { downloadAttachment } from '../services/ticketService.js'
 
 function getDirectDuplicateError(error) {
@@ -37,7 +37,7 @@ function TicketComparison({ reported, original }) {
     ['Status', 'statusName'],
   ]
   function ComparisonCard({ label, item }) {
-    return <article className="duplicate-comparison-card"><h3>{label}</h3><dl>{fields.map(([name, key]) => <div key={key}><dt>{name}</dt><dd>{key === 'statusName' ? <TicketStatusBadge value={item[key]} /> : key === 'priorityName' ? <TicketPriorityBadge value={item[key]} /> : item[key]}</dd></div>)}<div><dt>Created Date</dt><dd>{formatLocalDate(item.createdDate)}</dd></div></dl></article>
+    return <article className="duplicate-comparison-card"><h3>{label}</h3><dl>{fields.map(([name, key]) => <div key={key}><dt>{name}</dt><dd>{key === 'statusName' ? <TicketStatusBadge value={item[key]} /> : key === 'priorityName' ? <TicketPriorityBadge value={item[key]} /> : item[key]}</dd></div>)}<div><dt>Created Date</dt><dd>{formatLocalDateTime(item.createdDate)}</dd></div></dl></article>
   }
   return <div className="duplicate-comparison"><ComparisonCard label="Reported Ticket" item={reported} /><ComparisonCard label="Original Ticket" item={original} /></div>
 }
@@ -258,13 +258,13 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
       {toast && <div className="app-toast-region"><Toast key={toast.id} type={toast.type} title={toast.title} message={toast.message} onDismiss={dismissToast} /></div>}
       <Link className="back-link back-link--top" to={`/${roleArea}/tickets`}><ArrowLeft size={18} />Back to All Tickets</Link>
       <section className="page-heading page-heading--action">
-        <div><span className="eyebrow">{ticket.ticketReferenceNumber}</span><h2>{ticket.title}</h2><p>Created {formatLocalDate(ticket.createdDate)}</p></div>
+        <div><span className="eyebrow">{ticket.ticketReferenceNumber}</span><h2>{ticket.title}</h2><p>Created {formatLocalDateTime(ticket.createdDate)}</p></div>
         {roleArea === 'manager' && !ticket.pendingDuplicateReview && ticket.statusName !== 'Duplicate' && <button ref={duplicateTriggerRef} className="button button--secondary" type="button" onClick={openDuplicateDialog}>Report Possible Duplicate</button>}
         {roleArea === 'admin' && markingDuplicate && ticket.statusName !== 'Duplicate' && <button ref={duplicateTriggerRef} className="button button--secondary" type="button" onClick={openDuplicateDialog}>Mark as Duplicate</button>}
         {roleArea === 'admin' && reviewingDuplicate && ticket.statusName !== 'Duplicate' && <button ref={duplicateTriggerRef} className="button button--secondary" type="button" onClick={openDuplicateDialog}>Review Duplicate Report</button>}
       </section>
       {ticket.pendingDuplicateReview && !(roleArea === 'admin' && ticket.pendingDuplicateReview.reportedByAdministrator) && <div className="inline-alert"><span className="badge badge--pending-approval">Duplicate Review Pending</span></div>}
-      {ticket.statusName === 'Duplicate' && ticket.originalTicketReference && <section className="duplicate-info-panel" aria-labelledby="duplicate-info-title"><h2 id="duplicate-info-title">Duplicate Ticket</h2><p>This ticket was marked as a duplicate of:</p><Link className="duplicate-info-panel__link" to={`/${roleArea}/tickets/${ticket.originalTicketReference}`}><strong>{ticket.originalTicketReference}</strong><span>{ticket.originalTicketTitle || 'View original ticket'}</span></Link>{(ticket.duplicateApprovedDate || ticket.duplicateApprovedByName) && <p className="duplicate-info-panel__meta">Approved{ticket.duplicateApprovedDate ? ` ${formatLocalDate(ticket.duplicateApprovedDate)}` : ''}{ticket.duplicateApprovedByName ? ` by ${ticket.duplicateApprovedByName}` : ''}</p>}</section>}
+      {ticket.statusName === 'Duplicate' && ticket.originalTicketReference && <section className="duplicate-info-panel" aria-labelledby="duplicate-info-title"><h2 id="duplicate-info-title">Duplicate Ticket</h2><p>This ticket was marked as a duplicate of:</p><Link className="duplicate-info-panel__link" to={`/${roleArea}/tickets/${ticket.originalTicketReference}`}><strong>{ticket.originalTicketReference}</strong><span>{ticket.originalTicketTitle || 'View original ticket'}</span></Link>{(ticket.duplicateApprovedDate || ticket.duplicateApprovedByName) && <p className="duplicate-info-panel__meta">Approved{ticket.duplicateApprovedDate ? ` ${formatLocalDateTime(ticket.duplicateApprovedDate)}` : ''}{ticket.duplicateApprovedByName ? ` by ${ticket.duplicateApprovedByName}` : ''}</p>}</section>}
       <div className="details-grid">
         <section className="panel">
           <h2>Ticket Summary</h2>
@@ -292,7 +292,7 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
           {reviewingDuplicate ? <>
             <p id="duplicate-description">Compare the reported ticket with the proposed original ticket. If they represent the same issue, confirm to mark this ticket as a duplicate. This preserves all ticket history and links the duplicate to the original ticket.</p>
             <TicketComparison reported={reviewReportedTicket} original={reviewOriginalTicket} />
-            <div className="duplicate-report-meta"><span>Reported by <strong>{ticket.pendingDuplicateReview.reportedByName}</strong></span><span>{formatLocalDate(ticket.pendingDuplicateReview.createdDate)}</span></div>
+            <div className="duplicate-report-meta"><span>Reported by <strong>{ticket.pendingDuplicateReview.reportedByName}</strong></span><span>{formatLocalDateTime(ticket.pendingDuplicateReview.createdDate)}</span></div>
             {ticket.pendingDuplicateReview.reason && <section className="duplicate-reason"><h3>Reporter Reason</h3><p>{ticket.pendingDuplicateReview.reason}</p></section>}
             <label><span>Internal review note (Optional)</span><textarea value={reviewNote} onChange={(event) => setReviewNote(event.target.value)} maxLength="1000" placeholder="Add context for the internal review history..." disabled={processingDuplicate} /></label>
             <section className="duplicate-next-steps"><h3>What happens after approval?</h3><ul><li>This ticket will become Duplicate.</li><li>All history will be preserved.</li><li>Future work should continue on the original ticket.</li><li>The duplicate ticket becomes read-only.</li><li>The duplicate is linked to the original ticket.</li></ul></section>

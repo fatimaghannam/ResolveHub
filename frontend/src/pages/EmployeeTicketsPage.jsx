@@ -5,7 +5,7 @@ import { EmptyState, ErrorState, LoadingState } from '../components/common/State
 import Toast from '../components/common/Toast.jsx'
 import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
 import { cancelTicket, getCategories, getPriorities, getStatuses, getTickets } from '../services/ticketService.js'
-import { formatLocalDate } from '../utils/dateTime.js'
+import { formatLocalDateTime } from '../utils/dateTime.js'
 import {
   getLocalQuickDateRange,
   getUtcDateRange,
@@ -247,7 +247,7 @@ function EmployeeTicketsPage({ roleArea = 'employee' }) {
             <tbody>{data.items.map((ticket) => <tr key={ticket.id}>
               <td><strong>{formatTicketReference(ticket)}</strong></td><td>{ticket.title}</td><td>{ticket.categoryName}</td>
               <td><TicketPriorityBadge value={ticket.priorityName} /></td><td><TicketStatusBadge value={ticket.statusName} /></td>
-              <td>{ticket.assignedToName ?? 'Unassigned'}</td><td>{formatLocalDate(ticket.createdDate)}</td>
+              <td>{ticket.assignedToName ?? 'Unassigned'}</td><td>{formatLocalDateTime(ticket.createdDate)}</td>
               <td><div className="row-actions"><Link to={detailsPath(ticket)}>View</Link>{ticket.canEdit && <Link to={editPath(ticket)}>Edit</Link>}{ticket.canDelete && <button onClick={() => setCancelTarget(ticket)}>Delete</button>}</div></td>
             </tr>)}</tbody>
           </table></div>

@@ -12,7 +12,7 @@ import {
   markManagerNotificationRead,
   markAllManagerNotificationsRead,
 } from '../services/managerService.js'
-import { formatLocalDate } from '../utils/dateTime.js'
+import { formatLocalDateTime } from '../utils/dateTime.js'
 
 function AdminNotificationsPage({ roleArea = 'admin' }) {
   const [notifications, setNotifications] = useState(null)
@@ -80,7 +80,7 @@ function AdminNotificationsPage({ roleArea = 'admin' }) {
               <div className="notification-item__content">
                 <h3>{notification.title}</h3>
                 <p>{notification.message}</p>
-                <small>{formatLocalDate(notification.createdDate)}</small>
+                <small>{formatLocalDateTime(notification.createdDate)}</small>
                 <div className="notification-item__actions">
                   {notification.ticketReferenceNumber && <Link to={`/${roleArea}/tickets/${notification.ticketReferenceNumber}`} onClick={() => markRead(notification)}>View Ticket</Link>}
                   {!notification.isRead && <button type="button" onClick={() => markRead(notification)} disabled={saving} aria-label={`Mark ${notification.title} as read`}>Mark as Read</button>}

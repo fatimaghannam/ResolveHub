@@ -5,7 +5,7 @@ import { EmptyState, ErrorState, LoadingState } from '../components/common/State
 import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
 import { getAssignedTickets, getOpenTickets } from '../services/agentTicketService.js'
 import { getCategories, getPriorities, getStatuses } from '../services/ticketService.js'
-import { formatLocalDate } from '../utils/dateTime.js'
+import { formatLocalDateTime } from '../utils/dateTime.js'
 import {
   getLocalQuickDateRange,
   getUtcDateRange,
@@ -274,7 +274,7 @@ function AgentTicketsPage({ view = 'assigned' }) {
                         <td><span className="agent-ticket-ellipsis" title={ticket.categoryName}>{ticket.categoryName}</span></td>
                         <td><TicketPriorityBadge value={ticket.priorityName} /></td>
                         <td><TicketStatusBadge value={ticket.statusName} /></td>
-                        <td><span className="agent-ticket-ellipsis" title={formatLocalDate(ticket.createdDate)}>{formatLocalDate(ticket.createdDate)}</span></td>
+                        <td><span className="agent-ticket-ellipsis" title={formatLocalDateTime(ticket.createdDate)}>{formatLocalDateTime(ticket.createdDate)}</span></td>
                         <td><Link className="table-action" to={`/agent/tickets/${formatTicketReference(ticket)}`}>View</Link></td>
                       </tr>
                     ))}

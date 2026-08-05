@@ -21,7 +21,7 @@ import {
   resolveAgentTicket,
   updateAgentTicketStatus,
 } from '../services/agentTicketService.js'
-import { formatLocalDate, formatLocalDateTime } from '../utils/dateTime.js'
+import { formatLocalDateTime } from '../utils/dateTime.js'
 import { formatTicketReference } from '../utils/ticketReference.js'
 
 function AgentTicketDetailsPage() {
@@ -193,7 +193,7 @@ function AgentTicketDetailsPage() {
       {toast && <div className="app-toast-region"><Toast key={toast.id} type={toast.type} title={toast.title} message={toast.message} onDismiss={dismissToast} /></div>}
       <section className="ticket-details-header-grid">
         <Link className="back-link ticket-details-header__back" to="/agent/tickets"><ArrowLeft size={18} aria-hidden="true" />Back to Assigned Tickets</Link>
-        <div className="page-heading ticket-details-header__identity"><span className="eyebrow">{formatTicketReference(ticket)}</span><h2>{ticket.title}</h2><p>Created {formatLocalDate(ticket.createdDate)}</p></div>
+        <div className="page-heading ticket-details-header__identity"><span className="eyebrow">{formatTicketReference(ticket)}</span><h2>{ticket.title}</h2><p>Created {formatLocalDateTime(ticket.createdDate)}</p></div>
         <div className="heading-actions ticket-details-header__actions">
           {canStart && <button className="button button--primary" type="button" onClick={startProgress} disabled={Boolean(saving)}>{saving === 'progress' ? 'Starting…' : 'Start Work'}</button>}
           {ticket.statusName === 'In Progress' && <button className="button button--secondary" type="button" onClick={() => setDialog('pending')} disabled={Boolean(saving)}>{saving === 'pending' ? 'Moving to Pending…' : 'Mark as Pending'}</button>}
@@ -203,7 +203,7 @@ function AgentTicketDetailsPage() {
           {ticket.assignmentRequestStatus === 'Pending' && <PendingApprovalBadge />}
         </div>
       </section>
-      {ticket.statusName === 'Pending' && ticket.currentPending && <section className="pending-info-panel" aria-labelledby="pending-info-title"><div><span className="pending-info-panel__indicator" aria-hidden="true" /><div><h2 id="pending-info-title">Work Pending</h2><p>{ticket.currentPending.reasonText}</p></div></div><dl><div><dt>Pending since</dt><dd>{formatLocalDate(ticket.currentPending.pendingSince)}</dd></div><div><dt>Set by</dt><dd>{ticket.currentPending.setByName}</dd></div>{ticket.currentPending.additionalNote && <div><dt>Additional note</dt><dd>{ticket.currentPending.additionalNote}</dd></div>}</dl></section>}
+      {ticket.statusName === 'Pending' && ticket.currentPending && <section className="pending-info-panel" aria-labelledby="pending-info-title"><div><span className="pending-info-panel__indicator" aria-hidden="true" /><div><h2 id="pending-info-title">Work Pending</h2><p>{ticket.currentPending.reasonText}</p></div></div><dl><div><dt>Pending since</dt><dd>{formatLocalDateTime(ticket.currentPending.pendingSince)}</dd></div><div><dt>Set by</dt><dd>{ticket.currentPending.setByName}</dd></div>{ticket.currentPending.additionalNote && <div><dt>Additional note</dt><dd>{ticket.currentPending.additionalNote}</dd></div>}</dl></section>}
       {ticket.statusName === 'Duplicate' && ticket.originalTicketReference && <section className="duplicate-info-panel" aria-labelledby="duplicate-info-title"><h2 id="duplicate-info-title">Duplicate Ticket</h2><p>This ticket was marked as a duplicate of:</p><Link className="duplicate-info-panel__link" to={`/agent/tickets/${ticket.originalTicketReference}`}><strong>{ticket.originalTicketReference}</strong><span>{ticket.originalTicketTitle || 'View original ticket'}</span></Link></section>}
       <div className="details-grid">
         <section className="panel">

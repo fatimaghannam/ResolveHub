@@ -13,7 +13,7 @@ import { ErrorState, LoadingState } from '../components/common/States.jsx'
 import { TicketPriorityBadge } from '../components/tickets/TicketBadges.jsx'
 import { AgentWorkloadSummary } from '../components/tickets/AgentWorkload.jsx'
 import { getManagerDashboard } from '../services/managerService.js'
-import { formatLocalDate } from '../utils/dateTime.js'
+import { formatLocalDateTime } from '../utils/dateTime.js'
 
 const statistics = [
   ['Total Tickets', 'totalTickets', Ticket, 'blue'],
@@ -74,7 +74,7 @@ function ManagerDashboardPage() {
         <section className="panel dashboard-section">
           <div className="panel__heading"><div><h2>Unassigned Tickets</h2><p>Requests waiting for an active IT Support Agent.</p></div><Link to="/manager/assignments">Manage assignments</Link></div>
           <div className="table-scroll"><table className="ticket-table admin-dashboard-assignment-table"><thead><tr><th>Ticket</th><th>Title</th><th>Requester</th><th>Priority</th><th>Created</th><th>Action</th></tr></thead><tbody>
-            {data.unassigned.map((ticket) => <tr key={ticket.id}><td><strong>{ticket.ticketReferenceNumber}</strong></td><td><span className="assignment-title" title={ticket.title}>{ticket.title}</span></td><td>{ticket.requesterName}</td><td><TicketPriorityBadge value={ticket.priorityName} /></td><td>{formatLocalDate(ticket.createdDate)}</td><td><Link className="table-action" to={`/manager/assignments?ticket=${ticket.ticketReferenceNumber}`}>Assign</Link></td></tr>)}
+            {data.unassigned.map((ticket) => <tr key={ticket.id}><td><strong>{ticket.ticketReferenceNumber}</strong></td><td><span className="assignment-title" title={ticket.title}>{ticket.title}</span></td><td>{ticket.requesterName}</td><td><TicketPriorityBadge value={ticket.priorityName} /></td><td>{formatLocalDateTime(ticket.createdDate)}</td><td><Link className="table-action" to={`/manager/assignments?ticket=${ticket.ticketReferenceNumber}`}>Assign</Link></td></tr>)}
           </tbody></table></div>
         </section>
         <div className="admin-chart-grid">
@@ -84,7 +84,7 @@ function ManagerDashboardPage() {
           </section>
           <section className="panel">
             <div className="panel__heading"><div><h2>Recent Ticket Activity</h2><p>Latest operational changes.</p></div><Link to="/manager/activity">View activity</Link></div>
-            <div className="manager-activity-list">{data.recentActivity.map((item) => <article key={item.id}><strong>{item.actionType}</strong><span>{item.ticketReferenceNumber} · {item.actorName}</span><small>{formatLocalDate(item.createdDate)}</small></article>)}</div>
+            <div className="manager-activity-list">{data.recentActivity.map((item) => <article key={item.id}><strong>{item.actionType}</strong><span>{item.ticketReferenceNumber} · {item.actorName}</span><small>{formatLocalDateTime(item.createdDate)}</small></article>)}</div>
           </section>
         </div>
         <section className="panel">

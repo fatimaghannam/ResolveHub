@@ -11,7 +11,7 @@ import { Link, useOutletContext } from 'react-router-dom'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
 import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
 import { getAgentDashboard } from '../services/agentTicketService.js'
-import { formatLocalDate } from '../utils/dateTime.js'
+import { formatLocalDateTime } from '../utils/dateTime.js'
 import { formatTicketReference } from '../utils/ticketReference.js'
 
 const statIcons = [ListChecks, Clock3, PauseCircle, AlertTriangle, CircleAlert, CheckCircle2]
@@ -81,7 +81,7 @@ function AgentDashboardPage() {
                     <div className="priority-item__summary">
                       <strong>{formatTicketReference(ticket)}</strong>
                       <span>{ticket.title}</span>
-                      <small>Requested by {ticket.requesterName} · {formatLocalDate(ticket.createdDate)}</small>
+                      <small>Requested by {ticket.requesterName} · {formatLocalDateTime(ticket.createdDate)}</small>
                     </div>
                     <div className="priority-item__badges">
                       <TicketPriorityBadge value={ticket.priorityName} />
@@ -116,7 +116,7 @@ function AgentDashboardPage() {
                         <td>{ticket.requesterName}</td>
                         <td><TicketPriorityBadge value={ticket.priorityName} /></td>
                         <td><TicketStatusBadge value={ticket.statusName} /></td>
-                        <td>{formatLocalDate(ticket.createdDate)}</td>
+                        <td>{formatLocalDateTime(ticket.createdDate)}</td>
                         <td><Link className="table-action" to={`/agent/tickets/${formatTicketReference(ticket)}`}>View</Link></td>
                       </tr>
                     ))}

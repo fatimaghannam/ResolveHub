@@ -4,7 +4,7 @@ import { MoreHorizontal, Plus } from 'lucide-react'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
 import Toast from '../components/common/Toast.jsx'
 import { getAdminUsers, updateAdminUserStatus } from '../services/adminService.js'
-import { formatLocalDate } from '../utils/dateTime.js'
+import { formatLocalDateTime } from '../utils/dateTime.js'
 
 function AdminUsersPage() {
   const { user: authenticatedUser } = useOutletContext()
@@ -98,7 +98,7 @@ function AdminUsersPage() {
               <td><span className="users-role" title={user.role}>{user.role}</span></td>
               <td><span className="users-department" title={user.department}>{user.department}</span></td>
               <td><span className={`user-status user-status--${user.status.toLowerCase()}`}>{user.status}</span></td>
-              <td className="users-created">{formatLocalDate(user.createdDate)}</td>
+              <td className="users-created">{formatLocalDateTime(user.createdDate)}</td>
               <td>
                 <details className="row-action-menu">
                   <summary aria-label={`Actions for ${user.firstName} ${user.lastName}`}><MoreHorizontal size={19} aria-hidden="true" /></summary>

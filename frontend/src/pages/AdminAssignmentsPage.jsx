@@ -12,7 +12,7 @@ import {
   getManagerAssignments,
 } from '../services/managerService.js'
 import { getCategories, getPriorities } from '../services/ticketService.js'
-import { formatLocalDate } from '../utils/dateTime.js'
+import { formatLocalDateTime } from '../utils/dateTime.js'
 import {
   getLocalQuickDateRange,
   getUtcDateRange,
@@ -310,7 +310,7 @@ function AdminAssignmentsPage({ roleArea = 'admin' }) {
               <td><span className="assignment-ticket-identity"><strong>{request.ticketTitle}</strong><small>{request.ticketReferenceNumber}</small></span></td>
               <td><span className="assignment-agent-name">{request.requestedAgentName || 'Unavailable'}</span></td>
               {roleArea === 'admin' && <><td className="assignment-workload">{request.requestedAgentActiveTicketCount}/{request.requestedAgentMaxActiveTickets}</td><td>{request.requestedByName}</td></>}
-              <td className="assignment-date">{formatLocalDate(request.requestedDate)}</td>
+              <td className="assignment-date">{formatLocalDateTime(request.requestedDate)}</td>
               {roleArea === 'manager' && <td><span className={`badge assignment-request-status assignment-request-status--${request.status.toLowerCase()}`}>{request.status === 'Pending' ? 'Pending Approval' : request.status}</span></td>}
               <td><div className="table-actions assignment-request-actions">{roleArea === 'admin' && request.status === 'Pending' && <><button className="button button--primary button--compact assignment-approval-action" type="button" disabled={Boolean(reviewingRequest)} onClick={() => reviewRequest(request, 'approve')}>{approving ? 'Approving…' : 'Approve'}</button><button className="button button--danger-outline button--compact assignment-approval-action" type="button" disabled={Boolean(reviewingRequest)} onClick={() => setRejectingRequest(request)}>{rejecting ? 'Rejecting…' : 'Reject'}</button></>}<Link className={`${roleArea === 'admin' ? 'table-action assignment-approval-view-link' : 'button button--secondary button--compact assignment-approval-action'}${rowBusy ? ' assignment-action--disabled' : ''}`} to={`/${roleArea}/tickets/${request.ticketReferenceNumber}`} aria-disabled={rowBusy || undefined} tabIndex={rowBusy ? -1 : undefined} onClick={(event) => { if (rowBusy) event.preventDefault() }}>View Ticket</Link></div></td>
             </tr>
@@ -337,7 +337,7 @@ function AdminAssignmentsPage({ roleArea = 'admin' }) {
             <td><span className="assignments-ticket-title" title={ticket.title}>{ticket.title}</span></td>
             <td className="assignments-requester" title={ticket.requesterName}>{ticket.requesterName}</td>
             <td><TicketPriorityBadge value={ticket.priorityName} /></td>
-            <td className="assignments-created">{formatLocalDate(ticket.createdDate)}</td>
+            <td className="assignments-created">{formatLocalDateTime(ticket.createdDate)}</td>
             <td><label className="sr-only" htmlFor={`agent-${ticket.id}`}>Assign {ticket.ticketReferenceNumber} to</label><select className="assignment-agent-select" id={`agent-${ticket.id}`} value={selections[ticket.ticketReferenceNumber] ?? ''} onChange={(event) => setSelections({ ...selections, [ticket.ticketReferenceNumber]: event.target.value })}><option value="">Select agent</option>{agentWorkloads.map((agent) => <option value={agent.userId} key={agent.userId} disabled={agent.isAtCapacity}>{agent.name}</option>)}</select></td>
             <td><button className="button button--primary button--compact assignment-submit" type="button" disabled={!selectedAgent(ticket.ticketReferenceNumber) || selectedAgent(ticket.ticketReferenceNumber)?.isAtCapacity || Boolean(assigning)} onClick={() => assignTicket(ticket)}>{assigning === ticket.ticketReferenceNumber ? roleArea === 'manager' ? 'Submitting…' : 'Assigning…' : 'Assign'}</button></td>
           </tr>)}</tbody>

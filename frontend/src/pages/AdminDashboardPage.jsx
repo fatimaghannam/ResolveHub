@@ -21,7 +21,7 @@ import { TicketPriorityBadge } from '../components/tickets/TicketBadges.jsx'
 import { AgentWorkloadSummary } from '../components/tickets/AgentWorkload.jsx'
 import { ErrorState, LoadingState } from '../components/common/States.jsx'
 import { getAdminDashboard } from '../services/adminService.js'
-import { formatLocalDate } from '../utils/dateTime.js'
+import { formatLocalDateTime } from '../utils/dateTime.js'
 
 const statistics = [
   ['Total Users', 'totalUsers', Users, 'blue'],
@@ -121,7 +121,7 @@ function AdminDashboardPage() {
                 <td><strong>{ticket.ticketReferenceNumber}</strong></td>
                 <td><span className="assignment-title" title={ticket.title}>{ticket.title}</span></td><td>{ticket.requesterName}</td><td>{ticket.categoryName}</td>
                 <td><TicketPriorityBadge value={ticket.priorityName} /></td>
-                <td>{formatLocalDate(ticket.createdDate)}</td>
+                <td>{formatLocalDateTime(ticket.createdDate)}</td>
                 <td><Link className="button button--secondary button--compact" to={`/admin/assignments?ticket=${ticket.ticketReferenceNumber}`}>Assign</Link></td>
               </tr>
             ))}</tbody>
