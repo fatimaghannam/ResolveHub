@@ -21,8 +21,7 @@ export const assignManagerTicket = (ticketReference, agentUserId) =>
 export const getManagerWorkload = (signal) =>
   apiRequest('/api/manager/workload', { signal })
 
-export const getManagerActivity = (signal) =>
-  apiRequest('/api/manager/activity', { signal })
+
 
 export const getManagerAssignmentRequests = (signal) =>
   apiRequest('/api/manager/assignment-requests', { signal })

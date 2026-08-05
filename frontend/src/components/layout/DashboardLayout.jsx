@@ -15,7 +15,6 @@ import {
   Tags,
   Ticket,
   Users,
-  Activity,
   BarChart3,
   X,
 } from 'lucide-react'
@@ -64,7 +63,7 @@ const managerNavigation = [
   { id: 'assignments', to: '/manager/assignments', label: 'Ticket Assignments', icon: ClipboardCheck },
   { id: 'workload', to: '/manager/workload', label: 'Team Workload', icon: BarChart3 },
   { id: 'audit-log', to: '/manager/audit-log', label: 'System Audit Log', icon: FileClock },
-  { id: 'activity', to: '/manager/activity', label: 'Activity', icon: Activity },
+  
   { id: 'notifications', to: '/manager/notifications', label: 'Notifications', icon: Bell },
   { id: 'profile', to: '/manager/profile', label: 'Profile', icon: CircleUserRound },
 ]
@@ -106,7 +105,7 @@ function getPageTitle(pathname, roleArea) {
       '/manager/assignments': 'Ticket Assignments',
       '/manager/workload': 'Team Workload',
       '/manager/audit-log': 'System Audit Log',
-      '/manager/activity': 'Ticket Activity',
+
       '/manager/notifications': 'Notifications',
       '/manager/profile': 'Profile',
     }

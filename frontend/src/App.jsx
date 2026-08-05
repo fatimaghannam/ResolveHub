@@ -30,7 +30,7 @@ import AdminUserDetailsPage from './pages/AdminUserDetailsPage.jsx'
 import { ADMIN_ROLE, EMPLOYEE_ROLE, IT_AGENT_ROLE, MANAGER_ROLE } from './services/authStorage.js'
 import ManagerDashboardPage from './pages/ManagerDashboardPage.jsx'
 import ManagerWorkloadPage from './pages/ManagerWorkloadPage.jsx'
-import ManagerActivityPage from './pages/ManagerActivityPage.jsx'
+
 
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage.jsx'))
 
@@ -93,7 +93,7 @@ function App() {
           <Route path="assignments" element={<AdminAssignmentsPage roleArea="manager" />} />
           <Route path="workload" element={<ManagerWorkloadPage />} />
           <Route path="audit-log" element={<AdminActivityPage roleArea="manager" />} />
-          <Route path="activity" element={<ManagerActivityPage />} />
+         <Route path="activity" element={<Navigate to="/manager/audit-log" replace />} />
           <Route path="notifications" element={<AdminNotificationsPage roleArea="manager" />} />
           <Route path="profile" element={<AdminProfilePage />} />
         </Route>

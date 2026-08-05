@@ -77,20 +77,22 @@ function ManagerDashboardPage() {
             {data.unassigned.map((ticket) => <tr key={ticket.id}><td><strong>{ticket.ticketReferenceNumber}</strong></td><td><span className="assignment-title" title={ticket.title}>{ticket.title}</span></td><td>{ticket.requesterName}</td><td><TicketPriorityBadge value={ticket.priorityName} /></td><td>{formatLocalDateTime(ticket.createdDate)}</td><td><Link className="table-action" to={`/manager/assignments?ticket=${ticket.ticketReferenceNumber}`}>Assign</Link></td></tr>)}
           </tbody></table></div>
         </section>
-        <div className="admin-chart-grid">
-          <section className="panel">
-            <div className="panel__heading"><div><h2>Agent Workload</h2><p>Current active assignments by agent.</p></div><Link to="/manager/workload">View team</Link></div>
-            <div className="dashboard-workload-list">{data.agentWorkloads.map((agent) => <AgentWorkloadSummary agent={agent} key={agent.userId} />)}</div>
-          </section>
-          <section className="panel">
-            <div className="panel__heading"><div><h2>Recent Ticket Activity</h2><p>Latest operational changes.</p></div><Link to="/manager/activity">View activity</Link></div>
-            <div className="manager-activity-list">{data.recentActivity.map((item) => <article key={item.id}><strong>{item.actionType}</strong><span>{item.ticketReferenceNumber} · {item.actorName}</span><small>{formatLocalDateTime(item.createdDate)}</small></article>)}</div>
-          </section>
-        </div>
-        <section className="panel">
-          <div className="panel__heading"><div><h2>Tickets Requiring Attention</h2><p>Unassigned, high-priority, and critical support requests.</p></div><Link to="/manager/tickets">View all tickets</Link></div>
-          <div className="priority-list">{data.ticketsRequiringAttention.map((ticket) => <div className="priority-item" key={ticket.id}><div className="priority-item__summary"><strong>{ticket.ticketReferenceNumber}</strong><span>{ticket.title}</span></div><div className="priority-item__badges"><TicketPriorityBadge value={ticket.priorityName} /></div><Link className="table-action" to={`/manager/tickets/${ticket.ticketReferenceNumber}`}>View</Link></div>)}</div>
-        </section>
+        <section className="panel dashboard-section">
+  <div className="panel__heading">
+    <div>
+      <h2>Agent Workload</h2>
+      <p>Current active assignments by agent.</p>
+    </div>
+
+    <Link to="/manager/workload">View team</Link>
+  </div>
+
+  <div className="dashboard-workload-list">
+    {data.agentWorkloads.map((agent) => (
+      <AgentWorkloadSummary agent={agent} key={agent.userId} />
+    ))}
+  </div>
+</section>
       </>}
     </>
   )
