@@ -31,16 +31,49 @@ function AdminUserDetailsPage() {
   if (!user) return <LoadingState message="Loading user…" />
 
   const initials = `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase()
+  const fullName = `${user.firstName} ${user.lastName}`.trim()
+  const displayStatus = formatAccountStatus(user.status)
+  const showDepartment = user.role === 'Manager' || Boolean(user.department)
   return (
-    <>
+    <div className="admin-user-details-page">
       <Link className="back-link back-link--top" to="/admin/users"><ArrowLeft size={18} />Back to Users</Link>
-      <section className="page-heading"><h2>{user.firstName} {user.lastName}</h2><p>Read-only account details</p></section>
-      <section className="panel profile-panel">
-        <div className="admin-user-profile-heading"><span className="profile-avatar" aria-hidden="true">{initials}</span><div><h3>Profile</h3><p>{user.email}</p></div></div>
-        <dl className="profile-details"><div><dt>Full name</dt><dd>{user.firstName} {user.lastName}</dd></div><div><dt>Email</dt><dd>{user.email}</dd></div><div><dt>Role</dt><dd>{user.role}</dd></div><div><dt>Department</dt><dd>{user.department ?? '—'}</dd></div><div><dt>Status</dt><dd><span className={`user-status user-status--${accountStatusClassName(user.status)}`}>{formatAccountStatus(user.status)}</span></dd></div></dl>
+      <section className="page-heading admin-user-details-heading"><h2>User Details</h2><p>View account information, access level, and current status.</p></section>
+      <section className="panel admin-user-details-card">
+        <header className="admin-user-identity">
+          <span className="profile-avatar admin-user-identity__avatar" aria-hidden="true">{initials}</span>
+          <div className="admin-user-identity__content">
+            <h3>{fullName}</h3>
+            <a href={`mailto:${user.email}`}>{user.email}</a>
+            <div className="admin-user-identity__badges">
+              <span className="admin-user-role-badge">{user.role}</span>
+              <span className={`user-status user-status--${accountStatusClassName(user.status)}`}>{displayStatus}</span>
+            </div>
+            {showDepartment && <p className="admin-user-identity__department">{user.department ?? '—'}</p>}
+          </div>
+        </header>
+
+        <div className="admin-user-details-divider" />
+        <div className="admin-user-information-grid">
+          <section aria-labelledby="profile-information-title">
+            <h4 id="profile-information-title">Profile Information</h4>
+            <dl className="admin-user-information-list">
+              <div><dt>Full name</dt><dd>{fullName}</dd></div>
+              <div><dt>Email</dt><dd className="admin-user-information-email">{user.email}</dd></div>
+              <div><dt>Role</dt><dd>{user.role}</dd></div>
+              {showDepartment && <div><dt>Department</dt><dd>{user.department ?? '—'}</dd></div>}
+            </dl>
+          </section>
+          <section aria-labelledby="account-information-title">
+            <h4 id="account-information-title">Account Information</h4>
+            <dl className="admin-user-information-list">
+              <div><dt>Account status</dt><dd><span className={`user-status user-status--${accountStatusClassName(user.status)}`}>{displayStatus}</span></dd></div>
+              <div><dt>Created</dt><dd><time dateTime={user.createdDate}>{formatLocalDateTime(user.createdDate)}</time></dd></div>
+              {user.lastLoginDate && <div><dt>Last login</dt><dd><time dateTime={user.lastLoginDate}>{formatLocalDateTime(user.lastLoginDate)}</time></dd></div>}
+            </dl>
+          </section>
+        </div>
       </section>
-      <section className="panel profile-panel"><h3>Account Information</h3><dl className="profile-details"><div><dt>Created</dt><dd>{formatLocalDateTime(user.createdDate)}</dd></div>{user.lastLoginDate && <div><dt>Last login</dt><dd>{formatLocalDateTime(user.lastLoginDate)}</dd></div>}<div><dt>Account ID</dt><dd>{user.id}</dd></div></dl></section>
-    </>
+    </div>
   )
 }
 
