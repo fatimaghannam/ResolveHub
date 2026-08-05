@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using ResolveHub.Api.Data;
 using ResolveHub.Api.DTOs.Admin;
 using ResolveHub.Api.Entities;
+using ResolveHub.Api.Infrastructure;
 using ResolveHub.Api.Services.Interfaces;
 
 namespace ResolveHub.Api.Services.Implementations;
@@ -38,7 +39,8 @@ public sealed class SystemAuditLogService(ApplicationDbContext dbContext) : ISys
                 (log.PerformedByUserAccount.Email != null &&
                     log.PerformedByUserAccount.Email.Contains(search)));
 
-        query = ApplyDates(query, filter);
+        query = query.ApplyUtcDateRange(filter.FromUtc,
+            filter.ToUtcExclusive, log => log.CreatedDate);
 
         var totalItems = await query.CountAsync(token);
         var rows = await query.OrderByDescending(log => log.CreatedDate)
@@ -94,23 +96,6 @@ public sealed class SystemAuditLogService(ApplicationDbContext dbContext) : ISys
 
         return new(items, page, pageSize, totalItems,
             (int)Math.Ceiling(totalItems / (double)pageSize));
-    }
-
-    private static IQueryable<ActivityLog> ApplyDates(
-        IQueryable<ActivityLog> query, SystemAuditFilterDto filter)
-    {
-        var today = DateTime.UtcNow.Date;
-        return filter.DateRange switch
-        {
-            "today" => query.Where(log => log.CreatedDate >= today),
-            "yesterday" => query.Where(log => log.CreatedDate >= today.AddDays(-1) && log.CreatedDate < today),
-            "7" => query.Where(log => log.CreatedDate >= today.AddDays(-6)),
-            "30" => query.Where(log => log.CreatedDate >= today.AddDays(-29)),
-            "custom" => query.Where(log =>
-                (filter.FromDate == null || log.CreatedDate >= filter.FromDate.Value.Date) &&
-                (filter.ToDate == null || log.CreatedDate < filter.ToDate.Value.Date.AddDays(1))),
-            _ => query
-        };
     }
 
     private static string Category(string action, string entityType)

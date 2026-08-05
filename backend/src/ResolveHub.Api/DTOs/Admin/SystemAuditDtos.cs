@@ -4,9 +4,8 @@ namespace ResolveHub.Api.DTOs.Admin;
 public sealed class SystemAuditFilterDto
 {
     public string? Search { get; init; }
-    public string? DateRange { get; init; }
-    public DateTime? FromDate { get; init; }
-    public DateTime? ToDate { get; init; }
+    public DateTimeOffset? FromUtc { get; init; }
+    public DateTimeOffset? ToUtcExclusive { get; init; }
     [Range(1, int.MaxValue)] public int Page { get; init; } = 1;
     [Range(1, 100)] public int PageSize { get; init; } = 20;
 }

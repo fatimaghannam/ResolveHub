@@ -6,6 +6,7 @@ using ResolveHub.Api.Data;
 using ResolveHub.Api.DTOs.Tickets;
 using ResolveHub.Api.DTOs.Common;
 using ResolveHub.Api.Entities;
+using ResolveHub.Api.Infrastructure;
 using ResolveHub.Api.Services.Interfaces;
 using ResolveHub.Api.Services.Models;
 
@@ -159,15 +160,11 @@ public sealed class AdminTicketService(
             query = query.Where(ticket => ticket.AssignedToUserAccountID == null);
         if (filter.AssignedOnly == true)
             query = query.Where(ticket => ticket.AssignedToUserAccountID != null);
-        if (filter.FromUtc.HasValue)
-            query = query.Where(ticket =>
-                ticket.CreatedDate >= filter.FromUtc.Value.UtcDateTime);
-        else if (filter.FromDate.HasValue)
+        query = query.ApplyUtcDateRange(filter.FromUtc,
+            filter.ToUtcExclusive, ticket => ticket.CreatedDate);
+        if (!filter.FromUtc.HasValue && filter.FromDate.HasValue)
             query = query.Where(ticket => ticket.CreatedDate >= filter.FromDate.Value.Date);
-        if (filter.ToUtcExclusive.HasValue)
-            query = query.Where(ticket =>
-                ticket.CreatedDate < filter.ToUtcExclusive.Value.UtcDateTime);
-        else if (filter.ToDate.HasValue)
+        if (!filter.ToUtcExclusive.HasValue && filter.ToDate.HasValue)
         {
             var end = filter.ToDate.Value.Date.AddDays(1);
             query = query.Where(ticket => ticket.CreatedDate < end);
@@ -798,12 +795,8 @@ public sealed class AdminTicketService(
         if (filter.PriorityId.HasValue)
             query = query.Where(ticket =>
                 ticket.TicketPriorityID == filter.PriorityId);
-        if (filter.FromUtc.HasValue)
-            query = query.Where(ticket =>
-                ticket.CreatedDate >= filter.FromUtc.Value.UtcDateTime);
-        if (filter.ToUtcExclusive.HasValue)
-            query = query.Where(ticket =>
-                ticket.CreatedDate < filter.ToUtcExclusive.Value.UtcDateTime);
+        query = query.ApplyUtcDateRange(filter.FromUtc,
+            filter.ToUtcExclusive, ticket => ticket.CreatedDate);
         return query
             .OrderByDescending(ticket => ticket.TicketPriority.SortOrder)
             .ThenBy(ticket => ticket.CreatedDate)

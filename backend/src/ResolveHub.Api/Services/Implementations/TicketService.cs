@@ -5,6 +5,7 @@ using ResolveHub.Api.Data;
 using ResolveHub.Api.DTOs.Common;
 using ResolveHub.Api.DTOs.Tickets;
 using ResolveHub.Api.Entities;
+using ResolveHub.Api.Infrastructure;
 using ResolveHub.Api.Services.Interfaces;
 using ResolveHub.Api.Services.Models;
 
@@ -77,17 +78,8 @@ public sealed class TicketService(ApplicationDbContext dbContext)
         if (filter.PriorityId.HasValue)
             query = query.Where(ticket => ticket.TicketPriorityID == filter.PriorityId);
 
-        if (filter.FromUtc.HasValue)
-        {
-            var fromUtc = filter.FromUtc.Value.UtcDateTime;
-            query = query.Where(ticket => ticket.CreatedDate >= fromUtc);
-        }
-
-        if (filter.ToUtcExclusive.HasValue)
-        {
-            var toUtcExclusive = filter.ToUtcExclusive.Value.UtcDateTime;
-            query = query.Where(ticket => ticket.CreatedDate < toUtcExclusive);
-        }
+        query = query.ApplyUtcDateRange(filter.FromUtc,
+            filter.ToUtcExclusive, ticket => ticket.CreatedDate);
 
         var totalItems = await query.CountAsync(cancellationToken);
         query = ApplySorting(query, filter.SortBy, filter.SortDirection);

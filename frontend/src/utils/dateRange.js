@@ -51,6 +51,8 @@ export function getLocalQuickDateRange(range, currentDate = new Date()) {
   const end = new Date(today)
 
   switch (range) {
+    case 'today':
+      break
     case 'yesterday':
       start.setDate(start.getDate() - 1)
       end.setDate(end.getDate() - 1)
@@ -72,6 +74,7 @@ export function getLocalQuickDateRange(range, currentDate = new Date()) {
 }
 export const STANDARD_DATE_RANGE_OPTIONS = [
   ['all', 'All Dates'],
+  ['today', 'Today'],
   ['yesterday', 'Yesterday'],
   ['last7Days', 'Last 7 Days'],
   ['last30Days', 'Last 30 Days'],

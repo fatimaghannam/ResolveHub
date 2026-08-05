@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
 import { getSystemAuditLog } from '../services/adminService.js'
+import { getLocalQuickDateRange, getUtcDateRange, STANDARD_DATE_RANGE_OPTIONS } from '../utils/dateRange.js'
 import { formatLocalDate, formatLocalDateTime, formatLocalTime } from '../utils/dateTime.js'
 
 const initialFilters = {
@@ -34,10 +35,14 @@ function AdminActivityPage() {
     const controller = new AbortController()
     const timer = window.setTimeout(() => {
       const request = Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== ''))
-      if (request.dateRange !== 'custom') {
-        delete request.fromDate
-        delete request.toDate
-      }
+      const localDates = filters.dateRange === 'custom'
+        ? { fromDate: filters.fromDate, toDate: filters.toDate }
+        : getLocalQuickDateRange(filters.dateRange)
+      const { fromUtc, toUtcExclusive } = getUtcDateRange(localDates?.fromDate, localDates?.toDate)
+      delete request.dateRange
+      delete request.fromDate
+      delete request.toDate
+      if (fromUtc && toUtcExclusive) Object.assign(request, { fromUtc, toUtcExclusive })
       getSystemAuditLog(request, controller.signal)
         .then((result) => { setData(result); setError('') })
         .catch((requestError) => {
@@ -61,7 +66,7 @@ function AdminActivityPage() {
       <section className="page-heading"><h2>System Audit Log</h2><p>Review important administrative, security, and system-level actions across ResolveHub.</p></section>
       <section className="filter-panel system-audit-filters">
         <label className="filter-search"><span>Search</span><input value={filters.search} onChange={(event) => updateFilter('search', event.target.value)} placeholder="Action, user, ticket, category, or details" /></label>
-        <label><span>Date Range</span><select value={filters.dateRange} onChange={(event) => updateFilter('dateRange', event.target.value)}><option value="all">All Dates</option><option value="today">Today</option><option value="yesterday">Yesterday</option><option value="7">Last 7 Days</option><option value="30">Last 30 Days</option><option value="custom">Custom Range</option></select></label>
+        <label><span>Date Range</span><select value={filters.dateRange} onChange={(event) => updateFilter('dateRange', event.target.value)}>{STANDARD_DATE_RANGE_OPTIONS.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
         <button className="button button--secondary" type="button" onClick={() => setFilters(initialFilters)}>Clear</button>
         {filters.dateRange === 'custom' && <div className="system-audit-custom-dates"><label><span>From Date</span><input type="date" value={filters.fromDate} max={filters.toDate || undefined} onChange={(event) => updateFilter('fromDate', event.target.value)} /></label><label><span>To Date</span><input type="date" value={filters.toDate} min={filters.fromDate || undefined} onChange={(event) => updateFilter('toDate', event.target.value)} /></label>{dateError && <p className="form-error" role="alert">{dateError}</p>}</div>}
       </section>

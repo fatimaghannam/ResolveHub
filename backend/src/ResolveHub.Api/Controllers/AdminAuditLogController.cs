@@ -15,9 +15,10 @@ public sealed class AdminAuditLogController(ISystemAuditLogService service) : Co
     public async Task<ActionResult<SystemAuditPageDto>> Get(
         [FromQuery] SystemAuditFilterDto filter, CancellationToken token)
     {
-        if (filter.DateRange == "custom" && filter.FromDate is not null &&
-            filter.ToDate is not null && filter.FromDate.Value.Date > filter.ToDate.Value.Date)
-            return BadRequest(new { message = "From Date cannot be later than To Date." });
+        if (filter.FromUtc.HasValue != filter.ToUtcExclusive.HasValue)
+            return BadRequest(new { message = "Both UTC date boundaries are required." });
+        if (filter.FromUtc is not null && filter.ToUtcExclusive <= filter.FromUtc)
+            return BadRequest(new { message = "The end boundary must be later than the start boundary." });
 
         return Ok(await service.GetAsync(filter, token));
     }
