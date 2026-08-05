@@ -44,11 +44,6 @@ function AdminUserDetailsPage() {
           <div className="admin-user-identity__content">
             <h3>{fullName}</h3>
             <a href={`mailto:${user.email}`}>{user.email}</a>
-            <div className="admin-user-identity__badges">
-              <span className="admin-user-role-badge">{user.role}</span>
-              <span className={`user-status user-status--${accountStatusClassName(user.status)}`}>{displayStatus}</span>
-            </div>
-            {showDepartment && <p className="admin-user-identity__department">{user.department ?? '—'}</p>}
           </div>
         </header>
 

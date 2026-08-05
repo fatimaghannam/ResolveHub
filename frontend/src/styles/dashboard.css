@@ -625,9 +625,6 @@ html:has(.dashboard-shell) { scroll-padding-top: 98px; }
 .admin-user-identity__content h3 { margin:0 0 4px; color:var(--ink); font-size:1.2rem; line-height:1.3; }
 .admin-user-identity__content > a { display:block; max-width:100%; overflow:hidden; color:#66778b; font-size:.83rem; text-decoration:none; text-overflow:ellipsis; white-space:nowrap; }
 .admin-user-identity__content > a:hover { color:var(--blue); text-decoration:underline; text-underline-offset:3px; }
-.admin-user-identity__badges { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:11px; }
-.admin-user-role-badge { display:inline-flex; align-items:center; min-height:25px; padding:4px 9px; border:1px solid #cbdced; border-radius:999px; color:#315f8d; background:#eef5fc; font-size:.7rem; font-weight:750; line-height:1; white-space:nowrap; }
-.admin-user-identity__department { margin:7px 0 0; color:#738398; font-size:.74rem; font-weight:600; }
 .admin-user-details-divider { height:1px; margin:0 26px; background:#e5ebf1; }
 .admin-user-information-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:42px; padding:22px 26px 25px; }
 .admin-user-information-grid > section { min-width:0; }
