@@ -8,6 +8,7 @@ public enum LoginStatus
     InvalidCredentials,
     LockedOut,
     Inactive,
+    PendingSetup,
     MissingRole
 }
 

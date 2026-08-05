@@ -34,6 +34,7 @@ function ResetPasswordPage() {
   const navigate = useNavigate()
   const email = searchParams.get('email') ?? ''
   const token = searchParams.get('token') ?? ''
+  const isAccountSetup = searchParams.get('setup') === 'true'
 
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -78,7 +79,9 @@ function ResetPasswordPage() {
         replace: true,
         state: {
           passwordResetMessage:
-            'Your password has been reset successfully. Sign in using your new password.',
+            isAccountSetup
+              ? 'Your password has been created successfully. You can now sign in.'
+              : 'Your password has been reset successfully. Sign in using your new password.',
         },
       })
     } catch (error) {
@@ -94,8 +97,8 @@ function ResetPasswordPage() {
         <section className="login-card auth-card" aria-labelledby="reset-heading">
           <div className="login-card__header">
             <span className="login-card__brand">ResolveHub</span>
-            <h1 id="reset-heading">Create New Password</h1>
-            <p>Choose a strong password for your ResolveHub account.</p>
+            <h1 id="reset-heading">{isAccountSetup ? 'Set Your Password' : 'Create New Password'}</h1>
+            <p>{isAccountSetup ? 'Create a secure password to finish setting up your ResolveHub account.' : 'Choose a strong password for your ResolveHub account.'}</p>
           </div>
 
           <form className="login-form" onSubmit={handleSubmit} noValidate>
@@ -173,7 +176,7 @@ function ResetPasswordPage() {
                   Resetting...
                 </>
               ) : (
-                'Reset Password'
+                isAccountSetup ? 'Create Password' : 'Reset Password'
               )}
             </button>
           </form>

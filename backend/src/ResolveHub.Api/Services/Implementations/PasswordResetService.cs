@@ -52,6 +52,7 @@ public sealed class PasswordResetService
         if (user is null ||
             !user.IsActive ||
             !user.EmailConfirmed ||
+            !await _userManager.HasPasswordAsync(user) ||
             string.IsNullOrWhiteSpace(user.Email))
         {
             _logger.LogInformation(

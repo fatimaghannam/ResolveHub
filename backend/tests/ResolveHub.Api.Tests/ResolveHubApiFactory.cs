@@ -495,4 +495,11 @@ public sealed class FakePasswordResetEmailSender
 
         return Task.CompletedTask;
     }
+
+    public Task SendAccountInvitationEmailAsync(
+        string recipientEmail,
+        string recipientName,
+        string setupUrl,
+        CancellationToken cancellationToken) =>
+        SendPasswordResetEmailAsync(recipientEmail, recipientName, setupUrl, cancellationToken);
 }

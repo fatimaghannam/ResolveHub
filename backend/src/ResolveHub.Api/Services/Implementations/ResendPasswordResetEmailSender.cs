@@ -53,6 +53,40 @@ public sealed class ResendPasswordResetEmailSender(
             cancellationToken);
     }
 
+    public async Task SendAccountInvitationEmailAsync(
+        string recipientEmail,
+        string recipientName,
+        string setupUrl,
+        CancellationToken cancellationToken)
+    {
+        var encodedName = WebUtility.HtmlEncode(recipientName);
+        var encodedSetupUrl = WebUtility.HtmlEncode(setupUrl);
+        var expirationMinutes = _passwordResetSettings.TokenLifetimeMinutes;
+        var message = new EmailMessage
+        {
+            From = $"{_resendSettings.FromName} <{_resendSettings.FromEmail}>",
+            Subject = "Set up your ResolveHub account",
+            TextBody =
+                $"Hello {recipientName},{Environment.NewLine}{Environment.NewLine}" +
+                "Your ResolveHub account has been created. Use the secure link below to create your password:" +
+                $"{Environment.NewLine}{Environment.NewLine}{setupUrl}{Environment.NewLine}" +
+                $"This link expires in {expirationMinutes} minutes.{Environment.NewLine}{Environment.NewLine}" +
+                "If you did not expect this invitation, contact IT Support.",
+            HtmlBody = $"""
+                <!doctype html><html lang="en"><body style="margin:0;background:#f3f6fa;font-family:Arial,sans-serif;color:#172033;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:32px 16px;"><tr><td align="center">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#fff;border:1px solid #dce5ef;border-radius:16px;"><tr><td style="padding:36px;">
+                <p style="color:#1769c2;font-weight:700;letter-spacing:1px;text-transform:uppercase;">ResolveHub</p>
+                <h1>Set up your account</h1><p>Hello {encodedName},</p><p>Your ResolveHub account has been created. Create your password to finish setting up your account.</p>
+                <p><a href="{encodedSetupUrl}" style="display:inline-block;padding:14px 24px;border-radius:8px;background:#1769c2;color:#fff;font-weight:700;text-decoration:none;">Create Password</a></p>
+                <p>This link expires in {expirationMinutes} minutes.</p><p>If you did not expect this invitation, contact IT Support.</p>
+                </td></tr></table></td></tr></table></body></html>
+                """
+        };
+        message.To.Add(recipientEmail);
+        await resend.EmailSendAsync(message, cancellationToken);
+    }
+
     private static string BuildPlainTextBody(
         string recipientName,
         string resetUrl,

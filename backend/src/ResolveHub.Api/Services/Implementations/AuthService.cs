@@ -54,6 +54,14 @@ public sealed class AuthService : IAuthService
                 LoginStatus.Inactive);
         }
 
+        if (!await _userManager.HasPasswordAsync(user))
+        {
+            _logger.LogInformation(
+                "Login rejected because user {UserId} has not completed account setup.",
+                user.Id);
+            return new LoginServiceResult(LoginStatus.PendingSetup);
+        }
+
         var signInResult =
             await _signInManager.CheckPasswordSignInAsync(
                 user,

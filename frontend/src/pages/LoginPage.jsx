@@ -22,7 +22,7 @@ function getLoginError(error) {
   }
 
   if (error.status === 403) {
-    return 'This account has been deactivated. Please contact your system administrator.'
+    return error.response?.message ?? 'This account cannot sign in. Please contact your system administrator.'
   }
 
   if (error.status === 423) {

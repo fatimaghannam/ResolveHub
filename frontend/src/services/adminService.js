@@ -61,8 +61,23 @@ export const addAdminTicketComment = (ticketReference, message) =>
     body: JSON.stringify({ message }),
   })
 
-export const getAdminUsers = (signal) =>
-  apiRequest('/api/admin/users', { signal })
+export const getAdminUsers = (filters = {}, signal) =>
+  apiRequest(`/api/admin/users${toQueryString(filters)}`, { signal })
+
+export const getAdminUser = (userId, signal) =>
+  apiRequest(`/api/admin/users/${userId}`, { signal })
+
+export const getAdminUserDepartments = (signal) =>
+  apiRequest('/api/admin/users/departments', { signal })
+
+export const createAdminUser = (request) =>
+  apiRequest('/api/admin/users', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  })
+
+export const resendAdminUserInvitation = (userId) =>
+  apiRequest(`/api/admin/users/${userId}/resend-invitation`, { method: 'POST' })
 
 export const updateAdminUserStatus = (userId, isActive) =>
   apiRequest(`/api/admin/users/${userId}/status`, {

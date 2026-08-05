@@ -7,6 +7,20 @@ namespace ResolveHub.Api.Data.Seed;
 
 public static class DatabaseSeeder
 {
+    private static readonly string[] CompanyDepartments =
+    [
+        "Information Technology",
+        "Human Resources",
+        "Finance and Accounting",
+        "Sales",
+        "Marketing",
+        "Operations",
+        "Customer Support",
+        "Administration",
+        "Legal and Compliance",
+        "Engineering"
+    ];
+
     private static readonly SeedUser[] TestUsers =
     [
         new(
@@ -102,7 +116,31 @@ public static class DatabaseSeeder
     {
         await SeedRolesAsync(roleManager);
         await NormalizeLegacyItSupportAgentRoleAsync(dbContext, roleManager);
+        await SeedDepartmentsAsync(dbContext);
         await SeedTicketLookupsAsync(dbContext);
+    }
+
+    internal static async Task SeedDepartmentsAsync(ApplicationDbContext dbContext)
+    {
+        var existing = await dbContext.Departments
+            .Select(item => item.Name)
+            .ToListAsync();
+        var existingNames = existing.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var name in CompanyDepartments)
+        {
+            if (!existingNames.Add(name))
+                continue;
+
+            dbContext.Departments.Add(new Department
+            {
+                Name = name,
+                IsActive = true,
+                CreatedDate = DateTime.UtcNow
+            });
+        }
+
+        await dbContext.SaveChangesAsync();
     }
 
     private static async Task NormalizeLegacyItSupportAgentRoleAsync(

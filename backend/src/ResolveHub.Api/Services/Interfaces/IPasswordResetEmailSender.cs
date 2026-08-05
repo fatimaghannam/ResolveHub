@@ -7,4 +7,10 @@ public interface IPasswordResetEmailSender
         string recipientName,
         string resetUrl,
         CancellationToken cancellationToken);
+
+    Task SendAccountInvitationEmailAsync(
+        string recipientEmail,
+        string recipientName,
+        string setupUrl,
+        CancellationToken cancellationToken);
 }

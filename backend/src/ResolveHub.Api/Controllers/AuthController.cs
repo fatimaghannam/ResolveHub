@@ -70,6 +70,15 @@ public sealed class AuthController : ControllerBase
                             "This account has been deactivated. Please contact your system administrator."
                     }),
 
+            LoginStatus.PendingSetup =>
+                StatusCode(
+                    StatusCodes.Status403Forbidden,
+                    new
+                    {
+                        message =
+                            "Your account setup is not complete. Check your email for the invitation link or contact an Administrator."
+                    }),
+
             LoginStatus.MissingRole =>
                 StatusCode(
                     StatusCodes.Status500InternalServerError,
