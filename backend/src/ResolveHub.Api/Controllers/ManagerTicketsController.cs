@@ -15,6 +15,7 @@ namespace ResolveHub.Api.Controllers;
 public sealed class ManagerTicketsController(
     IManagerTicketService service,
     IAssignmentApprovalService assignmentApprovalService,
+    ITicketCancellationRequestService cancellationRequestService,
     ITicketCommentService commentService) : ControllerBase
 {
     [HttpGet("dashboard")]
@@ -67,6 +68,18 @@ public sealed class ManagerTicketsController(
     public async Task<ActionResult<IReadOnlyCollection<TicketAssignmentRequestDto>>>
         AssignmentRequests(CancellationToken token) =>
         Ok(await assignmentApprovalService.GetManagerRequestsAsync(UserId, token));
+
+    [HttpGet("cancellation-requests")]
+    public async Task<ActionResult<IReadOnlyCollection<TicketCancellationRequestDto>>>
+        CancellationRequests(CancellationToken token) =>
+        Ok(await cancellationRequestService.GetManagerRequestsAsync(token));
+
+    [HttpPost("cancellation-requests/{requestId:int}/{decision}")]
+    public async Task<IActionResult> ReviewCancellationRequest(int requestId,
+        string decision, ReviewTicketCancellationRequestDto request,
+        CancellationToken token) => ReviewResult(
+            await cancellationRequestService.ReviewAsync(
+                UserId, requestId, decision, request.ReviewNote, token));
 
     [HttpPost("tickets/{ticketReference}/comments")]
     [Consumes("application/json")]

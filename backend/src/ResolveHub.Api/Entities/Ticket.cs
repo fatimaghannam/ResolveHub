@@ -38,6 +38,7 @@ public sealed class Ticket
     public ICollection<TicketWorkSession> WorkSessions { get; set; } = [];
     public ICollection<TicketPendingRecord> PendingRecords { get; set; } = [];
     public ICollection<TicketAssignmentRequest> AssignmentRequests { get; set; } = [];
+    public ICollection<TicketCancellationRequest> CancellationRequests { get; set; } = [];
     public ICollection<DuplicateReview> DuplicateReviews { get; set; } = [];
     public ICollection<DuplicateReview> SuggestedDuplicateReviews { get; set; } = [];
 }

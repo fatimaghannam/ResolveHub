@@ -252,11 +252,17 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
     statusName: ticket.pendingDuplicateReview.suggestedOriginalTicketStatus,
     createdDate: ticket.pendingDuplicateReview.suggestedOriginalTicketCreatedDate,
   } : null
+  const cancellationRequest = roleArea === 'manager' &&
+    location.state?.cancellationRequest?.ticketReferenceNumber === ticket.ticketReferenceNumber
+    ? location.state.cancellationRequest
+    : null
+  const fromCancellationRequests = roleArea === 'manager' &&
+    location.state?.from === 'cancellation-requests'
 
   return (
     <>
       {toast && <div className="app-toast-region"><Toast key={toast.id} type={toast.type} title={toast.title} message={toast.message} onDismiss={dismissToast} /></div>}
-      <Link className="back-link back-link--top" to={`/${roleArea}/tickets`}><ArrowLeft size={18} />Back to All Tickets</Link>
+      <Link className="back-link back-link--top" to={fromCancellationRequests ? '/manager/assignments#cancellation-requests' : `/${roleArea}/tickets`}><ArrowLeft size={18} />{fromCancellationRequests ? 'Back to Cancellation Requests' : 'Back to All Tickets'}</Link>
       <section className="page-heading page-heading--action">
         <div><span className="eyebrow">{ticket.ticketReferenceNumber}</span><h2>{ticket.title}</h2><p>Created {formatLocalDateTime(ticket.createdDate)}</p></div>
         {roleArea === 'manager' && !ticket.pendingDuplicateReview && ticket.statusName !== 'Duplicate' && <button ref={duplicateTriggerRef} className="button button--secondary" type="button" onClick={openDuplicateDialog}>Report Possible Duplicate</button>}
@@ -273,6 +279,7 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
         </section>
         <aside className="panel details-side"><h2>Ticket Information</h2><dl><div><dt>Requester</dt><dd>{ticket.requesterName}</dd></div><div><dt>Category</dt><dd>{ticket.categoryName}</dd></div><div><dt>Priority</dt><dd><TicketPriorityBadge value={ticket.priorityName} /></dd></div><div><dt>Status</dt><dd><TicketStatusBadge value={ticket.statusName} /></dd></div>{ticket.originalTicketReference && <div><dt>Original Ticket</dt><dd><Link to={`/${roleArea}/tickets/${ticket.originalTicketReference}`}>{ticket.originalTicketReference}</Link></dd></div>}<div><dt>Assigned agent</dt><dd>{ticket.assignedAgentName ?? 'Unassigned'}</dd></div><div><dt>Created</dt><dd><time dateTime={ticket.createdDate} title="Displayed in your local time">{formatLocalDateTime(ticket.createdDate)}</time></dd></div>{ticket.resolvedDate && <div><dt>Resolved</dt><dd><time dateTime={ticket.resolvedDate} title="Displayed in your local time">{formatLocalDateTime(ticket.resolvedDate)}</time></dd></div>}{ticket.closedDate && <div><dt>Closed</dt><dd><time dateTime={ticket.closedDate} title="Displayed in your local time">{formatLocalDateTime(ticket.closedDate)}</time></dd></div>}</dl></aside>
       </div>
+      {cancellationRequest && <section className="panel manager-cancellation-request" aria-labelledby="manager-cancellation-request-title"><h2 id="manager-cancellation-request-title">Cancellation Request</h2><dl><div><dt>Requested by</dt><dd>{cancellationRequest.requestedByAgentName}</dd></div><div><dt>Requested on</dt><dd>{formatLocalDateTime(cancellationRequest.requestedDate)}</dd></div><div><dt>Status</dt><dd>{cancellationRequest.status === 'Pending' ? 'Pending Manager Review' : cancellationRequest.status}</dd></div></dl><div className="manager-cancellation-request__reason"><h3>Reason</h3><p>{cancellationRequest.reason}</p></div></section>}
       <div className="ticket-detail-section-stack">
       <TicketComments
         comments={ticket.comments}

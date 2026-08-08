@@ -134,6 +134,26 @@ public sealed record AgentTicketDetailsDto(
     string? OriginalTicketTitle)
 {
     public CurrentTicketPendingDto? CurrentPending { get; init; }
+    public TicketCancellationRequestDto? PendingCancellationRequest { get; init; }
+}
+
+public sealed record TicketCancellationRequestDto(
+    int Id, int TicketId, string TicketReferenceNumber, string TicketTitle,
+    int RequestedByAgentUserAccountId, string RequestedByAgentName,
+    string CurrentTicketStatus, string Reason, string Status, DateTime RequestedDate,
+    int? ReviewedByManagerUserAccountId, string? ReviewedByManagerName,
+    DateTime? ReviewedDate, string? ReviewNote, string? Outcome);
+
+public sealed class CreateTicketCancellationRequestDto
+{
+    [Required, StringLength(1000)]
+    public string Reason { get; init; } = string.Empty;
+}
+
+public sealed class ReviewTicketCancellationRequestDto
+{
+    [StringLength(500)]
+    public string? ReviewNote { get; init; }
 }
 
 public sealed record CurrentTicketPendingDto(

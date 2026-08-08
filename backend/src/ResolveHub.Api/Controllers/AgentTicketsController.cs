@@ -14,6 +14,7 @@ namespace ResolveHub.Api.Controllers;
 [Authorize(Roles = RoleNames.ITSupportAgent)]
 public sealed class AgentTicketsController(
     IAgentTicketService service,
+    ITicketCancellationRequestService cancellationRequestService,
     ITicketAttachmentService attachmentService,
     ITicketCommentService commentService) : ControllerBase
 {
@@ -44,6 +45,25 @@ public sealed class AgentTicketsController(
     [HttpPost("{ticketReference}/assignment-requests")]
     public IActionResult RequestAssignment(string ticketReference) =>
         StatusCode(403, new { message = "IT Support Agents cannot create assignment approval requests." });
+
+    [HttpPost("{ticketReference}/cancellation-requests")]
+    public async Task<ActionResult<TicketCancellationRequestDto>> RequestCancellation(
+        string ticketReference, CreateTicketCancellationRequestDto request,
+        CancellationToken token)
+    {
+        var result = await cancellationRequestService.CreateAsync(
+            GetUserId(), ticketReference, request.Reason, token);
+        return result.Status switch
+        {
+            TicketOperationStatus.Success => Created(
+                $"/api/agent/tickets/{ticketReference}/cancellation-requests/{result.Value!.Id}",
+                result.Value),
+            TicketOperationStatus.NotFound => NotFound(),
+            TicketOperationStatus.Forbidden => StatusCode(403, new { message = result.Message }),
+            TicketOperationStatus.Conflict => Conflict(new { message = result.Message }),
+            _ => BadRequest(new { message = result.Message })
+        };
+    }
 
     [HttpPatch("{ticketReference}/status")]
     public async Task<ActionResult<AgentTicketDetailsDto>> UpdateStatus(

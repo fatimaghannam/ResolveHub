@@ -905,7 +905,23 @@ public sealed class AgentTicketService(
                 ticket.OriginalTicket.TicketReferenceNumber,
             ticket.OriginalTicket == null ||
                 ticket.OriginalTicket.AssignedToUserAccountID != agentId ? null :
-                ticket.OriginalTicket.Title));
+                ticket.OriginalTicket.Title)
+            {
+                PendingCancellationRequest = ticket.CancellationRequests
+                    .Where(item => item.Status == CancellationRequestStatusNames.Pending)
+                    .Select(item => new TicketCancellationRequestDto(item.ID, item.TicketID,
+                        ticket.TicketReferenceNumber, ticket.Title,
+                        item.RequestedByAgentUserAccountID,
+                        item.RequestedByAgentUserAccount.FirstName + " " +
+                            item.RequestedByAgentUserAccount.LastName,
+                        ticket.TicketStatus.Name, item.Reason, item.Status,
+                        item.RequestedDate, item.ReviewedByManagerUserAccountID,
+                        item.ReviewedByManagerUserAccount == null ? null :
+                            item.ReviewedByManagerUserAccount.FirstName + " " +
+                            item.ReviewedByManagerUserAccount.LastName,
+                        item.ReviewedDate, item.ReviewNote, item.Outcome))
+                    .FirstOrDefault()
+            });
 
     private IQueryable<TicketCommentDto> ProjectComments(int ticketId) =>
         dbContext.TicketComments.AsNoTracking()

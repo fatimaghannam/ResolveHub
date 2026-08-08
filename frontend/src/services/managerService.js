@@ -26,6 +26,15 @@ export const getManagerWorkload = (signal) =>
 export const getManagerAssignmentRequests = (signal) =>
   apiRequest('/api/manager/assignment-requests', { signal })
 
+export const getManagerCancellationRequests = (signal) =>
+  apiRequest('/api/manager/cancellation-requests', { signal })
+
+export const reviewManagerCancellationRequest = (requestId, decision, reviewNote = null) =>
+  apiRequest(`/api/manager/cancellation-requests/${requestId}/${decision}`, {
+    method: 'POST',
+    body: JSON.stringify({ reviewNote }),
+  })
+
 export const addManagerTicketComment = (ticketReference, message) =>
   apiRequest(`/api/manager/tickets/${encodeURIComponent(ticketReference)}/comments`, {
     method: 'POST',

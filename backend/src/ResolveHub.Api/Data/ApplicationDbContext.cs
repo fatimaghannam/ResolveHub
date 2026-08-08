@@ -49,6 +49,8 @@ public sealed class ApplicationDbContext
     public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
     public DbSet<TicketAssignmentRequest> TicketAssignmentRequests =>
         Set<TicketAssignmentRequest>();
+    public DbSet<TicketCancellationRequest> TicketCancellationRequests =>
+        Set<TicketCancellationRequest>();
     public DbSet<DuplicateReview> DuplicateReviews => Set<DuplicateReview>();
     public DbSet<UserNotification> UserNotifications => Set<UserNotification>();
 
@@ -73,9 +75,39 @@ public sealed class ApplicationDbContext
         ConfigureTicketPendingRecord(builder);
         ConfigureActivityLog(builder);
         ConfigureTicketAssignmentRequest(builder);
+        ConfigureTicketCancellationRequest(builder);
         ConfigureDuplicateReview(builder);
         ConfigureUserNotification(builder);
         ConfigureIdentitySupportTables(builder);
+    }
+
+    private static void ConfigureTicketCancellationRequest(ModelBuilder builder)
+    {
+        builder.Entity<TicketCancellationRequest>(entity =>
+        {
+            entity.ToTable("TicketCancellationRequest");
+            entity.HasKey(item => item.ID);
+            entity.Property(item => item.ID).UseIdentityColumn();
+            entity.Property(item => item.Reason).HasMaxLength(1000).IsRequired();
+            entity.Property(item => item.Status).HasMaxLength(20).IsRequired();
+            entity.Property(item => item.ReviewNote).HasMaxLength(500);
+            entity.Property(item => item.Outcome).HasMaxLength(20);
+            entity.Property(item => item.RequestedDate).HasColumnType("datetime2");
+            entity.Property(item => item.ReviewedDate).HasColumnType("datetime2");
+            entity.HasIndex(item => new { item.TicketID, item.Status });
+            entity.HasIndex(item => item.TicketID)
+                .HasFilter("[Status] = 'Pending'").IsUnique();
+            entity.HasOne(item => item.Ticket).WithMany(ticket => ticket.CancellationRequests)
+                .HasForeignKey(item => item.TicketID).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.RequestedByAgentUserAccount)
+                .WithMany(user => user.CancellationRequestsMade)
+                .HasForeignKey(item => item.RequestedByAgentUserAccountID)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.ReviewedByManagerUserAccount)
+                .WithMany(user => user.CancellationRequestsReviewed)
+                .HasForeignKey(item => item.ReviewedByManagerUserAccountID)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
     }
 
     private static void ConfigureDuplicateReview(ModelBuilder builder)

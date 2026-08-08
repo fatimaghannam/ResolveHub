@@ -22,4 +22,9 @@ public static class TicketHistoryActionNames
     public const string AssignmentRequested = "Assignment Requested";
     public const string AssignmentRequestApproved = "Assignment Request Approved";
     public const string AssignmentRequestRejected = "Assignment Request Rejected";
+    public const string CancellationRequested = "Cancellation Requested";
+    public const string CancellationRequestApproved = "Cancellation Request Approved";
+    public const string CancellationRequestRejected = "Cancellation Request Rejected";
+    public const string AgentReleased = "Agent Released";
+    public const string ReassignmentInitiated = "Reassignment Initiated";
 }

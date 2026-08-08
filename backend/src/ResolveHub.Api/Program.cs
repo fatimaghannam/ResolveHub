@@ -335,6 +335,7 @@ builder.Services.AddScoped<IAdminCategoryService, AdminCategoryService>();
 builder.Services.AddScoped<ISystemAuditLogService, SystemAuditLogService>();
 builder.Services.AddScoped<IManagerTicketService, ManagerTicketService>();
 builder.Services.AddScoped<IAssignmentApprovalService, AssignmentApprovalService>();
+builder.Services.AddScoped<ITicketCancellationRequestService, TicketCancellationRequestService>();
 builder.Services.AddAuthorization();
 
 var app = builder.Build();

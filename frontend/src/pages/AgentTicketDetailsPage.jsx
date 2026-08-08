@@ -18,6 +18,7 @@ import {
   getAgentTicketDetails,
   markAgentTicketPending,
   resumeAgentTicketWork,
+  requestAgentTicketCancellation,
   resolveAgentTicket,
   updateAgentTicketStatus,
 } from '../services/agentTicketService.js'
@@ -35,6 +36,7 @@ function AgentTicketDetailsPage() {
   const [pendingReason, setPendingReason] = useState('')
   const [customPendingReason, setCustomPendingReason] = useState('')
   const [pendingNote, setPendingNote] = useState('')
+  const [cancellationReason, setCancellationReason] = useState('')
   const [saving, setSaving] = useState('')
   const [toast, setToast] = useState(null)
   const dismissToast = useCallback(() => setToast(null), [])
@@ -160,6 +162,22 @@ function AgentTicketDetailsPage() {
     }
   }
 
+  async function requestCancellation() {
+    if (!cancellationReason.trim() || saving) return
+    try {
+      setSaving('cancellation')
+      await requestAgentTicketCancellation(ticket.ticketReferenceNumber, cancellationReason.trim())
+      setDialog(null)
+      setCancellationReason('')
+      setReload((value) => value + 1)
+      notify('success', 'Cancellation Requested', 'Your request was submitted for Manager review. The ticket status has not changed.')
+    } catch (requestError) {
+      notify('error', 'Unable to Request Cancellation', requestError.message)
+    } finally {
+      setSaving('')
+    }
+  }
+
   async function downloadAttachment(file) {
     try {
       const blob = await downloadAgentTicketAttachment(
@@ -200,9 +218,11 @@ function AgentTicketDetailsPage() {
           {ticket.statusName === 'Pending' && <button className="button button--primary" type="button" onClick={resumeWork} disabled={Boolean(saving)}>{saving === 'resume' ? 'Resuming…' : 'Resume Work'}</button>}
           {ticket.canResolve && <button className="button button--primary" type="button" onClick={() => setDialog('resolve')} disabled={Boolean(saving)}>{saving === 'resolve' ? 'Resolving…' : 'Mark as Resolved'}</button>}
           {ticket.canClose && <button className="button button--primary" type="button" onClick={() => setDialog('close')} disabled={Boolean(saving)}>Close Ticket</button>}
+          {['Assigned', 'In Progress', 'Pending'].includes(ticket.statusName) && !ticket.pendingCancellationRequest && <button className="button button--danger-outline ticket-details-header__cancellation-action" type="button" onClick={() => setDialog('cancellation')} disabled={Boolean(saving)}>Request Cancellation</button>}
           {ticket.assignmentRequestStatus === 'Pending' && <PendingApprovalBadge />}
         </div>
       </section>
+      {ticket.pendingCancellationRequest && <div className="inline-alert cancellation-request-banner" role="status"><strong>Cancellation Requested — Pending Manager Review</strong><span>Submitted {formatLocalDateTime(ticket.pendingCancellationRequest.requestedDate)}. The ticket remains {ticket.statusName} while the request is reviewed.</span></div>}
       {ticket.statusName === 'Pending' && ticket.currentPending && <section className="pending-info-panel" aria-labelledby="pending-info-title"><div><span className="pending-info-panel__indicator" aria-hidden="true" /><div><h2 id="pending-info-title">Work Pending</h2><p>{ticket.currentPending.reasonText}</p></div></div><dl><div><dt>Pending since</dt><dd>{formatLocalDateTime(ticket.currentPending.pendingSince)}</dd></div><div><dt>Set by</dt><dd>{ticket.currentPending.setByName}</dd></div>{ticket.currentPending.additionalNote && <div><dt>Additional note</dt><dd>{ticket.currentPending.additionalNote}</dd></div>}</dl></section>}
       {ticket.statusName === 'Duplicate' && ticket.originalTicketReference && <section className="duplicate-info-panel" aria-labelledby="duplicate-info-title"><h2 id="duplicate-info-title">Duplicate Ticket</h2><p>This ticket was marked as a duplicate of:</p><Link className="duplicate-info-panel__link" to={`/agent/tickets/${ticket.originalTicketReference}`}><strong>{ticket.originalTicketReference}</strong><span>{ticket.originalTicketTitle || 'View original ticket'}</span></Link></section>}
       <div className="details-grid">
@@ -243,12 +263,12 @@ function AgentTicketDetailsPage() {
       {dialog && <>
         <button className="dialog-backdrop" type="button" aria-label="Close dialog" onClick={() => { if (!saving) setDialog(null) }} />
         <section className="dialog" role="dialog" aria-modal="true" aria-labelledby="agent-action-title" aria-describedby="agent-action-description">
-          <h2 id="agent-action-title">{dialog === 'close' ? 'Close Ticket' : dialog === 'pending' ? 'Mark as Pending' : 'Mark Ticket as Resolved'}</h2>
-          <p id="agent-action-description">{dialog === 'close' ? `Are you sure you want to close ${ticket.ticketReferenceNumber}? This confirms that the work has been completed.` : dialog === 'pending' ? 'Pause active work and record what the ticket is waiting for.' : 'Describe the technical resolution before marking this ticket as resolved.'}</p>
-          {dialog === 'pending' ? <div className="pending-dialog-fields"><label><span>Pending reason</span><select autoFocus value={pendingReason} onChange={(event) => setPendingReason(event.target.value)} disabled={Boolean(saving)}><option value="">Select a reason</option><option value="employee-response">Waiting for employee response</option><option value="manager-approval">Waiting for manager approval</option><option value="vendor">Waiting for vendor</option><option value="hardware">Waiting for hardware</option><option value="software-license">Waiting for software license</option><option value="other">Other</option></select></label>{pendingReason === 'other' && <label><span>Custom reason</span><input value={customPendingReason} onChange={(event) => setCustomPendingReason(event.target.value)} maxLength="300" disabled={Boolean(saving)} /></label>}<label><span>Additional note (optional)</span><textarea value={pendingNote} onChange={(event) => setPendingNote(event.target.value)} maxLength="1000" disabled={Boolean(saving)} /></label></div> : dialog === 'resolve'
+          <h2 id="agent-action-title">{dialog === 'cancellation' ? 'Request Ticket Cancellation' : dialog === 'close' ? 'Close Ticket' : dialog === 'pending' ? 'Mark as Pending' : 'Mark Ticket as Resolved'}</h2>
+          <p id="agent-action-description">{dialog === 'cancellation' ? `${ticket.ticketReferenceNumber} — ${ticket.title}` : dialog === 'close' ? `Are you sure you want to close ${ticket.ticketReferenceNumber}? This confirms that the work has been completed.` : dialog === 'pending' ? 'Pause active work and record what the ticket is waiting for.' : 'Describe the technical resolution before marking this ticket as resolved.'}</p>
+          {dialog === 'cancellation' ? <label><span>Reason for cancellation</span><textarea autoFocus required value={cancellationReason} onChange={(event) => setCancellationReason(event.target.value)} maxLength="1000" placeholder="Explain why you can no longer continue working on this ticket..." disabled={Boolean(saving)} /></label> : dialog === 'pending' ? <div className="pending-dialog-fields"><label><span>Pending reason</span><select autoFocus value={pendingReason} onChange={(event) => setPendingReason(event.target.value)} disabled={Boolean(saving)}><option value="">Select a reason</option><option value="employee-response">Waiting for employee response</option><option value="manager-approval">Waiting for manager approval</option><option value="vendor">Waiting for vendor</option><option value="hardware">Waiting for hardware</option><option value="software-license">Waiting for software license</option><option value="other">Other</option></select></label>{pendingReason === 'other' && <label><span>Custom reason</span><input value={customPendingReason} onChange={(event) => setCustomPendingReason(event.target.value)} maxLength="300" disabled={Boolean(saving)} /></label>}<label><span>Additional note (optional)</span><textarea value={pendingNote} onChange={(event) => setPendingNote(event.target.value)} maxLength="1000" disabled={Boolean(saving)} /></label></div> : dialog === 'resolve'
             ? <label><span>Resolution summary</span><textarea autoFocus value={resolutionSummary} onChange={(event) => setResolutionSummary(event.target.value)} minLength="10" maxLength="5000" disabled={Boolean(saving)} /></label>
             : <label><span>Closing note (optional)</span><textarea autoFocus value={closingNote} onChange={(event) => setClosingNote(event.target.value)} maxLength="500" disabled={Boolean(saving)} /></label>}
-          <div className="dialog__actions"><button className="button button--secondary" type="button" onClick={() => setDialog(null)} disabled={Boolean(saving)}>Cancel</button><button className="button button--primary" type="button" onClick={dialog === 'close' ? closeTicket : dialog === 'pending' ? markPending : resolveTicket} disabled={Boolean(saving) || (dialog === 'resolve' && resolutionSummary.trim().length < 10) || (dialog === 'pending' && (!pendingReason || (pendingReason === 'other' && !customPendingReason.trim())))}>{saving === 'pending' ? 'Moving to Pending…' : saving ? 'Saving…' : dialog === 'close' ? 'Close Ticket' : dialog === 'pending' ? 'Mark as Pending' : 'Mark as Resolved'}</button></div>
+          <div className="dialog__actions"><button className="button button--secondary" type="button" onClick={() => setDialog(null)} disabled={Boolean(saving)}>Cancel</button><button className="button button--primary" type="button" onClick={dialog === 'cancellation' ? requestCancellation : dialog === 'close' ? closeTicket : dialog === 'pending' ? markPending : resolveTicket} disabled={Boolean(saving) || (dialog === 'cancellation' && !cancellationReason.trim()) || (dialog === 'resolve' && resolutionSummary.trim().length < 10) || (dialog === 'pending' && (!pendingReason || (pendingReason === 'other' && !customPendingReason.trim())))}>{saving === 'cancellation' ? 'Submitting…' : saving === 'pending' ? 'Moving to Pending…' : saving ? 'Saving…' : dialog === 'cancellation' ? 'Submit Request' : dialog === 'close' ? 'Close Ticket' : dialog === 'pending' ? 'Mark as Pending' : 'Mark as Resolved'}</button></div>
         </section>
       </>}
     </>

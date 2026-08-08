@@ -49,6 +49,8 @@ public sealed class UserAccount : IdentityUser<int>
     public ICollection<TicketAssignmentRequest> AssignmentRequestsMade { get; set; } = [];
     public ICollection<TicketAssignmentRequest> AssignmentRequestsReceived { get; set; } = [];
     public ICollection<TicketAssignmentRequest> AssignmentRequestsReviewed { get; set; } = [];
+    public ICollection<TicketCancellationRequest> CancellationRequestsMade { get; set; } = [];
+    public ICollection<TicketCancellationRequest> CancellationRequestsReviewed { get; set; } = [];
     public ICollection<DuplicateReview> DuplicateReviewsReported { get; set; } = [];
     public ICollection<DuplicateReview> DuplicateReviewsReviewed { get; set; } = [];
     public ICollection<UserNotification> Notifications { get; set; } = [];

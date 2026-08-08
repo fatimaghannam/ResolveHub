@@ -41,6 +41,12 @@ export const closeAgentTicket = (ticketReference, request = {}) =>
     body: JSON.stringify(request),
   })
 
+export const requestAgentTicketCancellation = (ticketReference, reason) =>
+  apiRequest(`/api/agent/tickets/${encodeURIComponent(ticketReference)}/cancellation-requests`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  })
+
 export const getAgentTicketComments = (ticketReference, signal) =>
   apiRequest(`/api/agent/tickets/${encodeURIComponent(ticketReference)}/comments`, { signal })
 

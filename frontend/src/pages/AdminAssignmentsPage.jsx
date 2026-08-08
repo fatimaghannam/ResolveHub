@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { createPortal } from 'react-dom'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { ClipboardCheck, Inbox } from 'lucide-react'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
 import Toast from '../components/common/Toast.jsx'
@@ -10,6 +11,8 @@ import {
   assignManagerTicket,
   getManagerAssignmentRequests,
   getManagerAssignments,
+  getManagerCancellationRequests,
+  reviewManagerCancellationRequest,
 } from '../services/managerService.js'
 import { getCategories, getPriorities } from '../services/ticketService.js'
 import { formatLocalDateTime } from '../utils/dateTime.js'
@@ -44,8 +47,10 @@ const emptyUnassignedTickets = []
 
 function AdminAssignmentsPage({ roleArea = 'admin' }) {
   const [searchParams] = useSearchParams()
+  const location = useLocation()
   const selectedReference = searchParams.get('ticket')
   const unassignedSectionRef = useRef(null)
+  const cancellationRequestsSectionRef = useRef(null)
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [reload, setReload] = useState(0)
@@ -62,6 +67,13 @@ function AdminAssignmentsPage({ roleArea = 'admin' }) {
   const [reviewingRequest, setReviewingRequest] = useState('')
   const [rejectingRequest, setRejectingRequest] = useState(null)
   const [rejectionReason, setRejectionReason] = useState('')
+  const [cancellationRequests, setCancellationRequests] = useState([])
+  const [cancellationRequestError, setCancellationRequestError] = useState('')
+  const [reviewingCancellation, setReviewingCancellation] = useState('')
+  const [cancellationReview, setCancellationReview] = useState(null)
+  const [cancellationReviewNote, setCancellationReviewNote] = useState('')
+  const [openCancellationMenu, setOpenCancellationMenu] = useState(null)
+  const [cancellationMenuPosition, setCancellationMenuPosition] = useState(null)
   const dismissToast = useCallback(() => setToast(null), [])
 
   useEffect(() => {
@@ -114,6 +126,74 @@ function AdminAssignmentsPage({ roleArea = 'admin' }) {
       })
     return () => controller.abort()
   }, [reload, roleArea])
+
+  useEffect(() => {
+    if (roleArea !== 'manager') return undefined
+    const controller = new AbortController()
+    setCancellationRequestError('')
+    getManagerCancellationRequests(controller.signal)
+      .then((items) => { if (!controller.signal.aborted) setCancellationRequests(items) })
+      .catch((requestError) => {
+        if (requestError.name !== 'AbortError') setCancellationRequestError(requestError.message)
+      })
+    return () => controller.abort()
+  }, [reload, roleArea])
+
+  useEffect(() => {
+    if (openCancellationMenu === null) return undefined
+    function closeCancellationMenu(event) {
+      if (!event.target.closest('.cancellation-action-menu, .cancellation-action-menu__dropdown')) setOpenCancellationMenu(null)
+    }
+    function closeCancellationMenuOnEscape(event) {
+      if (event.key === 'Escape') setOpenCancellationMenu(null)
+    }
+    document.addEventListener('pointerdown', closeCancellationMenu)
+    document.addEventListener('keydown', closeCancellationMenuOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeCancellationMenu)
+      document.removeEventListener('keydown', closeCancellationMenuOnEscape)
+    }
+  }, [openCancellationMenu])
+
+  function toggleCancellationMenu(requestId, event) {
+    if (openCancellationMenu === requestId) {
+      setOpenCancellationMenu(null)
+      return
+    }
+    const triggerBounds = event.currentTarget.getBoundingClientRect()
+    const menuWidth = 196
+    const menuHeight = 180
+    const viewportMargin = 8
+    const openUpward = window.innerHeight - triggerBounds.bottom < menuHeight + viewportMargin
+    setCancellationMenuPosition({
+      left: Math.max(viewportMargin, Math.min(
+        triggerBounds.right - menuWidth,
+        window.innerWidth - menuWidth - viewportMargin,
+      )),
+      top: openUpward
+        ? Math.max(viewportMargin, triggerBounds.top - menuHeight - 6)
+        : triggerBounds.bottom + 6,
+    })
+    setOpenCancellationMenu(requestId)
+  }
+
+  async function reviewCancellationRequest() {
+    if (!cancellationReview || reviewingCancellation) return
+    const { request, decision } = cancellationReview
+    try {
+      setReviewingCancellation(`${request.id}-${decision}`)
+      await reviewManagerCancellationRequest(request.id, decision, cancellationReviewNote.trim() || null)
+      setCancellationReview(null)
+      setCancellationReviewNote('')
+      setReload((value) => value + 1)
+      setToast({ id: Date.now(), type: 'success', title: 'Cancellation Request Reviewed',
+        message: decision === 'reject' ? `${request.ticketReferenceNumber} remains assigned.` : decision === 'cancel' ? `${request.ticketReferenceNumber} was cancelled.` : `${request.ticketReferenceNumber} is ready for reassignment through Administrator approval.` })
+    } catch (requestError) {
+      setToast({ id: Date.now(), type: 'error', title: 'Review Failed', message: requestError.message })
+    } finally {
+      setReviewingCancellation('')
+    }
+  }
 
   async function reviewRequest(request, decision, reason = null) {
     if (reviewingRequest) return
@@ -233,6 +313,10 @@ function AdminAssignmentsPage({ roleArea = 'admin' }) {
       ticket.ticketReferenceNumber === selectedReference)) return
     unassignedSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [availableUnassignedTickets, selectedReference])
+  useEffect(() => {
+    if (roleArea !== 'manager' || location.hash !== '#cancellation-requests' || !data) return
+    cancellationRequestsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [data, location.hash, roleArea])
   const filteredAgentWorkloads = useMemo(() => {
     if (roleArea !== 'admin') return agentWorkloads
     const search = workloadFilters.search.trim().toLowerCase()
@@ -293,6 +377,10 @@ function AdminAssignmentsPage({ roleArea = 'admin' }) {
       {error && <ErrorState message={error} onRetry={() => setReload((value) => value + 1)} />}
       {!error && !data && <LoadingState message="Loading ticket assignments…" />}
       {data && <>
+      {roleArea === 'manager' && <section id="cancellation-requests" ref={cancellationRequestsSectionRef} className="panel dashboard-section assignment-management-section">
+        <div className="panel__heading assignment-section-heading"><div><h2>Cancellation Requests</h2><p>Review requests from IT Agents assigned to active tickets.</p></div><span className="assignment-section-count">{cancellationRequests.filter((item) => item.status === 'Pending').length} pending</span></div>
+        {cancellationRequestError ? <div className="inline-alert inline-alert--error" role="alert">{cancellationRequestError}</div> : cancellationRequests.length === 0 ? <AssignmentEmptyState title="No cancellation requests" message="Agent cancellation requests will appear here." /> : <div className="cancellation-requests-table-wrap"><table className="ticket-table cancellation-requests-table"><colgroup><col className="cancellation-col--ticket" /><col className="cancellation-col--agent" /><col className="cancellation-col--ticket-status" /><col className="cancellation-col--requested" /><col className="cancellation-col--request-status" /><col className="cancellation-col--actions" /></colgroup><thead><tr><th>Ticket</th><th>Assigned Agent</th><th>Status</th><th>Requested</th><th>Request Status</th><th>Review</th></tr></thead><tbody>{cancellationRequests.map((request) => <tr key={request.id}><td><span className="cancellation-ticket-identity"><strong>{request.ticketReferenceNumber}</strong><small>{request.ticketTitle}</small></span></td><td className="cancellation-request-agent">{request.requestedByAgentName}</td><td className="cancellation-request-ticket-status">{request.currentTicketStatus}</td><td>{formatLocalDateTime(request.requestedDate)}</td><td><span className={`badge assignment-request-status assignment-request-status--${request.status.toLowerCase()}`}>{request.status}</span></td><td><div className="cancellation-request-actions">{request.status === 'Pending' && <div className="cancellation-action-menu"><button className="button button--primary button--compact cancellation-action-menu__trigger" type="button" aria-haspopup="menu" aria-expanded={openCancellationMenu === request.id} onClick={(event) => toggleCancellationMenu(request.id, event)}>Review <span aria-hidden="true">▼</span></button>{openCancellationMenu === request.id && cancellationMenuPosition && createPortal(<div className="cancellation-action-menu__dropdown" style={cancellationMenuPosition} role="menu"><Link className="cancellation-action-menu__item" role="menuitem" to={`/manager/tickets/${request.ticketReferenceNumber}`} state={{ from: 'cancellation-requests', cancellationRequest: request }} onClick={() => setOpenCancellationMenu(null)}>View Ticket</Link><div className="cancellation-action-menu__divider" role="separator" /><button className="cancellation-action-menu__item cancellation-action-menu__item--danger" type="button" role="menuitem" onClick={() => { setOpenCancellationMenu(null); setCancellationReview({ request, decision: 'cancel' }) }}>Approve &amp; Cancel</button><button className="cancellation-action-menu__item" type="button" role="menuitem" onClick={() => { setOpenCancellationMenu(null); setCancellationReview({ request, decision: 'reassign' }) }}>Approve &amp; Reassign</button><div className="cancellation-action-menu__divider" role="separator" /><button className="cancellation-action-menu__item cancellation-action-menu__item--danger" type="button" role="menuitem" onClick={() => { setOpenCancellationMenu(null); setCancellationReview({ request, decision: 'reject' }) }}>Reject</button></div>, document.body)}</div>}</div></td></tr>)}</tbody></table></div>}
+      </section>}
       <section className="panel dashboard-section assignment-management-section">
         <div className="panel__heading assignment-section-heading"><div><h2>{roleArea === 'manager' ? 'My Assignment Requests' : 'Assignment Approvals'}</h2><p>{roleArea === 'manager' ? 'Track requests submitted for Administrator approval.' : 'Approve or reject assignment requests submitted by Managers.'}</p></div><span className="assignment-section-count">{visibleAssignmentRequests.length} {visibleAssignmentRequests.length === 1 ? 'request' : 'requests'}</span></div>
         {assignmentRequestError
@@ -317,6 +405,7 @@ function AdminAssignmentsPage({ roleArea = 'admin' }) {
             })}</tbody>
           </table></div>}
       </section>
+      {cancellationReview && <div className="dialog-backdrop" role="presentation"><div className="dialog" role="dialog" aria-modal="true" aria-labelledby="cancellation-review-title"><h2 id="cancellation-review-title">{cancellationReview.decision === 'reject' ? 'Reject Cancellation Request' : cancellationReview.decision === 'cancel' ? 'Approve & Cancel Ticket' : 'Approve & Reassign Ticket'}</h2><p>{cancellationReview.decision === 'cancel' ? `${cancellationReview.request.ticketReferenceNumber} will become Cancelled and the Agent will be released.` : cancellationReview.decision === 'reassign' ? `The Agent will be released and ${cancellationReview.request.ticketReferenceNumber} will return to the unassigned queue. A replacement assignment will still require Administrator approval.` : `The ticket will remain ${cancellationReview.request.currentTicketStatus} and assigned to ${cancellationReview.request.requestedByAgentName}.`}</p><label><span>Review note (optional)</span><textarea value={cancellationReviewNote} onChange={(event) => setCancellationReviewNote(event.target.value)} maxLength="500" disabled={Boolean(reviewingCancellation)} /></label><div className="dialog__actions"><button autoFocus className="button button--secondary" type="button" onClick={() => setCancellationReview(null)} disabled={Boolean(reviewingCancellation)}>Back</button><button className={cancellationReview.decision === 'cancel' ? 'button button--danger' : 'button button--primary'} type="button" onClick={reviewCancellationRequest} disabled={Boolean(reviewingCancellation)}>{reviewingCancellation ? 'Reviewing…' : 'Confirm Decision'}</button></div></div></div>}
       <section className="panel dashboard-section assignment-management-section" ref={unassignedSectionRef}>
         <div className="panel__heading assignment-table-heading"><h2>Unassigned Tickets</h2></div>
         {availableUnassignedTickets.length === 0
