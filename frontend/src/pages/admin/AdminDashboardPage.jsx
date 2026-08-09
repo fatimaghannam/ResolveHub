@@ -16,12 +16,12 @@ import {
   TicketCategoryChart,
   TicketStatusChart,
   TicketTrendChart,
-} from '../components/admin/AdminDashboardCharts.jsx'
-import { TicketPriorityBadge } from '../components/tickets/TicketBadges.jsx'
-import { AgentWorkloadSummary } from '../components/tickets/AgentWorkload.jsx'
-import { ErrorState, LoadingState } from '../components/common/States.jsx'
-import { getAdminDashboard } from '../services/adminService.js'
-import { formatLocalDateTime } from '../utils/dateTime.js'
+} from '../../components/admin/AdminDashboardCharts.jsx'
+import { TicketPriorityBadge } from '../../components/tickets/TicketBadges.jsx'
+import { AgentWorkloadSummary } from '../../components/tickets/AgentWorkload.jsx'
+import { ErrorState, LoadingState } from '../../components/common/States.jsx'
+import { getAdminDashboard } from '../../services/adminService.js'
+import { formatLocalDateTime } from '../../utils/dateTime.js'
 
 const statistics = [
   ['Total Users', 'totalUsers', Users, 'blue'],

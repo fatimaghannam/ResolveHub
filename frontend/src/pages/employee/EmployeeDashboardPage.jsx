@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { CircleCheckBig, Clock3, FolderOpen, Ticket } from 'lucide-react'
 import { Link, useOutletContext } from 'react-router-dom'
-import { getDashboard } from '../services/ticketService.js'
-import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
-import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
-import { formatLocalDateTime } from '../utils/dateTime.js'
-import { formatTicketReference } from '../utils/ticketReference.js'
+import { getDashboard } from '../../services/ticketService.js'
+import { EmptyState, ErrorState, LoadingState } from '../../components/common/States.jsx'
+import { TicketPriorityBadge, TicketStatusBadge } from '../../components/tickets/TicketBadges.jsx'
+import { formatLocalDateTime } from '../../utils/dateTime.js'
+import { formatTicketReference } from '../../utils/ticketReference.js'
 
 function EmployeeDashboardPage() {
   const { user } = useOutletContext()

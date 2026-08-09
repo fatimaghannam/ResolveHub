@@ -2,16 +2,16 @@ import { ArrowLeft } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation, useParams } from 'react-router-dom'
-import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
-import Toast from '../components/common/Toast.jsx'
+import { EmptyState, ErrorState, LoadingState } from '../../components/common/States.jsx'
+import Toast from '../../components/common/Toast.jsx'
 import {
   TicketPriorityBadge,
   TicketStatusBadge,
-} from '../components/tickets/TicketBadges.jsx'
-import TicketComments from '../components/tickets/TicketComments.jsx'
-import TicketAttachments from '../components/tickets/TicketAttachments.jsx'
-import TicketActivityLog from '../components/tickets/TicketActivityLog.jsx'
-import TicketHistorySection from '../components/tickets/TicketHistorySection.jsx'
+} from '../../components/tickets/TicketBadges.jsx'
+import TicketComments from '../../components/tickets/TicketComments.jsx'
+import TicketAttachments from '../../components/tickets/TicketAttachments.jsx'
+import TicketActivityLog from '../../components/tickets/TicketActivityLog.jsx'
+import TicketHistorySection from '../../components/tickets/TicketHistorySection.jsx'
 import {
   closeAgentTicket,
   downloadAgentTicketAttachment,
@@ -22,9 +22,9 @@ import {
   requestAgentTicketAssignment,
   resolveAgentTicket,
   updateAgentTicketStatus,
-} from '../services/agentTicketService.js'
-import { formatLocalDateTime } from '../utils/dateTime.js'
-import { formatTicketReference } from '../utils/ticketReference.js'
+} from '../../services/agentTicketService.js'
+import { formatLocalDateTime } from '../../utils/dateTime.js'
+import { formatTicketReference } from '../../utils/ticketReference.js'
 
 function AgentTicketDetailsPage() {
   const location = useLocation()

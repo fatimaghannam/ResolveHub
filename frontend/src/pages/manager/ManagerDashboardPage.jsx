@@ -8,12 +8,12 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
-import { TicketStatusChart } from '../components/admin/AdminDashboardCharts.jsx'
-import { ErrorState, LoadingState } from '../components/common/States.jsx'
-import { TicketPriorityBadge } from '../components/tickets/TicketBadges.jsx'
-import { AgentWorkloadSummary } from '../components/tickets/AgentWorkload.jsx'
-import { getManagerDashboard } from '../services/managerService.js'
-import { formatLocalDateTime } from '../utils/dateTime.js'
+import { TicketStatusChart } from '../../components/admin/AdminDashboardCharts.jsx'
+import { ErrorState, LoadingState } from '../../components/common/States.jsx'
+import { TicketPriorityBadge } from '../../components/tickets/TicketBadges.jsx'
+import { AgentWorkloadSummary } from '../../components/tickets/AgentWorkload.jsx'
+import { getManagerDashboard } from '../../services/managerService.js'
+import { formatLocalDateTime } from '../../utils/dateTime.js'
 
 const statistics = [
   ['Total Tickets', 'totalTickets', Ticket, 'cyan'],

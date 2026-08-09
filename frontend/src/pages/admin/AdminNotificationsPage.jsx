@@ -1,18 +1,18 @@
 import { Bell, CheckCheck, ShieldAlert } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
+import { EmptyState, ErrorState, LoadingState } from '../../components/common/States.jsx'
 import {
   getAdminNotifications,
   markAdminNotificationRead,
   markAllAdminNotificationsRead,
-} from '../services/adminService.js'
+} from '../../services/adminService.js'
 import {
   getManagerNotifications,
   markManagerNotificationRead,
   markAllManagerNotificationsRead,
-} from '../services/managerService.js'
-import { formatLocalDateTime } from '../utils/dateTime.js'
+} from '../../services/managerService.js'
+import { formatLocalDateTime } from '../../utils/dateTime.js'
 
 function AdminNotificationsPage({ roleArea = 'admin' }) {
   const [notifications, setNotifications] = useState(null)

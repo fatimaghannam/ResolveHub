@@ -1,11 +1,11 @@
 import { ArrowLeft } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
-import { getAdminUser } from '../services/adminService.js'
-import { accountStatusClassName, formatAccountStatus } from '../utils/accountStatus.js'
-import { formatLocalDateTime } from '../utils/dateTime.js'
-import UserAvatar from '../components/common/UserAvatar.jsx'
+import { EmptyState, ErrorState, LoadingState } from '../../components/common/States.jsx'
+import { getAdminUser } from '../../services/adminService.js'
+import { accountStatusClassName, formatAccountStatus } from '../../utils/accountStatus.js'
+import { formatLocalDateTime } from '../../utils/dateTime.js'
+import UserAvatar from '../../components/common/UserAvatar.jsx'
 
 function AdminUserDetailsPage() {
   const { userId } = useParams()

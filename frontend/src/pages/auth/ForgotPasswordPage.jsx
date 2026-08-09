@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { requestPasswordReset } from '../services/authService.js'
-import '../styles/login.css'
+import { requestPasswordReset } from '../../services/authService.js'
+import '../../styles/login.css'
 
 const GENERIC_SUCCESS_MESSAGE =
   'If an eligible account exists for that email address, password reset instructions have been sent.'

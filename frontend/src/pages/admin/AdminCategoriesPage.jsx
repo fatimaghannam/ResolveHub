@@ -1,9 +1,9 @@
 import { MoreHorizontal, Plus } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
-import Toast from '../components/common/Toast.jsx'
-import { createAdminCategory, getAdminCategories, updateAdminCategory, updateAdminCategoryStatus } from '../services/adminService.js'
+import { EmptyState, ErrorState, LoadingState } from '../../components/common/States.jsx'
+import Toast from '../../components/common/Toast.jsx'
+import { createAdminCategory, getAdminCategories, updateAdminCategory, updateAdminCategoryStatus } from '../../services/adminService.js'
 
 const emptyForm = { name: '', description: '' }
 

@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import Pagination from '../components/common/Pagination.jsx'
-import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
-import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
-import { getAssignedTickets, getOpenTickets } from '../services/agentTicketService.js'
-import { getCategories, getPriorities, getStatuses } from '../services/ticketService.js'
-import { formatLocalDateTime } from '../utils/dateTime.js'
+import Pagination from '../../components/common/Pagination.jsx'
+import { EmptyState, ErrorState, LoadingState } from '../../components/common/States.jsx'
+import { TicketPriorityBadge, TicketStatusBadge } from '../../components/tickets/TicketBadges.jsx'
+import { getAssignedTickets, getOpenTickets } from '../../services/agentTicketService.js'
+import { getCategories, getPriorities, getStatuses } from '../../services/ticketService.js'
+import { formatLocalDateTime } from '../../utils/dateTime.js'
 import {
   getLocalQuickDateRange,
   getUtcDateRange,
   STANDARD_DATE_RANGE_OPTIONS,
-} from '../utils/dateRange.js'
-import { formatTicketReference } from '../utils/ticketReference.js'
+} from '../../utils/dateRange.js'
+import { formatTicketReference } from '../../utils/ticketReference.js'
 
 const pageSize = 8
 const dateRangeOptions = STANDARD_DATE_RANGE_OPTIONS

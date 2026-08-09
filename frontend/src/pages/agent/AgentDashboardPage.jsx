@@ -8,11 +8,11 @@ import {
   PauseCircle,
 } from 'lucide-react'
 import { Link, useOutletContext } from 'react-router-dom'
-import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
-import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
-import { getAgentDashboard } from '../services/agentTicketService.js'
-import { formatLocalDateTime } from '../utils/dateTime.js'
-import { formatTicketReference } from '../utils/ticketReference.js'
+import { EmptyState, ErrorState, LoadingState } from '../../components/common/States.jsx'
+import { TicketPriorityBadge, TicketStatusBadge } from '../../components/tickets/TicketBadges.jsx'
+import { getAgentDashboard } from '../../services/agentTicketService.js'
+import { formatLocalDateTime } from '../../utils/dateTime.js'
+import { formatTicketReference } from '../../utils/ticketReference.js'
 
 const statIcons = [ListChecks, Clock3, PauseCircle, AlertTriangle, CircleAlert, CircleCheckBig]
 const statDefinitions = [

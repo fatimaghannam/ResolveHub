@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
-import { getSystemAuditLog } from '../services/adminService.js'
-import { getLocalQuickDateRange, getUtcDateRange, STANDARD_DATE_RANGE_OPTIONS } from '../utils/dateRange.js'
-import { formatLocalDate, formatLocalDateTime, formatLocalTime } from '../utils/dateTime.js'
+import { EmptyState, ErrorState, LoadingState } from '../../components/common/States.jsx'
+import { getSystemAuditLog } from '../../services/adminService.js'
+import { getLocalQuickDateRange, getUtcDateRange, STANDARD_DATE_RANGE_OPTIONS } from '../../utils/dateRange.js'
+import { formatLocalDate, formatLocalDateTime, formatLocalTime } from '../../utils/dateTime.js'
 
 const initialFilters = {
   search: '', dateRange: 'all', fromDate: '', toDate: '', page: 1, pageSize: 20,

@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useState } from 'react'
 import { FilePlus2 } from 'lucide-react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import Pagination from '../components/common/Pagination.jsx'
-import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
-import Toast from '../components/common/Toast.jsx'
-import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
-import { getAdminTickets } from '../services/adminService.js'
-import { getManagerTickets } from '../services/managerService.js'
-import { getCategories, getPriorities, getStatuses } from '../services/ticketService.js'
+import Pagination from '../../components/common/Pagination.jsx'
+import { EmptyState, ErrorState, LoadingState } from '../../components/common/States.jsx'
+import Toast from '../../components/common/Toast.jsx'
+import { TicketPriorityBadge, TicketStatusBadge } from '../../components/tickets/TicketBadges.jsx'
+import { getAdminTickets } from '../../services/adminService.js'
+import { getManagerTickets } from '../../services/managerService.js'
+import { getCategories, getPriorities, getStatuses } from '../../services/ticketService.js'
 import {
   getLocalQuickDateRange,
   getUtcDateRange,
   STANDARD_DATE_RANGE_OPTIONS,
-} from '../utils/dateRange.js'
-import { formatLocalDateTime } from '../utils/dateTime.js'
+} from '../../utils/dateRange.js'
+import { formatLocalDateTime } from '../../utils/dateTime.js'
 
 const pageSize = 8
 const blankFilters = {

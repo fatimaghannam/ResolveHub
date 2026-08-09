@@ -2,11 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { ClipboardCheck, Inbox } from 'lucide-react'
-import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
-import Toast from '../components/common/Toast.jsx'
-import { TicketPriorityBadge } from '../components/tickets/TicketBadges.jsx'
-import { AgentWorkloadCard } from '../components/tickets/AgentWorkload.jsx'
-import { assignAdminTicket, getAdminAssignmentRequests, getAdminAssignments, reviewAdminAssignmentRequest } from '../services/adminService.js'
+import { EmptyState, ErrorState, LoadingState } from '../../components/common/States.jsx'
+import Toast from '../../components/common/Toast.jsx'
+import { TicketPriorityBadge } from '../../components/tickets/TicketBadges.jsx'
+import { AgentWorkloadCard } from '../../components/tickets/AgentWorkload.jsx'
+import { assignAdminTicket, getAdminAssignmentRequests, getAdminAssignments, reviewAdminAssignmentRequest } from '../../services/adminService.js'
 import {
   assignManagerTicket,
   getManagerAssignmentRequests,
@@ -15,14 +15,14 @@ import {
   getManagerCancellationRequests,
   reviewManagerCancellationRequest,
   reviewManagerAgentAssignmentRequest,
-} from '../services/managerService.js'
-import { getCategories, getPriorities } from '../services/ticketService.js'
-import { formatLocalDate, formatLocalDateTime } from '../utils/dateTime.js'
+} from '../../services/managerService.js'
+import { getCategories, getPriorities } from '../../services/ticketService.js'
+import { formatLocalDate, formatLocalDateTime } from '../../utils/dateTime.js'
 import {
   getLocalQuickDateRange,
   getUtcDateRange,
   STANDARD_DATE_RANGE_OPTIONS,
-} from '../utils/dateRange.js'
+} from '../../utils/dateRange.js'
 
 const blankFilters = {
   search: '',

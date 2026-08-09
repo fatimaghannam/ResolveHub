@@ -1,11 +1,11 @@
 import { Bell, CheckCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
-import { getNotifications, markAllNotificationsRead, markNotificationRead } from '../services/notificationService.js'
-import { notifyNotificationsChanged } from '../services/notificationEvents.js'
-import { formatLocalDateTime } from '../utils/dateTime.js'
-import { notificationTarget } from '../utils/notificationRoutes.js'
+import { EmptyState, ErrorState, LoadingState } from '../../components/common/States.jsx'
+import { getNotifications, markAllNotificationsRead, markNotificationRead } from '../../services/notificationService.js'
+import { notifyNotificationsChanged } from '../../services/notificationEvents.js'
+import { formatLocalDateTime } from '../../utils/dateTime.js'
+import { notificationTarget } from '../../utils/notificationRoutes.js'
 
 function NotificationsPage({ roleArea }) {
   const navigate = useNavigate()

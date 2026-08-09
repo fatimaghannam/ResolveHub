@@ -1,12 +1,12 @@
 import { ArrowLeft } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
-import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
-import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
-import { getAdminTickets, getAdminWorkload } from '../services/adminService.js'
-import { getManagerTickets, getManagerWorkload } from '../services/managerService.js'
-import { getStatuses } from '../services/ticketService.js'
-import { formatLocalDateTime } from '../utils/dateTime.js'
+import { EmptyState, ErrorState, LoadingState } from '../../components/common/States.jsx'
+import { TicketPriorityBadge, TicketStatusBadge } from '../../components/tickets/TicketBadges.jsx'
+import { getAdminTickets, getAdminWorkload } from '../../services/adminService.js'
+import { getManagerTickets, getManagerWorkload } from '../../services/managerService.js'
+import { getStatuses } from '../../services/ticketService.js'
+import { formatLocalDateTime } from '../../utils/dateTime.js'
 
 const workloadStatuses = new Set(['Assigned', 'In Progress', 'Pending'])
 

@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import TicketForm from '../components/tickets/TicketForm.jsx'
+import TicketForm from '../../components/tickets/TicketForm.jsx'
 import {
   createDraft,
   createTicket,
   updateDraft,
   uploadAttachment,
-} from '../services/ticketService.js'
-import { formatTicketReference } from '../utils/ticketReference.js'
+} from '../../services/ticketService.js'
+import { formatTicketReference } from '../../utils/ticketReference.js'
 
 function CreateTicketPage({ roleArea = 'employee' }) {
   const navigate = useNavigate()

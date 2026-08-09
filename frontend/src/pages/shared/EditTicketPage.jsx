@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import TicketForm from '../components/tickets/TicketForm.jsx'
-import { ErrorState, LoadingState } from '../components/common/States.jsx'
+import TicketForm from '../../components/tickets/TicketForm.jsx'
+import { ErrorState, LoadingState } from '../../components/common/States.jsx'
 import {
   deleteAttachment,
   getTicket,
   updateTicket,
   uploadAttachment,
-} from '../services/ticketService.js'
-import { formatTicketReference } from '../utils/ticketReference.js'
+} from '../../services/ticketService.js'
+import { formatTicketReference } from '../../utils/ticketReference.js'
 
 function EditTicketPage({ roleArea = 'employee' }) {
   const { id } = useParams()

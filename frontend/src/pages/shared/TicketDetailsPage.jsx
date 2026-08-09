@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { ErrorState, LoadingState } from '../components/common/States.jsx'
-import Toast from '../components/common/Toast.jsx'
-import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
-import TicketAttachments from '../components/tickets/TicketAttachments.jsx'
-import TicketComments from '../components/tickets/TicketComments.jsx'
-import TicketHistorySection from '../components/tickets/TicketHistorySection.jsx'
+import { ErrorState, LoadingState } from '../../components/common/States.jsx'
+import Toast from '../../components/common/Toast.jsx'
+import { TicketPriorityBadge, TicketStatusBadge } from '../../components/tickets/TicketBadges.jsx'
+import TicketAttachments from '../../components/tickets/TicketAttachments.jsx'
+import TicketComments from '../../components/tickets/TicketComments.jsx'
+import TicketHistorySection from '../../components/tickets/TicketHistorySection.jsx'
 import {
   cancelTicket,
   downloadAttachment,
   getTicket,
-} from '../services/ticketService.js'
-import { formatLocalDateTime } from '../utils/dateTime.js'
-import { formatTicketReference } from '../utils/ticketReference.js'
+} from '../../services/ticketService.js'
+import { formatLocalDateTime } from '../../utils/dateTime.js'
+import { formatTicketReference } from '../../utils/ticketReference.js'
 
 function TicketDetailsPage() {
   const { id } = useParams()

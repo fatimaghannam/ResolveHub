@@ -1,21 +1,21 @@
 import { ArrowLeft } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
-import Toast from '../components/common/Toast.jsx'
-import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
-import TicketComments from '../components/tickets/TicketComments.jsx'
-import TicketAttachments from '../components/tickets/TicketAttachments.jsx'
-import TicketActivityLog from '../components/tickets/TicketActivityLog.jsx'
-import TicketHistorySection from '../components/tickets/TicketHistorySection.jsx'
+import { EmptyState, ErrorState, LoadingState } from '../../components/common/States.jsx'
+import Toast from '../../components/common/Toast.jsx'
+import { TicketPriorityBadge, TicketStatusBadge } from '../../components/tickets/TicketBadges.jsx'
+import TicketComments from '../../components/tickets/TicketComments.jsx'
+import TicketAttachments from '../../components/tickets/TicketAttachments.jsx'
+import TicketActivityLog from '../../components/tickets/TicketActivityLog.jsx'
+import TicketHistorySection from '../../components/tickets/TicketHistorySection.jsx'
 import {
   getAdminTicket,
   markAdminTicketDuplicate,
   reviewAdminDuplicate,
-} from '../services/adminService.js'
-import { getManagerTicket, reportManagerDuplicate } from '../services/managerService.js'
-import { formatLocalDateTime } from '../utils/dateTime.js'
-import { downloadAttachment } from '../services/ticketService.js'
+} from '../../services/adminService.js'
+import { getManagerTicket, reportManagerDuplicate } from '../../services/managerService.js'
+import { formatLocalDateTime } from '../../utils/dateTime.js'
+import { downloadAttachment } from '../../services/ticketService.js'
 
 function getDirectDuplicateError(error) {
   if (error.status === 404) {

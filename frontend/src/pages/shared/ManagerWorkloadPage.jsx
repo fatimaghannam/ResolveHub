@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
-import { AgentWorkloadCard } from '../components/tickets/AgentWorkload.jsx'
-import { getManagerWorkload } from '../services/managerService.js'
-import { getAdminWorkload } from '../services/adminService.js'
+import { EmptyState, ErrorState, LoadingState } from '../../components/common/States.jsx'
+import { AgentWorkloadCard } from '../../components/tickets/AgentWorkload.jsx'
+import { getManagerWorkload } from '../../services/managerService.js'
+import { getAdminWorkload } from '../../services/adminService.js'
 
 function ManagerWorkloadPage({ roleArea = 'manager' }) {
   const [agents, setAgents] = useState(null)

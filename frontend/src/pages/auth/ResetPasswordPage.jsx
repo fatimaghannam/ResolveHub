@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { resetPassword } from '../services/authService.js'
-import '../styles/login.css'
+import { resetPassword } from '../../services/authService.js'
+import '../../styles/login.css'
 
 function getResetPasswordError(error) {
   if (error.message === 'CONNECTION_ERROR') {

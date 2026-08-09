@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
 import { MoreHorizontal, Plus } from 'lucide-react'
-import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
-import Toast from '../components/common/Toast.jsx'
-import { createAdminUser, getAdminUserDepartments, getAdminUsers, resendAdminUserInvitation, updateAdminUserStatus } from '../services/adminService.js'
-import { accountStatusClassName, formatAccountStatus } from '../utils/accountStatus.js'
-import { formatLocalDate, formatLocalDateTime, formatLocalTime } from '../utils/dateTime.js'
+import { EmptyState, ErrorState, LoadingState } from '../../components/common/States.jsx'
+import Toast from '../../components/common/Toast.jsx'
+import { createAdminUser, getAdminUserDepartments, getAdminUsers, resendAdminUserInvitation, updateAdminUserStatus } from '../../services/adminService.js'
+import { accountStatusClassName, formatAccountStatus } from '../../utils/accountStatus.js'
+import { formatLocalDate, formatLocalDateTime, formatLocalTime } from '../../utils/dateTime.js'
 
 const emptyUserForm = { firstName: '', lastName: '', email: '', departmentId: '', role: 'Employee' }
 

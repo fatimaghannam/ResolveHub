@@ -1,10 +1,10 @@
 import { Camera, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import UserAvatar from '../components/common/UserAvatar.jsx'
-import { removeProfilePhoto, uploadProfilePhoto } from '../services/profileService.js'
-import { accountStatusClassName, formatAccountStatus } from '../utils/accountStatus.js'
-import { formatLocalDateTime } from '../utils/dateTime.js'
+import UserAvatar from '../../components/common/UserAvatar.jsx'
+import { removeProfilePhoto, uploadProfilePhoto } from '../../services/profileService.js'
+import { accountStatusClassName, formatAccountStatus } from '../../utils/accountStatus.js'
+import { formatLocalDateTime } from '../../utils/dateTime.js'
 
 function ProfilePage() {
   const { user, role, updateUser } = useOutletContext()

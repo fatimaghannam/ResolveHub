@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { loginUser } from '../services/authService.js'
+import { loginUser } from '../../services/authService.js'
 import {
   AUTH_STORAGE_KEY,
   clearStoredAuth,
@@ -9,8 +9,8 @@ import {
   isItAgent,
   isAdministrator,
   isManager,
-} from '../services/authStorage.js'
-import '../styles/login.css'
+} from '../../services/authStorage.js'
+import '../../styles/login.css'
 
 function getLoginError(error) {
   if (error.status === 400) {
