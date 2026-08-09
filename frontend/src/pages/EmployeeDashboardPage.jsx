@@ -30,9 +30,9 @@ function EmployeeDashboardPage() {
   if (!data) return <LoadingState message="Loading your dashboard…" />
 
   const cards = [
-    ['Total Tickets', data.totalTickets, Ticket, 'blue'],
-    ['Open', data.openTickets, FolderOpen, 'cyan'],
-    ['In Progress', data.inProgressTickets, Clock3, 'amber'],
+    ['Total Tickets', data.totalTickets, Ticket, 'cyan'],
+    ['Open', data.openTickets, FolderOpen, 'amber'],
+    ['In Progress', data.inProgressTickets, Clock3, 'blue'],
     ['Resolved', data.resolvedTickets, CircleCheckBig, 'green'],
   ]
 

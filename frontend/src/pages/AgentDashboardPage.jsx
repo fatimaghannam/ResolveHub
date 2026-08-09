@@ -17,7 +17,7 @@ import { formatTicketReference } from '../utils/ticketReference.js'
 const statIcons = [ListChecks, Clock3, PauseCircle, AlertTriangle, CircleAlert, CircleCheckBig]
 const statDefinitions = [
   ['Active Assigned Tickets', 'activeAssignedTickets', 'blue'],
-  ['In Progress', 'inProgress', 'cyan'],
+  ['In Progress', 'inProgress', 'blue'],
   ['Pending', 'pending', 'amber'],
   ['High Priority Open', 'highPriorityOpen', 'amber'],
   ['Critical Open', 'criticalOpen', 'red'],

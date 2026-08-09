@@ -296,7 +296,7 @@ function DashboardLayout() {
             aria-expanded={!isDesktopCollapsed}
             aria-controls={sidebarId}
           >
-            {isDesktopCollapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
+            {isDesktopCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
           </button>
           <button
             type="button"
@@ -317,6 +317,7 @@ function DashboardLayout() {
                 to={to}
                 onClick={() => setIsMobileSidebarOpen(false)}
                 aria-label={label}
+                data-tooltip={label}
                 aria-current={active ? 'page' : undefined}
                 title={isDesktopCollapsed ? label : undefined}
                 className={`sidebar-link ${active ? 'sidebar-link--active' : ''}`}

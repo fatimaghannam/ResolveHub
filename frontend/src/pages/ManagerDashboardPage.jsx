@@ -16,9 +16,9 @@ import { getManagerDashboard } from '../services/managerService.js'
 import { formatLocalDateTime } from '../utils/dateTime.js'
 
 const statistics = [
-  ['Total Tickets', 'totalTickets', Ticket, 'blue'],
-  ['Open Tickets', 'openTickets', FolderOpen, 'cyan'],
-  ['In Progress', 'inProgressTickets', Clock3, 'amber'],
+  ['Total Tickets', 'totalTickets', Ticket, 'cyan'],
+  ['Open Tickets', 'openTickets', FolderOpen, 'amber'],
+  ['In Progress', 'inProgressTickets', Clock3, 'blue'],
   ['Unassigned', 'unassignedTickets', UserRoundMinus, 'red'],
   ['Resolved This Month', 'resolvedThisMonth', CircleCheckBig, 'green'],
   ['Critical Tickets', 'criticalTickets', AlertTriangle, 'red'],
