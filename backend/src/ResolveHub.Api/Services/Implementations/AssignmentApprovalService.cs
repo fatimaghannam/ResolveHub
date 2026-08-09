@@ -27,6 +27,7 @@ public sealed class AssignmentApprovalService(
                 Message: "This ticket is no longer open for assignment.");
         if (await dbContext.TicketAssignmentRequests.AnyAsync(item =>
                 item.TicketID == ticket.ID &&
+                item.RequestedAgentUserAccountID.HasValue &&
                 item.Status == AssignmentRequestStatusNames.Pending, token))
             return new(TicketOperationStatus.Conflict,
                 Message: "An assignment request is already pending for this ticket.");

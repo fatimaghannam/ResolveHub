@@ -43,8 +43,22 @@ public sealed class AgentTicketsController(
     }
 
     [HttpPost("{ticketReference}/assignment-requests")]
-    public IActionResult RequestAssignment(string ticketReference) =>
-        StatusCode(403, new { message = "IT Support Agents cannot create assignment approval requests." });
+    public async Task<ActionResult<TicketAssignmentRequestDto>> RequestAssignment(
+        string ticketReference, CancellationToken token)
+    {
+        var result = await service.RequestAssignmentAsync(
+            GetUserId(), ticketReference, token);
+        return result.Status switch
+        {
+            TicketOperationStatus.Success => Created(
+                $"/api/agent/tickets/{ticketReference}/assignment-requests/{result.Value!.Id}",
+                result.Value),
+            TicketOperationStatus.NotFound => NotFound(),
+            TicketOperationStatus.Forbidden => StatusCode(403, new { message = result.Message }),
+            TicketOperationStatus.Conflict => Conflict(new { message = result.Message }),
+            _ => BadRequest(new { message = result.Message })
+        };
+    }
 
     [HttpPost("{ticketReference}/cancellation-requests")]
     public async Task<ActionResult<TicketCancellationRequestDto>> RequestCancellation(

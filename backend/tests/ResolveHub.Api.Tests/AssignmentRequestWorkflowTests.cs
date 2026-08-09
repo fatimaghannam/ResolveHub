@@ -36,9 +36,6 @@ public sealed class AssignmentRequestWorkflowTests
         using var adminClient = await LoginAsync(factory, admin.Email!);
         var ticket = await CreateTicketAsync(factory, employeeClient);
 
-        var forbiddenAgentRequest = await agentClient.PostAsync(
-            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/assignment-requests", null);
-        Assert.Equal(HttpStatusCode.Forbidden, forbiddenAgentRequest.StatusCode);
         var requested = await managerClient.PostAsJsonAsync(
             $"/api/manager/tickets/{ticket.TicketReferenceNumber}/assignment-requests",
             new { agentUserId = requestedAgent.Id });
@@ -90,6 +87,199 @@ public sealed class AssignmentRequestWorkflowTests
             item.UserAccountID == manager.Id && item.Title == "Assignment Request Approved"));
         Assert.True(await db.UserNotifications.AnyAsync(item =>
             item.UserAccountID == requestedAgent.Id && item.Title == "Ticket Assigned"));
+    }
+
+    [Fact]
+    public async Task AgentSelfRequest_ManagerReview_EnforcesAudienceCapacityAndTicketState()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        await factory.SeedTicketLookupsAsync();
+        var manager = await factory.CreateUserAsync(
+            "self-request-manager@resolvehub.test", Password, RoleNames.Manager);
+        var requester = await factory.CreateUserAsync(
+            "self-request-owner@resolvehub.test", Password, RoleNames.Employee);
+        var firstAgent = await factory.CreateUserAsync(
+            "self-request-agent-one@resolvehub.test", Password, RoleNames.ITSupportAgent);
+        var secondAgent = await factory.CreateUserAsync(
+            "self-request-agent-two@resolvehub.test", Password, RoleNames.ITSupportAgent);
+        var admin = await factory.CreateUserAsync(
+            "self-request-admin@resolvehub.test", Password, RoleNames.Admin);
+        using var requesterClient = await LoginAsync(factory, requester.Email!);
+        using var managerClient = await LoginAsync(factory, manager.Email!);
+        using var firstAgentClient = await LoginAsync(factory, firstAgent.Email!);
+        using var secondAgentClient = await LoginAsync(factory, secondAgent.Email!);
+        using var adminClient = await LoginAsync(factory, admin.Email!);
+        var ticket = await CreateTicketAsync(factory, requesterClient);
+
+        var details = await firstAgentClient.GetFromJsonAsync<AgentTicketDetailsDto>(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}");
+        Assert.True(details!.CanRequestAssignment);
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await requesterClient.PostAsync(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/assignment-requests", null))
+            .StatusCode);
+        var firstResponse = await firstAgentClient.PostAsJsonAsync(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/assignment-requests",
+            new { requestedAgentId = secondAgent.Id });
+        Assert.Equal(HttpStatusCode.Created, firstResponse.StatusCode);
+        var firstRequest = (await firstResponse.Content
+            .ReadFromJsonAsync<TicketAssignmentRequestDto>())!;
+        Assert.Null(firstRequest.RequestedAgentUserAccountId);
+        Assert.Equal(firstAgent.Id, firstRequest.RequestedByUserAccountId);
+        Assert.Equal(HttpStatusCode.Conflict, (await firstAgentClient.PostAsync(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/assignment-requests", null))
+            .StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await firstAgentClient.PostAsJsonAsync(
+            $"/api/manager/agent-assignment-requests/{firstRequest.Id}/approve",
+            new { reason = (string?)null })).StatusCode);
+
+        var secondResponse = await secondAgentClient.PostAsync(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/assignment-requests", null);
+        Assert.Equal(HttpStatusCode.Created, secondResponse.StatusCode);
+        var secondRequest = (await secondResponse.Content
+            .ReadFromJsonAsync<TicketAssignmentRequestDto>())!;
+
+        var managerQueue = (await managerClient.GetFromJsonAsync<
+            IReadOnlyCollection<TicketAssignmentRequestDto>>(
+                "/api/manager/agent-assignment-requests"))!;
+        Assert.Equal(2, managerQueue.Count);
+        Assert.All(managerQueue, item => Assert.Equal(0,
+            item.RequestedAgentActiveTicketCount));
+        Assert.Empty((await adminClient.GetFromJsonAsync<
+            IReadOnlyCollection<TicketAssignmentRequestDto>>(
+                "/api/admin/assignment-requests"))!);
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await managerClient.PostAsJsonAsync(
+            $"/api/manager/agent-assignment-requests/{firstRequest.Id}/decline",
+            new { reason = " " })).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await managerClient.PostAsJsonAsync(
+            $"/api/manager/agent-assignment-requests/{firstRequest.Id}/decline",
+            new { reason = "Another Agent is better positioned for this request." }))
+            .StatusCode);
+        using (var declinedScope = factory.Services.CreateScope())
+        {
+            var declinedDb = declinedScope.ServiceProvider
+                .GetRequiredService<ApplicationDbContext>();
+            var declinedTicket = await declinedDb.Tickets
+                .Include(item => item.TicketStatus)
+                .SingleAsync(item => item.ID == ticket.Id);
+            Assert.Null(declinedTicket.AssignedToUserAccountID);
+            Assert.Equal(TicketStatusNames.Open, declinedTicket.TicketStatus.Name);
+        }
+        Assert.Equal(HttpStatusCode.Created, (await firstAgentClient.PostAsync(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/assignment-requests", null))
+            .StatusCode);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await managerClient.PostAsJsonAsync(
+            $"/api/manager/agent-assignment-requests/{secondRequest.Id}/approve",
+            new { reason = (string?)null })).StatusCode);
+
+        var firstAgentOpen = await firstAgentClient.GetFromJsonAsync<
+            PagedResultDto<AgentTicketListItemDto>>("/api/agent/tickets/open");
+        var secondAgentAssigned = await secondAgentClient.GetFromJsonAsync<
+            PagedResultDto<AgentTicketListItemDto>>("/api/agent/tickets");
+        Assert.DoesNotContain(firstAgentOpen!.Items,
+            item => item.Id == ticket.Id);
+        Assert.Contains(secondAgentAssigned!.Items,
+            item => item.Id == ticket.Id);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var storedTicket = await db.Tickets.Include(item => item.TicketStatus)
+            .SingleAsync(item => item.ID == ticket.Id);
+        Assert.Equal(secondAgent.Id, storedTicket.AssignedToUserAccountID);
+        Assert.Equal(TicketStatusNames.Assigned, storedTicket.TicketStatus.Name);
+        Assert.DoesNotContain(await db.TicketAssignmentRequests
+            .Where(item => item.TicketID == ticket.Id).ToListAsync(),
+            item => item.Status == AssignmentRequestStatusNames.Pending);
+        Assert.True(await db.UserNotifications.AnyAsync(item =>
+            item.UserAccountID == manager.Id && item.Title == "New Assignment Request"));
+        Assert.True(await db.UserNotifications.AnyAsync(item =>
+            item.UserAccountID == firstAgent.Id && item.Title == "Assignment Request Declined"));
+        Assert.True(await db.UserNotifications.AnyAsync(item =>
+            item.UserAccountID == secondAgent.Id && item.Title == "Assignment Request Approved"));
+        Assert.True(await db.ActivityLogs.AnyAsync(item =>
+            item.PerformedByUserAccountID == manager.Id &&
+            item.ActionType == TicketHistoryActionNames.AssignmentRequestApproved));
+    }
+
+    [Fact]
+    public async Task AgentSelfRequest_ApprovalRevalidatesCapacityAndCurrentAssignment()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        await factory.SeedTicketLookupsAsync();
+        var manager = await factory.CreateUserAsync(
+            "revalidation-manager@resolvehub.test", Password, RoleNames.Manager);
+        var requester = await factory.CreateUserAsync(
+            "revalidation-owner@resolvehub.test", Password, RoleNames.Employee);
+        var requestingAgent = await factory.CreateUserAsync(
+            "revalidation-requesting-agent@resolvehub.test", Password,
+            RoleNames.ITSupportAgent);
+        var otherAgent = await factory.CreateUserAsync(
+            "revalidation-other-agent@resolvehub.test", Password,
+            RoleNames.ITSupportAgent);
+        var admin = await factory.CreateUserAsync(
+            "revalidation-admin@resolvehub.test", Password, RoleNames.Admin);
+        using var requesterClient = await LoginAsync(factory, requester.Email!);
+        using var requestingAgentClient = await LoginAsync(factory, requestingAgent.Email!);
+        using var managerClient = await LoginAsync(factory, manager.Email!);
+        using var adminClient = await LoginAsync(factory, admin.Email!);
+
+        var capacityTarget = await CreateTicketAsync(factory, requesterClient);
+        var capacityRequestResponse = await requestingAgentClient.PostAsync(
+            $"/api/agent/tickets/{capacityTarget.TicketReferenceNumber}/assignment-requests",
+            null);
+        capacityRequestResponse.EnsureSuccessStatusCode();
+        var capacityRequest = (await capacityRequestResponse.Content
+            .ReadFromJsonAsync<TicketAssignmentRequestDto>())!;
+        for (var index = 0; index < TicketWorkloadRules.MaxActiveTicketsPerAgent; index++)
+        {
+            var workloadTicket = await CreateTicketAsync(factory, requesterClient);
+            var assignment = await adminClient.PostAsJsonAsync(
+                $"/api/admin/tickets/{workloadTicket.TicketReferenceNumber}/assign",
+                new { agentUserId = requestingAgent.Id });
+            assignment.EnsureSuccessStatusCode();
+        }
+
+        Assert.Equal(HttpStatusCode.Conflict, (await managerClient.PostAsJsonAsync(
+            $"/api/manager/agent-assignment-requests/{capacityRequest.Id}/approve",
+            new { reason = (string?)null })).StatusCode);
+
+        var staleTarget = await CreateTicketAsync(factory, requesterClient);
+        var staleRequestResponse = await otherAgentRequestAsync();
+        var staleRequest = (await staleRequestResponse.Content
+            .ReadFromJsonAsync<TicketAssignmentRequestDto>())!;
+        var assignedElsewhere = await adminClient.PostAsJsonAsync(
+            $"/api/admin/tickets/{staleTarget.TicketReferenceNumber}/assign",
+            new { agentUserId = requestingAgent.Id });
+        Assert.Equal(HttpStatusCode.Conflict, assignedElsewhere.StatusCode);
+
+        // Use the other Agent because the requesting Agent is at capacity.
+        assignedElsewhere = await adminClient.PostAsJsonAsync(
+            $"/api/admin/tickets/{staleTarget.TicketReferenceNumber}/assign",
+            new { agentUserId = otherAgent.Id });
+        assignedElsewhere.EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.Conflict, (await managerClient.PostAsJsonAsync(
+            $"/api/manager/agent-assignment-requests/{staleRequest.Id}/approve",
+            new { reason = (string?)null })).StatusCode);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Assert.Equal(otherAgent.Id, (await db.Tickets.SingleAsync(item =>
+            item.ID == staleTarget.Id)).AssignedToUserAccountID);
+        Assert.Equal(AssignmentRequestStatusNames.Pending,
+            (await db.TicketAssignmentRequests.SingleAsync(item =>
+                item.ID == staleRequest.Id)).Status);
+
+        async Task<HttpResponseMessage> otherAgentRequestAsync()
+        {
+            using var otherAgentClient = await LoginAsync(factory, otherAgent.Email!);
+            var response = await otherAgentClient.PostAsync(
+                $"/api/agent/tickets/{staleTarget.TicketReferenceNumber}/assignment-requests",
+                null);
+            response.EnsureSuccessStatusCode();
+            return response;
+        }
     }
 
     [Fact]

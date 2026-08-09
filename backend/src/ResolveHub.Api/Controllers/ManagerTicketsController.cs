@@ -69,6 +69,25 @@ public sealed class ManagerTicketsController(
         AssignmentRequests(CancellationToken token) =>
         Ok(await assignmentApprovalService.GetManagerRequestsAsync(UserId, token));
 
+    [HttpGet("agent-assignment-requests")]
+    public async Task<ActionResult<IReadOnlyCollection<TicketAssignmentRequestDto>>>
+        AgentAssignmentRequests(CancellationToken token) =>
+        Ok(await service.GetAssignmentRequestsAsync(token));
+
+    [HttpPost("agent-assignment-requests/{requestId:int}/{decision}")]
+    public async Task<IActionResult> ReviewAgentAssignmentRequest(
+        int requestId, string decision, ReviewAssignmentRequestDto? request,
+        CancellationToken token)
+    {
+        var approve = string.Equals(decision, "approve", StringComparison.OrdinalIgnoreCase);
+        var decline = string.Equals(decision, "decline", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(decision, "reject", StringComparison.OrdinalIgnoreCase);
+        if (!approve && !decline)
+            return BadRequest(new { message = "Decision must be approve or decline." });
+        return ReviewResult(await service.ReviewAssignmentRequestAsync(
+            UserId, requestId, approve, request?.Reason, token));
+    }
+
     [HttpGet("cancellation-requests")]
     public async Task<ActionResult<IReadOnlyCollection<TicketCancellationRequestDto>>>
         CancellationRequests(CancellationToken token) =>

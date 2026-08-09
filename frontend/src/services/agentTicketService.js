@@ -12,6 +12,11 @@ export const getOpenTickets = (filters, signal) =>
 export const getAgentTicketDetails = (ticketReference, signal) =>
   apiRequest(`/api/agent/tickets/${encodeURIComponent(ticketReference)}`, { signal })
 
+export const requestAgentTicketAssignment = (ticketReference) =>
+  apiRequest(`/api/agent/tickets/${encodeURIComponent(ticketReference)}/assignment-requests`, {
+    method: 'POST',
+  })
+
 export const updateAgentTicketStatus = (ticketReference, request) =>
   apiRequest(`/api/agent/tickets/${encodeURIComponent(ticketReference)}/status`, {
     method: 'PATCH',

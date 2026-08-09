@@ -13,7 +13,8 @@ namespace ResolveHub.Api.Services.Implementations;
 
 public sealed class ManagerTicketService(
     ApplicationDbContext dbContext,
-    IAdminTicketService adminTicketService) : IManagerTicketService
+    IAdminTicketService adminTicketService,
+    INotificationService notificationService) : IManagerTicketService
 {
     public Task<PagedResultDto<AdminTicketListItemDto>> GetTicketsAsync(
         AdminTicketFilterDto filter, CancellationToken token) =>
@@ -154,6 +155,7 @@ public sealed class ManagerTicketService(
         GetAssignmentRequestsAsync(CancellationToken token) =>
         await dbContext.TicketAssignmentRequests.AsNoTracking()
             .Where(item => item.Status == AssignmentRequestStatusNames.Pending &&
+                item.RequestedAgentUserAccountID == null &&
                 !item.Ticket.IsDeleted &&
                 item.Ticket.AssignedToUserAccountID == null &&
                 item.Ticket.TicketStatus.Name == TicketStatusNames.Open)
@@ -163,11 +165,13 @@ public sealed class ManagerTicketService(
                 item.Ticket.Title, item.RequestedByUserAccountID,
                 item.RequestedByUserAccount.FirstName + " " +
                     item.RequestedByUserAccount.LastName,
-                item.RequestedAgentUserAccountID,
-                item.RequestedAgentUserAccount == null ? null :
-                    item.RequestedAgentUserAccount.FirstName + " " +
-                    item.RequestedAgentUserAccount.LastName,
-                0, TicketWorkloadRules.MaxActiveTicketsPerAgent,
+                item.RequestedByUserAccountID,
+                item.RequestedByUserAccount.FirstName + " " +
+                    item.RequestedByUserAccount.LastName,
+                item.RequestedByUserAccount.AssignedTickets.Count(ticket =>
+                    !ticket.IsDeleted && TicketWorkloadRules.ActiveStatuses.Contains(
+                        ticket.TicketStatus.Name)),
+                TicketWorkloadRules.MaxActiveTicketsPerAgent,
                 item.Status, item.RequestedDate,
                 item.ReviewedByUserAccountID,
                 item.ReviewedByUserAccount == null ? null :
@@ -177,19 +181,38 @@ public sealed class ManagerTicketService(
             .ToListAsync(token);
 
     public async Task<TicketServiceResult<bool>> ReviewAssignmentRequestAsync(
-        int managerId, int requestId, bool approve, CancellationToken token)
+        int managerId, int requestId, bool approve, string? reason,
+        CancellationToken token)
     {
+        var declineReason = reason?.Trim();
+        if (!approve && string.IsNullOrWhiteSpace(declineReason))
+            return new(TicketOperationStatus.Invalid,
+                Message: "A decline reason is required.");
         var request = await dbContext.TicketAssignmentRequests
             .Include(item => item.Ticket)
+                .ThenInclude(item => item.TicketStatus)
+            .Include(item => item.RequestedByUserAccount)
             .SingleOrDefaultAsync(item => item.ID == requestId, token);
         if (request is null) return new(TicketOperationStatus.NotFound);
+        if (request.RequestedAgentUserAccountID.HasValue)
+            return new(TicketOperationStatus.Forbidden,
+                Message: "Manager-created assignment requests require Administrator review.");
         if (request.Status != AssignmentRequestStatusNames.Pending)
             return new(TicketOperationStatus.Conflict,
                 Message: "This assignment request has already been reviewed.");
         if (request.Ticket.IsDeleted ||
-            request.Ticket.AssignedToUserAccountID.HasValue)
+            request.Ticket.AssignedToUserAccountID.HasValue ||
+            request.Ticket.TicketStatus.Name != TicketStatusNames.Open)
             return new(TicketOperationStatus.Conflict,
                 Message: "This ticket is no longer available for assignment.");
+
+        var requestingAgentIsActive = request.RequestedByUserAccount.IsActive &&
+            await dbContext.UserRoles.AnyAsync(item =>
+                item.UserId == request.RequestedByUserAccountID &&
+                item.Role.Name == RoleNames.ITSupportAgent, token);
+        if (!requestingAgentIsActive)
+            return new(TicketOperationStatus.Conflict,
+                Message: "The requesting IT Agent is no longer active.");
 
         if (approve)
         {
@@ -201,6 +224,18 @@ public sealed class ManagerTicketService(
                     transaction = await dbContext.Database.BeginTransactionAsync(
                         IsolationLevel.Serializable, token);
                 }
+                await dbContext.Entry(request.Ticket).ReloadAsync(token);
+                var currentStatus = await dbContext.TicketStatuses.AsNoTracking()
+                    .Where(item => item.ID == request.Ticket.TicketStatusID)
+                    .Select(item => item.Name).SingleAsync(token);
+                if (request.Ticket.AssignedToUserAccountID.HasValue ||
+                    currentStatus != TicketStatusNames.Open)
+                {
+                    if (transaction is not null)
+                        await transaction.RollbackAsync(token);
+                    return new(TicketOperationStatus.Conflict,
+                        Message: "This ticket is no longer available for assignment.");
+                }
                 var assignment = await adminTicketService.AssignAsync(
                     managerId, request.Ticket.TicketReferenceNumber,
                     request.RequestedByUserAccountID, token);
@@ -211,7 +246,7 @@ public sealed class ManagerTicketService(
                     return assignment;
                 }
                 await CompleteReviewAsync(
-                    request, managerId, true, token);
+                    request, managerId, true, null, token);
                 if (transaction is not null)
                     await transaction.CommitAsync(token);
                 return new(TicketOperationStatus.Success, true);
@@ -229,13 +264,13 @@ public sealed class ManagerTicketService(
             }
         }
 
-        await CompleteReviewAsync(request, managerId, false, token);
+        await CompleteReviewAsync(request, managerId, false, declineReason, token);
         return new(TicketOperationStatus.Success, true);
     }
 
     private async Task CompleteReviewAsync(
         TicketAssignmentRequest request, int managerId,
-        bool approve, CancellationToken token)
+        bool approve, string? declineReason, CancellationToken token)
     {
         var now = DateTime.UtcNow;
         if (approve)
@@ -243,6 +278,7 @@ public sealed class ManagerTicketService(
             var competingRequests = await dbContext.TicketAssignmentRequests
                 .Where(item => item.TicketID == request.TicketID &&
                     item.ID != request.ID &&
+                    item.RequestedAgentUserAccountID == null &&
                     item.Status == AssignmentRequestStatusNames.Pending)
                 .ToListAsync(token);
             foreach (var competing in competingRequests)
@@ -250,6 +286,12 @@ public sealed class ManagerTicketService(
                 competing.Status = AssignmentRequestStatusNames.Rejected;
                 competing.ReviewedByUserAccountID = managerId;
                 competing.ReviewedDate = now;
+                competing.ReviewReason = "The ticket was assigned to another IT Agent.";
+                notificationService.Add(competing.RequestedByUserAccountID,
+                    NotificationTypeNames.AssignmentRequestRejected,
+                    "Assignment Request Declined",
+                    $"Your request for {request.Ticket.TicketReferenceNumber} was declined.",
+                    request.Ticket.TicketReferenceNumber, now, managerId);
             }
         }
         request.Status = approve
@@ -257,6 +299,7 @@ public sealed class ManagerTicketService(
             : AssignmentRequestStatusNames.Rejected;
         request.ReviewedByUserAccountID = managerId;
         request.ReviewedDate = now;
+        request.ReviewReason = approve ? null : declineReason;
         dbContext.TicketHistory.Add(new TicketHistory
         {
             TicketID = request.TicketID,
@@ -268,7 +311,7 @@ public sealed class ManagerTicketService(
             NewValue = request.Status,
             Description = approve
                 ? "Manager approved the assignment request."
-                : "Manager rejected the assignment request.",
+                : $"Manager declined the assignment request. Reason: {declineReason}",
             CreatedDate = now
         });
         dbContext.ActivityLogs.Add(new ActivityLog
@@ -281,11 +324,19 @@ public sealed class ManagerTicketService(
             EntityID = request.Ticket.TicketReferenceNumber,
             Description = approve
                 ? "Manager approved an agent assignment request."
-                : "Manager rejected an agent assignment request.",
+                : "Manager declined an agent assignment request.",
             OldValue = AssignmentRequestStatusNames.Pending,
             NewValue = request.Status,
             CreatedDate = now
         });
+        notificationService.Add(request.RequestedByUserAccountID,
+            approve ? NotificationTypeNames.AssignmentRequestApproved :
+                NotificationTypeNames.AssignmentRequestRejected,
+            approve ? "Assignment Request Approved" : "Assignment Request Declined",
+            approve
+                ? $"Your request for {request.Ticket.TicketReferenceNumber} was approved."
+                : $"Your request for {request.Ticket.TicketReferenceNumber} was declined.",
+            request.Ticket.TicketReferenceNumber, now, managerId);
         await dbContext.SaveChangesAsync(token);
     }
 

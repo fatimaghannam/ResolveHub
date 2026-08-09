@@ -260,6 +260,8 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
     location.state?.from === 'cancellation-requests'
   const fromAssignmentApprovals = roleArea === 'admin' &&
     location.state?.from === 'assignment-approvals'
+  const fromAgentAssignmentRequests = roleArea === 'manager' &&
+    location.state?.from === 'agent-assignment-requests'
   const fromAgentWorkloadTickets = location.state?.from === 'agent-workload-tickets' &&
     typeof location.state?.backTo === 'string' &&
     location.state.backTo.startsWith(`/${roleArea}/workload/`)
@@ -272,6 +274,8 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
     ? `/${roleArea}/notifications`
     : fromCancellationRequests
       ? '/manager/assignments#cancellation-requests'
+      : fromAgentAssignmentRequests
+        ? '/manager/assignments#agent-assignment-requests'
       : fromAssignmentApprovals
         ? '/admin/assignments#assignment-approvals'
         : fromAgentWorkloadTickets
@@ -281,6 +285,8 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
     ? 'Back to Notifications'
     : fromCancellationRequests
       ? 'Back to Cancellation Requests'
+      : fromAgentAssignmentRequests
+        ? 'Back to Agent Assignment Requests'
       : fromAssignmentApprovals
         ? 'Back to Assignment Approvals'
         : fromAgentWorkloadTickets

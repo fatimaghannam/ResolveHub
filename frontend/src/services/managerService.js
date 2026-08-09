@@ -26,6 +26,15 @@ export const getManagerWorkload = (signal) =>
 export const getManagerAssignmentRequests = (signal) =>
   apiRequest('/api/manager/assignment-requests', { signal })
 
+export const getManagerAgentAssignmentRequests = (signal) =>
+  apiRequest('/api/manager/agent-assignment-requests', { signal })
+
+export const reviewManagerAgentAssignmentRequest = (requestId, decision, reason = null) =>
+  apiRequest(`/api/manager/agent-assignment-requests/${requestId}/${decision}`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  })
+
 export const getManagerCancellationRequests = (signal) =>
   apiRequest('/api/manager/cancellation-requests', { signal })
 

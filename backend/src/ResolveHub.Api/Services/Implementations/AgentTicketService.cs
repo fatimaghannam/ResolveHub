@@ -177,6 +177,16 @@ public sealed class AgentTicketService(
         RequestAssignmentAsync(
             int agentId, string ticketReference, CancellationToken token)
     {
+        var agentName = await dbContext.Users.AsNoTracking()
+            .Where(user => user.Id == agentId && user.IsActive &&
+                user.UserAccountRoles.Any(role =>
+                    role.Role.Name == RoleNames.ITSupportAgent))
+            .Select(user => user.FirstName + " " + user.LastName)
+            .SingleOrDefaultAsync(token);
+        if (agentName is null)
+            return new(TicketOperationStatus.Forbidden,
+                Message: "Only an active IT Support Agent can request assignment.");
+
         var ticket = await dbContext.Tickets
             .Include(item => item.TicketStatus)
             .SingleOrDefaultAsync(item =>
@@ -199,7 +209,6 @@ public sealed class AgentTicketService(
                 Message: "You already requested assignment to this ticket.");
 
         var now = DateTime.UtcNow;
-        var agentName = await GetAgentNameAsync(agentId, token);
         var request = new TicketAssignmentRequest
         {
             TicketID = ticket.ID,
@@ -214,6 +223,16 @@ public sealed class AgentTicketService(
         AddActivity(ticket, agentId, TicketHistoryActionNames.AssignmentRequested,
             null, AssignmentRequestStatusNames.Pending,
             $"Assignment requested by {agentName}.", now);
+        var managerIds = await dbContext.UserRoles.AsNoTracking()
+            .Where(item => item.Role.Name == RoleNames.Manager &&
+                item.UserAccount.IsActive)
+            .Select(item => item.UserId).Distinct().ToListAsync(token);
+        foreach (var managerId in managerIds)
+            notificationService.Add(managerId,
+                NotificationTypeNames.AssignmentRequestCreated,
+                "New Assignment Request",
+                $"{agentName} requested assignment to {ticket.TicketReferenceNumber}.",
+                ticket.TicketReferenceNumber, now, agentId);
         await dbContext.SaveChangesAsync(token);
         return new(TicketOperationStatus.Success,
             new(request.ID, ticket.ID, ticket.TicketReferenceNumber, ticket.Title,

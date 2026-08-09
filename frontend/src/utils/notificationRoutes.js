@@ -1,6 +1,8 @@
 export function notificationTarget(notification, roleArea) {
   if (notification.type === 'AssignmentRequestCreated' && roleArea === 'admin')
     return '/admin/assignments'
+  if (notification.type === 'AssignmentRequestCreated' && roleArea === 'manager')
+    return '/manager/assignments#agent-assignment-requests'
   if (notification.type === 'CancellationRequestCreated' && roleArea === 'manager')
     return '/manager/assignments'
   if (!notification.ticketReferenceNumber) return `/${roleArea}/notifications`

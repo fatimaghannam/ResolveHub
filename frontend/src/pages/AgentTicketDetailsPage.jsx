@@ -5,7 +5,6 @@ import { Link, useLocation, useParams } from 'react-router-dom'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
 import Toast from '../components/common/Toast.jsx'
 import {
-  PendingApprovalBadge,
   TicketPriorityBadge,
   TicketStatusBadge,
 } from '../components/tickets/TicketBadges.jsx'
@@ -20,6 +19,7 @@ import {
   markAgentTicketPending,
   resumeAgentTicketWork,
   requestAgentTicketCancellation,
+  requestAgentTicketAssignment,
   resolveAgentTicket,
   updateAgentTicketStatus,
 } from '../services/agentTicketService.js'
@@ -220,6 +220,25 @@ function AgentTicketDetailsPage() {
     }
   }
 
+  async function requestAssignment() {
+    if (saving) return
+    try {
+      setSaving('assignment')
+      await requestAgentTicketAssignment(ticket.ticketReferenceNumber)
+      setDialog(null)
+      setTicket((current) => ({
+        ...current,
+        canRequestAssignment: false,
+        assignmentRequestStatus: 'Pending',
+      }))
+      notify('success', 'Assignment Requested', 'Your request was submitted for Manager review. The ticket remains unassigned.')
+    } catch (requestError) {
+      notify('error', 'Unable to Request Assignment', requestError.message)
+    } finally {
+      setSaving('')
+    }
+  }
+
   async function downloadAttachment(file) {
     try {
       const blob = await downloadAgentTicketAttachment(
@@ -256,15 +275,16 @@ function AgentTicketDetailsPage() {
     <>
       {toast && <div className="app-toast-region"><Toast key={toast.id} type={toast.type} title={toast.title} message={toast.message} onDismiss={dismissToast} /></div>}
       <section className="ticket-details-header-grid">
-        <Link className="back-link ticket-details-header__back" to={location.state?.from === 'notifications' ? '/agent/notifications' : '/agent/tickets'}><ArrowLeft size={18} aria-hidden="true" />{location.state?.from === 'notifications' ? 'Back to Notifications' : 'Back to Assigned Tickets'}</Link>
+        <Link className="back-link ticket-details-header__back" to={location.state?.from === 'notifications' ? '/agent/notifications' : location.state?.from === 'open-tickets' ? '/agent/tickets/open' : '/agent/tickets'}><ArrowLeft size={18} aria-hidden="true" />{location.state?.from === 'notifications' ? 'Back to Notifications' : location.state?.from === 'open-tickets' ? 'Back to Open Tickets' : 'Back to Assigned Tickets'}</Link>
         <div className="page-heading ticket-details-header__identity"><span className="eyebrow">{formatTicketReference(ticket)}</span><h2>{ticket.title}</h2><p>Created {formatLocalDateTime(ticket.createdDate)}</p></div>
         <div className="heading-actions ticket-details-header__actions">
+          {ticket.canRequestAssignment && <button className="button button--primary" type="button" onClick={() => setDialog('assignment')} disabled={Boolean(saving)}>Request Assignment</button>}
+          {ticket.assignmentRequestStatus === 'Pending' && <button className="button button--secondary" type="button" disabled>Assignment Requested</button>}
           {canStart && <button className="button button--primary" type="button" onClick={startProgress} disabled={Boolean(saving)}>{saving === 'progress' ? 'Starting…' : 'Start Work'}</button>}
           {ticket.statusName === 'Pending' && <button className="button button--primary" type="button" onClick={resumeWork} disabled={Boolean(saving)}>{saving === 'resume' ? 'Resuming…' : 'Resume Work'}</button>}
           {ticket.canResolve && <button className="button button--primary" type="button" onClick={() => setDialog('resolve')} disabled={Boolean(saving)}>{saving === 'resolve' ? 'Resolving…' : 'Mark as Resolved'}</button>}
           {ticket.canClose && <button className="button button--primary" type="button" onClick={() => setDialog('close')} disabled={Boolean(saving)}>Close Ticket</button>}
           {hasMoreActions && <div className="agent-more-actions"><button className="button button--secondary agent-more-actions__trigger" type="button" aria-haspopup="menu" aria-expanded={moreActionsOpen} onClick={toggleMoreActions} disabled={Boolean(saving)}>More Actions <span aria-hidden="true">▼</span></button>{moreActionsOpen && moreActionsPosition && createPortal(<div className="cancellation-action-menu__dropdown agent-more-actions__dropdown" style={moreActionsPosition} role="menu">{canMarkPending && <button className="cancellation-action-menu__item" type="button" role="menuitem" onClick={() => { setMoreActionsOpen(false); setDialog('pending') }}>Mark as Pending</button>}{canMarkPending && canRequestCancellation && <div className="cancellation-action-menu__divider" role="separator" />}{canRequestCancellation && <button className="cancellation-action-menu__item cancellation-action-menu__item--danger" type="button" role="menuitem" onClick={() => { setMoreActionsOpen(false); setDialog('cancellation') }}>Request Cancellation</button>}</div>, document.body)}</div>}
-          {ticket.assignmentRequestStatus === 'Pending' && <PendingApprovalBadge />}
         </div>
       </section>
       {ticket.pendingCancellationRequest && <div className="inline-alert cancellation-request-banner" role="status"><strong>Cancellation Requested — Pending Manager Review</strong><span>Submitted {formatLocalDateTime(ticket.pendingCancellationRequest.requestedDate)}. The ticket remains {ticket.statusName} while the request is reviewed.</span></div>}
@@ -308,12 +328,12 @@ function AgentTicketDetailsPage() {
       {dialog && <>
         <button className="dialog-backdrop" type="button" aria-label="Close dialog" onClick={() => { if (!saving) setDialog(null) }} />
         <section className="dialog" role="dialog" aria-modal="true" aria-labelledby="agent-action-title" aria-describedby="agent-action-description">
-          <h2 id="agent-action-title">{dialog === 'cancellation' ? 'Request ticket cancellation' : dialog === 'close' ? 'Close Ticket' : dialog === 'pending' ? 'Mark as Pending' : 'Mark Ticket as Resolved'}</h2>
-          <p id="agent-action-description">{dialog === 'cancellation' ? 'Please provide a reason for requesting cancellation of this ticket.' : dialog === 'close' ? `Are you sure you want to close ${ticket.ticketReferenceNumber}? This confirms that the work has been completed.` : dialog === 'pending' ? 'Pause active work and record what the ticket is waiting for.' : 'Describe the technical resolution before marking this ticket as resolved.'}</p>
-          {dialog === 'cancellation' ? <label><span>Reason</span><textarea autoFocus required value={cancellationReason} onChange={(event) => setCancellationReason(event.target.value)} maxLength="1000" placeholder="Provide a clear reason for requesting cancellation..." disabled={Boolean(saving)} /></label> : dialog === 'pending' ? <div className="pending-dialog-fields"><label><span>Pending reason</span><select autoFocus value={pendingReason} onChange={(event) => setPendingReason(event.target.value)} disabled={Boolean(saving)}><option value="">Select a reason</option><option value="employee-response">Waiting for employee response</option><option value="manager-approval">Waiting for manager approval</option><option value="vendor">Waiting for vendor</option><option value="hardware">Waiting for hardware</option><option value="software-license">Waiting for software license</option><option value="other">Other</option></select></label>{pendingReason === 'other' && <label><span>Custom reason</span><input value={customPendingReason} onChange={(event) => setCustomPendingReason(event.target.value)} maxLength="300" disabled={Boolean(saving)} /></label>}<label><span>Additional note (optional)</span><textarea value={pendingNote} onChange={(event) => setPendingNote(event.target.value)} maxLength="1000" disabled={Boolean(saving)} /></label></div> : dialog === 'resolve'
+          <h2 id="agent-action-title">{dialog === 'assignment' ? 'Request Assignment' : dialog === 'cancellation' ? 'Request ticket cancellation' : dialog === 'close' ? 'Close Ticket' : dialog === 'pending' ? 'Mark as Pending' : 'Mark Ticket as Resolved'}</h2>
+          <p id="agent-action-description">{dialog === 'assignment' ? 'Request assignment to this ticket? A Manager will review your request before the ticket is assigned to you.' : dialog === 'cancellation' ? 'Please provide a reason for requesting cancellation of this ticket.' : dialog === 'close' ? `Are you sure you want to close ${ticket.ticketReferenceNumber}? This confirms that the work has been completed.` : dialog === 'pending' ? 'Pause active work and record what the ticket is waiting for.' : 'Describe the technical resolution before marking this ticket as resolved.'}</p>
+          {dialog === 'assignment' ? null : dialog === 'cancellation' ? <label><span>Reason</span><textarea autoFocus required value={cancellationReason} onChange={(event) => setCancellationReason(event.target.value)} maxLength="1000" placeholder="Provide a clear reason for requesting cancellation..." disabled={Boolean(saving)} /></label> : dialog === 'pending' ? <div className="pending-dialog-fields"><label><span>Pending reason</span><select autoFocus value={pendingReason} onChange={(event) => setPendingReason(event.target.value)} disabled={Boolean(saving)}><option value="">Select a reason</option><option value="employee-response">Waiting for employee response</option><option value="manager-approval">Waiting for manager approval</option><option value="vendor">Waiting for vendor</option><option value="hardware">Waiting for hardware</option><option value="software-license">Waiting for software license</option><option value="other">Other</option></select></label>{pendingReason === 'other' && <label><span>Custom reason</span><input value={customPendingReason} onChange={(event) => setCustomPendingReason(event.target.value)} maxLength="300" disabled={Boolean(saving)} /></label>}<label><span>Additional note (optional)</span><textarea value={pendingNote} onChange={(event) => setPendingNote(event.target.value)} maxLength="1000" disabled={Boolean(saving)} /></label></div> : dialog === 'resolve'
             ? <label><span>Resolution summary</span><textarea autoFocus value={resolutionSummary} onChange={(event) => setResolutionSummary(event.target.value)} minLength="10" maxLength="5000" disabled={Boolean(saving)} /></label>
             : <label><span>Closing note (optional)</span><textarea autoFocus value={closingNote} onChange={(event) => setClosingNote(event.target.value)} maxLength="500" disabled={Boolean(saving)} /></label>}
-          <div className="dialog__actions"><button className="button button--secondary" type="button" onClick={() => setDialog(null)} disabled={Boolean(saving)}>Cancel</button><button className="button button--primary" type="button" onClick={dialog === 'cancellation' ? requestCancellation : dialog === 'close' ? closeTicket : dialog === 'pending' ? markPending : resolveTicket} disabled={Boolean(saving) || (dialog === 'cancellation' && !cancellationReason.trim()) || (dialog === 'resolve' && resolutionSummary.trim().length < 10) || (dialog === 'pending' && (!pendingReason || (pendingReason === 'other' && !customPendingReason.trim())))}>{saving === 'cancellation' ? 'Submitting…' : saving === 'pending' ? 'Moving to Pending…' : saving ? 'Saving…' : dialog === 'cancellation' ? 'Submit Request' : dialog === 'close' ? 'Close Ticket' : dialog === 'pending' ? 'Mark as Pending' : 'Mark as Resolved'}</button></div>
+          <div className="dialog__actions"><button className="button button--secondary" type="button" onClick={() => setDialog(null)} disabled={Boolean(saving)}>Cancel</button><button className="button button--primary" type="button" onClick={dialog === 'assignment' ? requestAssignment : dialog === 'cancellation' ? requestCancellation : dialog === 'close' ? closeTicket : dialog === 'pending' ? markPending : resolveTicket} disabled={Boolean(saving) || (dialog === 'cancellation' && !cancellationReason.trim()) || (dialog === 'resolve' && resolutionSummary.trim().length < 10) || (dialog === 'pending' && (!pendingReason || (pendingReason === 'other' && !customPendingReason.trim())))}>{saving === 'assignment' ? 'Submitting…' : saving === 'cancellation' ? 'Submitting…' : saving === 'pending' ? 'Moving to Pending…' : saving ? 'Saving…' : dialog === 'assignment' ? 'Submit Request' : dialog === 'cancellation' ? 'Submit Request' : dialog === 'close' ? 'Close Ticket' : dialog === 'pending' ? 'Mark as Pending' : 'Mark as Resolved'}</button></div>
         </section>
       </>}
     </>

@@ -824,6 +824,27 @@ html:has(.dashboard-shell) { scroll-padding-top: 98px; }
 .assignment-review-menu__dropdown { width:172px; }
 .assignment-review-menu__approve { color:#176b47; }
 .assignment-review-menu__approve:hover,.assignment-review-menu__approve:focus-visible { background:#eaf7f0; }
+.agent-assignment-requests-table { width:100%; min-width:900px; table-layout:fixed; }
+.agent-assignment-requests-table .request-col--ticket { width:auto; }
+.agent-assignment-requests-table .request-col--agent { width:190px; }
+.agent-assignment-requests-table .request-col--workload { width:165px; }
+.agent-assignment-requests-table .request-col--date { width:145px; }
+.agent-assignment-requests-table .request-col--action { width:120px; }
+.agent-assignment-requests-table th,
+.agent-assignment-requests-table td { padding-inline:16px; vertical-align:middle; }
+.agent-assignment-requests-table th { white-space:nowrap; }
+.agent-assignment-requests-table .assignment-ticket-identity strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.agent-assignment-requests-table .assignment-ticket-identity small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.agent-requester-identity { min-width:0; display:grid; gap:5px; }
+.agent-requester-identity .assignment-agent-name,
+.agent-requester-identity small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.agent-requester-identity small { color:#718197; font-size:.72rem; font-weight:650; }
+.agent-assignment-requests-table .assignment-workload,
+.agent-assignment-requests-table .assignment-date { white-space:nowrap; }
+.agent-assignment-requests-table th:last-child,
+.agent-assignment-requests-table .agent-assignment-review-cell { padding-right:18px; text-align:right; }
+.agent-assignment-review-cell .assignment-review-menu { display:inline-block; }
+.agent-assignment-requests-table-wrap { overflow-x:auto; }
 .assignment-action--disabled { opacity: .5; pointer-events: none; }
 .assignment-approval-action.button--danger-outline:hover { border-color: #d8948d; background: #fff5f4; }
 .assignment-approval-action.button--secondary:hover { border-color: #aebfd0; background: #f7f9fb; }

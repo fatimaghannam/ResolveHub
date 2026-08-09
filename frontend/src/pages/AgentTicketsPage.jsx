@@ -65,7 +65,7 @@ function getApiFilters(filters) {
 
 const viewContent = {
   assigned: ['Assigned Tickets', 'Review and manage the support requests assigned to you.', 'assigned'],
-  open: ['Open Tickets', 'Review unassigned requests and ask a Manager for assignment.', 'open'],
+  open: ['Open Tickets', 'Review unassigned tickets and request assignment from a Manager.', 'open'],
 }
 
 function AgentTicketsPage({ view = 'assigned' }) {
@@ -248,8 +248,8 @@ function AgentTicketsPage({ view = 'assigned' }) {
             <div className="results-count">{data.totalItems} {noun} ticket{data.totalItems === 1 ? '' : 's'}</div>
             {data.items.length === 0 ? (
               <EmptyState
-                title={hasActiveFilters ? 'No tickets match the selected filters' : 'No tickets found.'}
-                message={hasActiveFilters ? 'Try changing or clearing the current filters.' : `${title} will appear here.`}
+                title={hasActiveFilters ? 'No tickets match the selected filters' : view === 'open' ? 'No open tickets are currently available.' : 'No tickets found.'}
+                message={hasActiveFilters ? 'Try changing or clearing the current filters.' : view === 'open' ? 'New unassigned tickets will appear here.' : `${title} will appear here.`}
               />
             ) : (
               <div className="table-scroll agent-ticket-table-wrap">
@@ -275,7 +275,7 @@ function AgentTicketsPage({ view = 'assigned' }) {
                         <td><TicketPriorityBadge value={ticket.priorityName} /></td>
                         <td><TicketStatusBadge value={ticket.statusName} /></td>
                         <td><span className="agent-ticket-ellipsis" title={formatLocalDateTime(ticket.createdDate)}>{formatLocalDateTime(ticket.createdDate)}</span></td>
-                        <td><Link className="table-action" to={`/agent/tickets/${formatTicketReference(ticket)}`}>View</Link></td>
+                        <td><Link className="table-action" to={`/agent/tickets/${formatTicketReference(ticket)}`} state={{ from: view === 'open' ? 'open-tickets' : 'assigned-tickets' }}>View</Link></td>
                       </tr>
                     ))}
                   </tbody>
