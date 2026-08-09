@@ -17,14 +17,13 @@ import AgentDashboardPage from './pages/AgentDashboardPage.jsx'
 import AgentTicketsPage from './pages/AgentTicketsPage.jsx'
 import AgentTicketDetailsPage from './pages/AgentTicketDetailsPage.jsx'
 import AgentNotificationsPage from './pages/AgentNotificationsPage.jsx'
-import AgentProfilePage from './pages/AgentProfilePage.jsx'
+import ProfilePage from './pages/ProfilePage.jsx'
 import AdminTicketsPage from './pages/AdminTicketsPage.jsx'
 import AdminAssignmentsPage from './pages/AdminAssignmentsPage.jsx'
 import AdminUsersPage from './pages/AdminUsersPage.jsx'
 import AdminCategoriesPage from './pages/AdminCategoriesPage.jsx'
 import AdminActivityPage from './pages/AdminActivityPage.jsx'
 import AdminNotificationsPage from './pages/AdminNotificationsPage.jsx'
-import AdminProfilePage from './pages/AdminProfilePage.jsx'
 import AdminTicketDetailsPage from './pages/AdminTicketDetailsPage.jsx'
 import AdminUserDetailsPage from './pages/AdminUserDetailsPage.jsx'
 import { ADMIN_ROLE, EMPLOYEE_ROLE, IT_AGENT_ROLE, MANAGER_ROLE } from './services/authStorage.js'
@@ -58,6 +57,7 @@ function App() {
           <Route path="tickets/drafts/:id" element={<EditTicketDraftPage />} />
           <Route path="tickets/:id" element={<TicketDetailsPage />} />
           <Route path="tickets/:id/edit" element={<EditTicketPage />} />
+          <Route path="profile" element={<ProfilePage />} />
           <Route path="coming-soon" element={<ComingSoonPage />} />
         </Route>
         <Route
@@ -76,7 +76,7 @@ function App() {
           <Route path="tickets/history" element={<Navigate to="/agent/tickets/assigned" replace />} />
           <Route path="tickets/:id" element={<AgentTicketDetailsPage />} />
           <Route path="notifications" element={<AgentNotificationsPage />} />
-          <Route path="profile" element={<AgentProfilePage />} />
+          <Route path="profile" element={<ProfilePage />} />
         </Route>
         <Route
           path="/manager"
@@ -95,7 +95,7 @@ function App() {
           <Route path="audit-log" element={<AdminActivityPage roleArea="manager" />} />
          <Route path="activity" element={<Navigate to="/manager/audit-log" replace />} />
           <Route path="notifications" element={<AdminNotificationsPage roleArea="manager" />} />
-          <Route path="profile" element={<AdminProfilePage />} />
+          <Route path="profile" element={<ProfilePage />} />
         </Route>
         <Route
           path="/admin"
@@ -121,7 +121,7 @@ function App() {
           <Route path="audit-log" element={<AdminActivityPage roleArea="admin" />} />
           <Route path="activity" element={<Navigate to="/admin/audit-log" replace />} />
           <Route path="notifications" element={<AdminNotificationsPage />} />
-          <Route path="profile" element={<AdminProfilePage />} />
+          <Route path="profile" element={<ProfilePage />} />
         </Route>
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>

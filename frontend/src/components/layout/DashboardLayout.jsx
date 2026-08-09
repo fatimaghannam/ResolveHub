@@ -33,7 +33,7 @@ const employeeNavigation = [
   { id: 'tickets', to: '/employee/tickets', label: 'My Tickets', icon: Ticket },
   { id: 'create', to: '/employee/tickets/create', label: 'Create Ticket', icon: FilePlus2 },
   { to: '/employee/coming-soon', label: 'Notifications', icon: Bell, soon: true },
-  { to: '/employee/coming-soon', label: 'Profile', icon: CircleUserRound, soon: true },
+  { id: 'profile', to: '/employee/profile', label: 'Profile', icon: CircleUserRound },
 ]
 
 const agentNavigation = [

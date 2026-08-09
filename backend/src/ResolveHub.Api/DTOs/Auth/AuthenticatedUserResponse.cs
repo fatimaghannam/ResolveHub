@@ -5,4 +5,6 @@ public sealed record AuthenticatedUserResponse(
     string Email,
     string FirstName,
     string LastName,
-    IReadOnlyCollection<string> Roles);
+    IReadOnlyCollection<string> Roles,
+    bool IsActive,
+    DateTime CreatedDate);

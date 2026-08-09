@@ -132,7 +132,9 @@ public sealed class AuthService : IAuthService
                         "The authenticated user has no email."),
                 FirstName: user.FirstName,
                 LastName: user.LastName,
-                Roles: roleCollection));
+                Roles: roleCollection,
+                IsActive: user.IsActive,
+                CreatedDate: user.CreatedDate));
 
         _logger.LogInformation(
             "User {UserId} logged in successfully.",
