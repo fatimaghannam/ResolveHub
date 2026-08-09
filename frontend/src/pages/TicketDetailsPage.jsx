@@ -109,7 +109,9 @@ function TicketDetailsPage() {
   }
 
   function goBackToTickets() {
-    navigate('/employee/tickets')
+    navigate(location.state?.from === 'notifications'
+      ? '/employee/notifications'
+      : '/employee/tickets')
   }
 
   const toastRegion = toast && (
@@ -130,9 +132,9 @@ function TicketDetailsPage() {
   return (
     <>
       {toastRegion}
-      <button type="button" className="back-link back-link--top" onClick={goBackToTickets} aria-label="Back to My Tickets">
+      <button type="button" className="back-link back-link--top" onClick={goBackToTickets} aria-label={location.state?.from === 'notifications' ? 'Back to Notifications' : 'Back to My Tickets'}>
         <ArrowLeft size={17} aria-hidden="true" />
-        <span>Back to My Tickets</span>
+        <span>{location.state?.from === 'notifications' ? 'Back to Notifications' : 'Back to My Tickets'}</span>
       </button>
       <section className="page-heading page-heading--action"><div><span className="eyebrow">{formatTicketReference(ticket)}</span><h2>{ticket.title}</h2><p>Created <time dateTime={ticket.createdDate} title="Displayed in your local time">{formatLocalDateTime(ticket.createdDate)}</time></p></div><div className="heading-actions">{ticket.canEdit && <Link className="button button--secondary" to={`/employee/tickets/${id}/edit`}>Edit</Link>}{ticket.canDelete && <button className="button button--danger-outline" onClick={() => setDialogOpen(true)}>Cancel Ticket</button>}</div></section>
       {!ticket.canEdit && <div className="inline-alert">This ticket can no longer be edited because work has already started.</div>}

@@ -59,7 +59,7 @@ public sealed class TicketCancellationRequestService(ApplicationDbContext dbCont
             .Where(item => item.Role.Name == RoleNames.Manager && item.UserAccount.IsActive)
             .Select(item => item.UserId).Distinct().ToListAsync(token);
         foreach (var managerId in managerIds)
-            Notify(managerId, ticket, "CancellationRequest", "Cancellation Request Pending",
+            Notify(managerId, ticket, NotificationTypeNames.CancellationRequestCreated, "Cancellation request received",
                 $"{agentName} requested cancellation of ticket {ticket.TicketReferenceNumber}.", now);
         await dbContext.SaveChangesAsync(token);
         return new(TicketOperationStatus.Success, ToDto(request, ticket, agentName, null));
@@ -110,8 +110,8 @@ public sealed class TicketCancellationRequestService(ApplicationDbContext dbCont
                     CancellationRequestStatusNames.Pending, request.Status,
                     request.ReviewNote is null ? "Manager rejected the cancellation request." :
                         $"Manager rejected the cancellation request. Note: {request.ReviewNote}", now);
-                Notify(request.RequestedByAgentUserAccountID, ticket, "CancellationRequest",
-                    "Cancellation Request Rejected",
+                Notify(request.RequestedByAgentUserAccountID, ticket, NotificationTypeNames.CancellationRequestRejected,
+                    "Cancellation request rejected",
                     $"Your cancellation request for {ticket.TicketReferenceNumber} was rejected.", now);
             }
             else
@@ -141,8 +141,8 @@ public sealed class TicketCancellationRequestService(ApplicationDbContext dbCont
                     AddTracking(ticket, managerId, TicketHistoryActionNames.TicketCancelled,
                         oldStatus, TicketStatusNames.Cancelled,
                         "Ticket cancelled after approval of the assigned Agent's request.", now);
-                    Notify(request.RequestedByAgentUserAccountID, ticket, "CancellationRequest",
-                        "Cancellation Request Approved",
+                    Notify(request.RequestedByAgentUserAccountID, ticket, NotificationTypeNames.CancellationRequestApproved,
+                        "Cancellation request approved",
                         $"Your cancellation request for {ticket.TicketReferenceNumber} was approved and the ticket was cancelled.", now);
                 }
                 else
@@ -151,8 +151,8 @@ public sealed class TicketCancellationRequestService(ApplicationDbContext dbCont
                     AddTracking(ticket, managerId, TicketHistoryActionNames.ReassignmentInitiated,
                         oldStatus, TicketStatusNames.Open,
                         "Ticket returned to the unassigned queue for a Manager assignment request and Administrator approval.", now);
-                    Notify(request.RequestedByAgentUserAccountID, ticket, "CancellationRequest",
-                        "Release Request Approved",
+                    Notify(request.RequestedByAgentUserAccountID, ticket, NotificationTypeNames.CancellationRequestApproved,
+                        "Cancellation request approved",
                         $"Your request for {ticket.TicketReferenceNumber} was approved. You have been released and the ticket will continue through reassignment.", now);
                 }
             }

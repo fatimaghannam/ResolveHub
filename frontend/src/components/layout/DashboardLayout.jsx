@@ -27,12 +27,13 @@ import {
   isManager,
 } from '../../services/authStorage.js'
 import '../../styles/dashboard.css'
+import NotificationBell from './NotificationBell.jsx'
 
 const employeeNavigation = [
   { id: 'dashboard', to: '/employee/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'tickets', to: '/employee/tickets', label: 'My Tickets', icon: Ticket },
   { id: 'create', to: '/employee/tickets/create', label: 'Create Ticket', icon: FilePlus2 },
-  { to: '/employee/coming-soon', label: 'Notifications', icon: Bell, soon: true },
+  { id: 'notifications', to: '/employee/notifications', label: 'Notifications', icon: Bell },
   { id: 'profile', to: '/employee/profile', label: 'Profile', icon: CircleUserRound },
 ]
 
@@ -311,6 +312,7 @@ function DashboardLayout() {
             <Menu size={22} />
           </button>
           <h1>{pageTitle}</h1>
+          <NotificationBell roleArea={roleArea} />
           <div className="topbar__user">
             <span className="avatar">{user?.firstName?.[0]?.toUpperCase() ?? roleLabel[0]}</span>
             <span>

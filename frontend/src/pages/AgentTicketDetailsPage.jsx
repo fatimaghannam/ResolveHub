@@ -1,6 +1,6 @@
 import { ArrowLeft } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
 import Toast from '../components/common/Toast.jsx'
 import {
@@ -26,6 +26,7 @@ import { formatLocalDateTime } from '../utils/dateTime.js'
 import { formatTicketReference } from '../utils/ticketReference.js'
 
 function AgentTicketDetailsPage() {
+  const location = useLocation()
   const { id } = useParams()
   const [ticket, setTicket] = useState(null)
   const [error, setError] = useState(null)
@@ -210,7 +211,7 @@ function AgentTicketDetailsPage() {
     <>
       {toast && <div className="app-toast-region"><Toast key={toast.id} type={toast.type} title={toast.title} message={toast.message} onDismiss={dismissToast} /></div>}
       <section className="ticket-details-header-grid">
-        <Link className="back-link ticket-details-header__back" to="/agent/tickets"><ArrowLeft size={18} aria-hidden="true" />Back to Assigned Tickets</Link>
+        <Link className="back-link ticket-details-header__back" to={location.state?.from === 'notifications' ? '/agent/notifications' : '/agent/tickets'}><ArrowLeft size={18} aria-hidden="true" />{location.state?.from === 'notifications' ? 'Back to Notifications' : 'Back to Assigned Tickets'}</Link>
         <div className="page-heading ticket-details-header__identity"><span className="eyebrow">{formatTicketReference(ticket)}</span><h2>{ticket.title}</h2><p>Created {formatLocalDateTime(ticket.createdDate)}</p></div>
         <div className="heading-actions ticket-details-header__actions">
           {canStart && <button className="button button--primary" type="button" onClick={startProgress} disabled={Boolean(saving)}>{saving === 'progress' ? 'Starting…' : 'Start Work'}</button>}

@@ -65,7 +65,7 @@ public sealed class AssignmentApprovalService(
             .Where(item => item.Role.Name == RoleNames.Admin && item.UserAccount.IsActive)
             .Select(item => item.UserId).Distinct().ToListAsync(token);
         foreach (var administratorId in administratorIds)
-            Notify(administratorId, ticket, "AssignmentApproval",
+            Notify(administratorId, ticket, NotificationTypeNames.AssignmentRequestCreated,
                 "Assignment Request Pending",
                 $"{managerName} requested {ticket.TicketReferenceNumber} be assigned to {agent.Name}.", now);
         await dbContext.SaveChangesAsync(token);
@@ -143,13 +143,12 @@ public sealed class AssignmentApprovalService(
                 : $"Administrator rejected assignment to {agentName}. Reason: {rejectionReason}";
             AddAudit(request.Ticket, administratorId, action,
                 AssignmentRequestStatusNames.Pending, request.Status, description, now);
-            Notify(request.RequestedByUserAccountID, request.Ticket, "AssignmentApproval",
+            Notify(request.RequestedByUserAccountID, request.Ticket,
+                approve ? NotificationTypeNames.AssignmentRequestApproved : NotificationTypeNames.AssignmentRequestRejected,
                 approve ? "Assignment Request Approved" : "Assignment Request Rejected",
-                description, now);
-            if (approve)
-                Notify(request.RequestedAgentUserAccountID.Value, request.Ticket,
-                    "TicketAssignment", "Ticket Assigned",
-                    $"{request.Ticket.TicketReferenceNumber} has been assigned to you.", now);
+                approve
+                    ? $"Your assignment request for {request.Ticket.TicketReferenceNumber} was approved."
+                    : $"Your assignment request for {request.Ticket.TicketReferenceNumber} was rejected. Reason: {rejectionReason}", now);
             await dbContext.SaveChangesAsync(token);
             if (transaction is not null) await transaction.CommitAsync(token);
             return new(TicketOperationStatus.Success, true);

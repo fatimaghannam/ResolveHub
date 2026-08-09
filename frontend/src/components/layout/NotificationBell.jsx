@@ -1,0 +1,74 @@
+import { Bell } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { getNotifications, markAllNotificationsRead, markNotificationRead } from '../../services/notificationService.js'
+import { notifyNotificationsChanged, subscribeToNotificationsChanged } from '../../services/notificationEvents.js'
+import { notificationTarget } from '../../utils/notificationRoutes.js'
+
+function relativeTime(value) {
+  const minutes = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60000))
+  if (minutes < 1) return 'Just now'
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
+
+function NotificationBell({ roleArea }) {
+  const navigate = useNavigate()
+  const wrapperRef = useRef(null)
+  const [open, setOpen] = useState(false)
+  const [items, setItems] = useState([])
+
+  async function load() {
+    try { setItems(await getNotifications(100)) } catch { /* Full page displays request errors. */ }
+  }
+
+  useEffect(() => {
+    load()
+    const unsubscribe = subscribeToNotificationsChanged(load)
+    function close(event) {
+      if (!wrapperRef.current?.contains(event.target)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', close)
+    return () => { unsubscribe(); document.removeEventListener('pointerdown', close) }
+  }, [])
+
+  async function toggle() {
+    const next = !open
+    setOpen(next)
+    if (next) await load()
+  }
+
+  async function select(item) {
+    if (!item.isRead) await markNotificationRead(item.id)
+    setItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, isRead: true } : entry))
+    notifyNotificationsChanged()
+    setOpen(false)
+    navigate(notificationTarget(item, roleArea), { state: { from: 'notifications' } })
+  }
+
+  async function markAll() {
+    await markAllNotificationsRead()
+    setItems((current) => current.map((item) => ({ ...item, isRead: true })))
+    notifyNotificationsChanged()
+  }
+
+  const unreadItems = items.filter((item) => !item.isRead)
+  const unread = unreadItems.length
+  return <div className="notification-bell" ref={wrapperRef}>
+    <button className="notification-bell__button" type="button" aria-label={`Notifications${unread ? `, ${unread} unread` : ''}`} aria-expanded={open} onClick={toggle}>
+      <Bell size={20} />{unread > 0 && <span>{unread > 9 ? '9+' : unread}</span>}
+    </button>
+    {open && <div className="notification-dropdown">
+      <header><strong>Notifications</strong>{unread > 0 && <button type="button" onClick={markAll}>Mark all as read</button>}</header>
+      <div>{unreadItems.length === 0 ? <div className="notification-dropdown__empty"><strong>You're all caught up.</strong><span>No unread notifications.</span></div> : unreadItems.slice(0, 5).map((item) =>
+        <button className={item.isRead ? '' : 'is-unread'} type="button" key={item.id} onClick={() => select(item)}>
+          {!item.isRead && <i className="notification-unread-dot" />}<span><strong>{item.title}</strong><time>{relativeTime(item.createdDate)}</time></span>
+        </button>)}</div>
+      <Link to={`/${roleArea}/notifications`} onClick={() => setOpen(false)}>View all notifications</Link>
+    </div>}
+  </div>
+}
+
+export default NotificationBell

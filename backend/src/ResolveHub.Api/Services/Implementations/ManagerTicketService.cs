@@ -126,7 +126,7 @@ public sealed class ManagerTicketService(
             dbContext.UserNotifications.Add(new UserNotification
             {
                 UserAccountID = administratorId,
-                Type = "DuplicateReview",
+                Type = NotificationTypeNames.DuplicateReportCreated,
                 Title = "Duplicate Review Pending",
                 Message = $"{reporter.Name} reported {reported.TicketReferenceNumber} as a possible duplicate of {original.TicketReferenceNumber}.",
                 TicketReferenceNumber = reported.TicketReferenceNumber,

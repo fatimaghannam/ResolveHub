@@ -14,7 +14,8 @@ namespace ResolveHub.Api.Services.Implementations;
 
 public sealed class AdminTicketService(
     ApplicationDbContext dbContext,
-    ILogger<AdminTicketService> logger)
+    ILogger<AdminTicketService> logger,
+    INotificationService notificationService)
     : IAdminTicketService
 {
     public async Task<AdminAssignmentOverviewDto> GetAssignmentsAsync(
@@ -453,6 +454,26 @@ public sealed class AdminTicketService(
                 CreatedDate = now
             });
 
+            if (agentUserId.HasValue)
+            {
+                var type = previousAgentId.HasValue
+                    ? NotificationTypeNames.TicketReassigned
+                    : NotificationTypeNames.TicketAssigned;
+                notificationService.Add(agentUserId.Value, type,
+                    previousAgentId.HasValue ? "Ticket Reassigned" : "Ticket Assigned",
+                    $"{ticket.TicketReferenceNumber} has been assigned to you.",
+                    ticket.TicketReferenceNumber, now, administratorId);
+                notificationService.Add(ticket.CreatedByUserAccountID, type,
+                    previousAgentId.HasValue ? "Ticket reassigned" : "Ticket assigned",
+                    $"{ticket.TicketReferenceNumber} has been assigned to {assignedAgentName}.",
+                    ticket.TicketReferenceNumber, now, administratorId);
+            }
+            if (previousAgentId.HasValue && previousAgentId != agentUserId)
+                notificationService.Add(previousAgentId.Value,
+                    NotificationTypeNames.TicketReassigned, "Ticket reassigned",
+                    $"{ticket.TicketReferenceNumber} is no longer assigned to you.",
+                    ticket.TicketReferenceNumber, now, administratorId);
+
             await dbContext.SaveChangesAsync(token);
             if (transaction is not null)
                 await transaction.CommitAsync(token);
@@ -569,7 +590,7 @@ public sealed class AdminTicketService(
         dbContext.UserNotifications.Add(new UserNotification
         {
             UserAccountID = review.ReportedByUserAccountID,
-            Type = "DuplicateReview",
+            Type = approve ? NotificationTypeNames.DuplicateReportApproved : NotificationTypeNames.DuplicateReportRejected,
             Title = approve ? "Duplicate Review Approved" : "Duplicate Report Rejected",
             Message = approve
                 ? $"{review.Ticket.TicketReferenceNumber} was marked as a duplicate of {review.SuggestedOriginalTicket.TicketReferenceNumber}."

@@ -532,14 +532,16 @@ public sealed class TicketCommentService(
         CommentVisibility visibility, DateTime now, CancellationToken token)
     {
         var recipients = new HashSet<int>();
-        if (ticket.CreatedByUserAccountID != authorId)
+        if (visibility == CommentVisibility.Public &&
+            ticket.CreatedByUserAccountID != authorId)
             recipients.Add(ticket.CreatedByUserAccountID);
         if (ticket.AssignedToUserAccountID is int assignedId && assignedId != authorId)
             recipients.Add(assignedId);
         if (parent is not null && parent.AuthorUserAccountID != authorId &&
             (visibility == CommentVisibility.Public ||
-             parent.AuthorUserAccountID == ticket.CreatedByUserAccountID ||
-             parent.AuthorUserAccountID == ticket.AssignedToUserAccountID))
+             parent.AuthorUserAccountID == ticket.AssignedToUserAccountID) &&
+            (visibility == CommentVisibility.Public ||
+             parent.AuthorUserAccountID != ticket.CreatedByUserAccountID))
             recipients.Add(parent.AuthorUserAccountID);
         var authorName = await dbContext.Users.Where(user => user.Id == authorId)
             .Select(user => user.FirstName + " " + user.LastName).SingleAsync(token);
@@ -547,11 +549,14 @@ public sealed class TicketCommentService(
             dbContext.UserNotifications.Add(new UserNotification
             {
                 UserAccountID = recipient,
-                Type = parent is null ? "TicketComment" : "CommentReply",
-                Title = parent is null ? "New Ticket Comment" : "New Comment Reply",
-                Message = parent is null
-                    ? $"{authorName} added a {visibility} comment to {ticket.TicketReferenceNumber}."
-                    : $"{authorName} replied to a comment on {ticket.TicketReferenceNumber}.",
+                Type = visibility == CommentVisibility.Public
+                    ? NotificationTypeNames.PublicCommentAdded
+                    : parent is null ? "InternalCommentAdded" : "InternalCommentReply",
+                Title = recipient == ticket.CreatedByUserAccountID
+                    ? "New reply on your ticket" : "New reply",
+                Message = recipient == ticket.CreatedByUserAccountID
+                    ? $"{authorName} replied to {ticket.TicketReferenceNumber}."
+                    : $"A new reply was added to {ticket.TicketReferenceNumber}.",
                 TicketReferenceNumber = ticket.TicketReferenceNumber,
                 CreatedDate = now
             });

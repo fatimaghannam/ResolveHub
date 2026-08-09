@@ -258,11 +258,22 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
     : null
   const fromCancellationRequests = roleArea === 'manager' &&
     location.state?.from === 'cancellation-requests'
+  const fromNotifications = location.state?.from === 'notifications'
+  const backTarget = fromNotifications
+    ? `/${roleArea}/notifications`
+    : fromCancellationRequests
+      ? '/manager/assignments#cancellation-requests'
+      : `/${roleArea}/tickets`
+  const backLabel = fromNotifications
+    ? 'Back to Notifications'
+    : fromCancellationRequests
+      ? 'Back to Cancellation Requests'
+      : 'Back to All Tickets'
 
   return (
     <>
       {toast && <div className="app-toast-region"><Toast key={toast.id} type={toast.type} title={toast.title} message={toast.message} onDismiss={dismissToast} /></div>}
-      <Link className="back-link back-link--top" to={fromCancellationRequests ? '/manager/assignments#cancellation-requests' : `/${roleArea}/tickets`}><ArrowLeft size={18} />{fromCancellationRequests ? 'Back to Cancellation Requests' : 'Back to All Tickets'}</Link>
+      <Link className="back-link back-link--top" to={backTarget}><ArrowLeft size={18} />{backLabel}</Link>
       <section className="page-heading page-heading--action">
         <div><span className="eyebrow">{ticket.ticketReferenceNumber}</span><h2>{ticket.title}</h2><p>Created {formatLocalDateTime(ticket.createdDate)}</p></div>
         {roleArea === 'manager' && !ticket.pendingDuplicateReview && ticket.statusName !== 'Duplicate' && <button ref={duplicateTriggerRef} className="button button--secondary" type="button" onClick={openDuplicateDialog}>Report Possible Duplicate</button>}

@@ -12,7 +12,8 @@ namespace ResolveHub.Api.Services.Implementations;
 
 public sealed class AgentTicketService(
     ApplicationDbContext dbContext,
-    ITicketActivityService activityService)
+    ITicketActivityService activityService,
+    INotificationService notificationService)
     : IAgentTicketService
 {
     private static readonly string[] ActiveStatuses =
@@ -300,6 +301,7 @@ public sealed class AgentTicketService(
                 ? $"Ticket work started by {actorName}."
                 : $"Ticket status changed from {oldStatus} to {target.Name}.",
             now);
+        NotifyEmployee(ticket, target.Name, now, agentId);
 
         var result = await SaveWorkflowAsync(token);
         if (result is not null) return result;
@@ -394,6 +396,7 @@ public sealed class AgentTicketService(
             AddActivity(ticket, agentId, TicketHistoryActionNames.WorkPaused,
                 TicketStatusNames.InProgress, TicketStatusNames.Pending,
                 description, now);
+            NotifyEmployee(ticket, TicketStatusNames.Pending, now, agentId);
             await dbContext.SaveChangesAsync(token);
             if (transaction is not null) await transaction.CommitAsync(token);
             var details = await GetTicketAsync(agentId, ticketReference, token);
@@ -474,6 +477,7 @@ public sealed class AgentTicketService(
             AddActivity(ticket, agentId, TicketHistoryActionNames.WorkResumed,
                 TicketStatusNames.Pending, TicketStatusNames.InProgress,
                 description, now);
+            NotifyEmployee(ticket, TicketStatusNames.InProgress, now, agentId);
             await dbContext.SaveChangesAsync(token);
             if (transaction is not null) await transaction.CommitAsync(token);
             var details = await GetTicketAsync(agentId, ticketReference, token);
@@ -535,6 +539,7 @@ public sealed class AgentTicketService(
         AddActivity(ticket, agentId, TicketHistoryActionNames.TicketResolved,
             oldStatus, TicketStatusNames.Resolved,
             $"Ticket resolved by {actorName}.", now);
+        NotifyEmployee(ticket, TicketStatusNames.Resolved, now, agentId);
         var result = await SaveWorkflowAsync(token);
         if (result is not null) return result;
         return new(TicketOperationStatus.Success,
@@ -584,6 +589,7 @@ public sealed class AgentTicketService(
         AddActivity(ticket, agentId, TicketHistoryActionNames.TicketClosed,
             TicketStatusNames.Resolved, TicketStatusNames.Closed,
             description, now);
+        NotifyEmployee(ticket, TicketStatusNames.Closed, now, agentId);
 
         var result = await SaveWorkflowAsync(token);
         if (result is not null) return result;
@@ -752,6 +758,26 @@ public sealed class AgentTicketService(
             (TicketStatusNames.Pending, TicketStatusNames.InProgress) => true,
             _ => false
         };
+
+    private void NotifyEmployee(Ticket ticket, string status, DateTime now, int actorId)
+    {
+        var details = status switch
+        {
+            TicketStatusNames.InProgress => (NotificationTypeNames.TicketInProgress,
+                "Ticket in progress", "has been moved to In Progress"),
+            TicketStatusNames.Pending => (NotificationTypeNames.TicketPending,
+                "Ticket pending", "has been moved to Pending"),
+            TicketStatusNames.Resolved => (NotificationTypeNames.TicketResolved,
+                "Ticket resolved", "has been marked as resolved"),
+            TicketStatusNames.Closed => (NotificationTypeNames.TicketClosed,
+                "Ticket closed", "has been closed"),
+            _ => (string.Empty, string.Empty, string.Empty)
+        };
+        if (details.Item1.Length == 0) return;
+        notificationService.Add(ticket.CreatedByUserAccountID, details.Item1,
+            details.Item2, $"{ticket.TicketReferenceNumber} {details.Item3}.",
+            ticket.TicketReferenceNumber, now, actorId);
+    }
 
     private async Task<TicketServiceResult<AgentTicketDetailsDto>?> SaveWorkflowAsync(
         CancellationToken token)
