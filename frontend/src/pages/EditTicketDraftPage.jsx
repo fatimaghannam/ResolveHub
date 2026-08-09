@@ -34,7 +34,7 @@ function EditTicketDraftPage({ roleArea = 'employee' }) {
   if (error) return <ErrorState message={error} onRetry={() => setRetry((value) => value + 1)} />
   if (!draft) return <LoadingState message="Loading draft…" />
   return (
-    <>
+    <div className="ticket-form-page">
       <section className="page-heading"><h2>Edit Draft</h2><p>Complete the required fields when you are ready to submit this request.</p></section>
       <TicketForm
         mode="draft"
@@ -66,7 +66,7 @@ function EditTicketDraftPage({ roleArea = 'employee' }) {
           })
         }}
       />
-    </>
+    </div>
   )
 }
 
