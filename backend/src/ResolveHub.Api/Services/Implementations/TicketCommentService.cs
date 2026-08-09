@@ -211,7 +211,7 @@ public sealed class TicketCommentService(
             IsInternal = visibility == CommentVisibility.Private,
             CreatedDate = now
         });
-        await AddNotificationsAsync(ticket, userId, parent, visibility, now, token);
+        await AddNotificationsAsync(ticket, userId, visibility, now, token);
         await dbContext.SaveChangesAsync(token);
         return new(TicketOperationStatus.Success,
             (await ProjectAsync(ticket, userId, token)).Single(item => item.Id == comment.ID));
@@ -528,21 +528,23 @@ public sealed class TicketCommentService(
     }
 
     private async Task AddNotificationsAsync(
-        Ticket ticket, int authorId, TicketComment? parent,
-        CommentVisibility visibility, DateTime now, CancellationToken token)
+        Ticket ticket, int authorId, CommentVisibility visibility,
+        DateTime now, CancellationToken token)
     {
-        var recipients = new HashSet<int>();
-        if (visibility == CommentVisibility.Public &&
-            ticket.CreatedByUserAccountID != authorId)
-            recipients.Add(ticket.CreatedByUserAccountID);
-        if (ticket.AssignedToUserAccountID is int assignedId && assignedId != authorId)
+        var recipients = new HashSet<int> { ticket.CreatedByUserAccountID };
+        if (ticket.AssignedToUserAccountID is int assignedId)
             recipients.Add(assignedId);
-        if (parent is not null && parent.AuthorUserAccountID != authorId &&
-            (visibility == CommentVisibility.Public ||
-             parent.AuthorUserAccountID == ticket.AssignedToUserAccountID) &&
-            (visibility == CommentVisibility.Public ||
-             parent.AuthorUserAccountID != ticket.CreatedByUserAccountID))
-            recipients.Add(parent.AuthorUserAccountID);
+        if (visibility == CommentVisibility.Public)
+        {
+            var activeAdministratorIds = await dbContext.UserRoles
+                .Where(userRole => userRole.Role.Name == RoleNames.Admin &&
+                    userRole.UserAccount.IsActive)
+                .Select(userRole => userRole.UserId)
+                .ToListAsync(token);
+            recipients.UnionWith(activeAdministratorIds);
+        }
+        recipients.Remove(authorId);
+
         var authorName = await dbContext.Users.Where(user => user.Id == authorId)
             .Select(user => user.FirstName + " " + user.LastName).SingleAsync(token);
         foreach (var recipient in recipients)
@@ -551,12 +553,10 @@ public sealed class TicketCommentService(
                 UserAccountID = recipient,
                 Type = visibility == CommentVisibility.Public
                     ? NotificationTypeNames.PublicCommentAdded
-                    : parent is null ? "InternalCommentAdded" : "InternalCommentReply",
-                Title = recipient == ticket.CreatedByUserAccountID
-                    ? "New reply on your ticket" : "New reply",
-                Message = recipient == ticket.CreatedByUserAccountID
-                    ? $"{authorName} replied to {ticket.TicketReferenceNumber}."
-                    : $"A new reply was added to {ticket.TicketReferenceNumber}.",
+                    : NotificationTypeNames.PrivateCommentAdded,
+                Title = visibility == CommentVisibility.Public
+                    ? "New Public Comment" : "New Private Comment",
+                Message = $"{authorName} added a {visibility.ToString().ToLowerInvariant()} comment to {ticket.TicketReferenceNumber}.",
                 TicketReferenceNumber = ticket.TicketReferenceNumber,
                 CreatedDate = now
             });

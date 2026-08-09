@@ -9,6 +9,7 @@ public static class NotificationTypeNames
     public const string TicketResolved = "TicketResolved";
     public const string TicketClosed = "TicketClosed";
     public const string PublicCommentAdded = "PublicCommentAdded";
+    public const string PrivateCommentAdded = "PrivateCommentAdded";
     public const string AssignmentRequestCreated = "AssignmentRequestCreated";
     public const string AssignmentRequestApproved = "AssignmentRequestApproved";
     public const string AssignmentRequestRejected = "AssignmentRequestRejected";
