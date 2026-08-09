@@ -68,6 +68,7 @@ public sealed class TicketCancellationRequestService(ApplicationDbContext dbCont
     public async Task<IReadOnlyCollection<TicketCancellationRequestDto>>
         GetManagerRequestsAsync(CancellationToken token) =>
         await Project(dbContext.TicketCancellationRequests.AsNoTracking()
+                .Where(item => item.Status == CancellationRequestStatusNames.Pending)
                 .OrderByDescending(item => item.RequestedDate).Take(100))
             .ToListAsync(token);
 
