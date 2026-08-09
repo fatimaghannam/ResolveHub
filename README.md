@@ -123,7 +123,7 @@ IT Support Agents work on tickets assigned to their accounts.
 - Track active and completed work duration
 - Search, filter, and paginate ticket lists
 
-IT Support Agents cannot assign tickets to themselves or create assignment approval requests.
+IT Support Agents can assign tickets to themselves after manager's approval.
 
 ### Manager
 
