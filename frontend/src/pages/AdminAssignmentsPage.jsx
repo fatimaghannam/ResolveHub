@@ -15,7 +15,7 @@ import {
   reviewManagerCancellationRequest,
 } from '../services/managerService.js'
 import { getCategories, getPriorities } from '../services/ticketService.js'
-import { formatLocalDateTime } from '../utils/dateTime.js'
+import { formatLocalDate, formatLocalDateTime } from '../utils/dateTime.js'
 import {
   getLocalQuickDateRange,
   getUtcDateRange,
@@ -429,7 +429,7 @@ function AdminAssignmentsPage({ roleArea = 'admin' }) {
             <td><span className="assignments-ticket-title" title={ticket.title}>{ticket.title}</span></td>
             <td className="assignments-requester" title={ticket.requesterName}>{ticket.requesterName}</td>
             <td><TicketPriorityBadge value={ticket.priorityName} /></td>
-            <td className="assignments-created">{formatLocalDateTime(ticket.createdDate)}</td>
+            <td className="assignments-created">{formatLocalDate(ticket.createdDate)}</td>
             <td><label className="sr-only" htmlFor={`agent-${ticket.id}`}>Assign {ticket.ticketReferenceNumber} to</label><select className="assignment-agent-select" id={`agent-${ticket.id}`} value={selections[ticket.ticketReferenceNumber] ?? ''} onChange={(event) => setSelections({ ...selections, [ticket.ticketReferenceNumber]: event.target.value })}><option value="">Select agent</option>{agentWorkloads.map((agent) => <option value={agent.userId} key={agent.userId} disabled={agent.isAtCapacity}>{agent.name}</option>)}</select></td>
             <td><button className="button button--primary button--compact assignment-submit" type="button" disabled={!selectedAgent(ticket.ticketReferenceNumber) || selectedAgent(ticket.ticketReferenceNumber)?.isAtCapacity || Boolean(assigning)} onClick={() => assignTicket(ticket)}>{assigning === ticket.ticketReferenceNumber ? roleArea === 'manager' ? 'Submitting…' : 'Assigning…' : 'Assign'}</button></td>
           </tr>)}</tbody>

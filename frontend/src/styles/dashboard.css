@@ -144,6 +144,7 @@ html:has(.dashboard-shell) { scroll-padding-top: 98px; }
 .ticket-table tr:last-child td { border-bottom: 0; }.ticket-table strong { color: #183c67; }
 .agent-ticket-table { min-width: 1060px; }
 .agent-ticket-title, .agent-ticket-ellipsis { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-ticket-table td:nth-child(7) .agent-ticket-ellipsis { overflow: visible; text-overflow: clip; white-space: nowrap; }
 .agent-ticket-table td:first-child strong { white-space: nowrap; }
 .agent-dashboard-ticket-table { min-width: 0; }
 .agent-dashboard-ticket-table th:first-child { width: 42%; }
@@ -738,6 +739,7 @@ html:has(.dashboard-shell) { scroll-padding-top: 98px; }
 .manager-assignment-filters { grid-template-columns: minmax(260px, 1.6fr) repeat(3, minmax(150px, 1fr)); }
 .admin-ticket-table { min-width: 1250px; }.admin-assignment-table { min-width: 980px; }.admin-activity-table { min-width: 900px; }
 .admin-ticket-title, .admin-ticket-cell-ellipsis { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-ticket-table td:nth-child(8) .admin-ticket-cell-ellipsis { overflow: visible; text-overflow: clip; white-space: nowrap; }
 .admin-ticket-table td:first-child strong { white-space: nowrap; }
 .admin-ticket-table-wrap { width: 100%; max-width: 100%; box-sizing: border-box; }
 .admin-ticket-table .row-actions { align-items: center; white-space: nowrap; }
@@ -854,15 +856,15 @@ html:has(.dashboard-shell) { scroll-padding-top: 98px; }
 @media (min-width: 1101px) {
   .assignment-table-wrap { overflow-x: visible; }
   .admin-assignments-page-table { width: 100%; min-width: 0; table-layout: fixed; }
-  .admin-assignments-page-table .assignments-col--number { width: 120px; }
+  .admin-assignments-page-table .assignments-col--number { width: 124px; }
   .admin-assignments-page-table .assignments-col--title { width: auto; }
-  .admin-assignments-page-table .assignments-col--requester { width: 130px; }
+  .admin-assignments-page-table .assignments-col--requester { width: 140px; }
   .admin-assignments-page-table .assignments-col--priority { width: 80px; }
-  .admin-assignments-page-table .assignments-col--created { width: 105px; }
-  .admin-assignments-page-table .assignments-col--agent { width: 170px; }
-  .admin-assignments-page-table .assignments-col--action { width: 80px; }
+  .admin-assignments-page-table .assignments-col--created { width: 112px; }
+  .admin-assignments-page-table .assignments-col--agent { width: 185px; }
+  .admin-assignments-page-table .assignments-col--action { width: 84px; }
   .admin-assignments-page-table th,
-  .admin-assignments-page-table td { padding-inline: 8px; }
+  .admin-assignments-page-table td { padding-inline: 9px; }
   .admin-assignments-page-table th:nth-child(1),
   .admin-assignments-page-table td:nth-child(1),
   .admin-assignments-page-table th:nth-child(4),
@@ -884,12 +886,12 @@ html:has(.dashboard-shell) { scroll-padding-top: 98px; }
   .agent-ticket-table-wrap { overflow-x: visible; }
   .agent-ticket-table { width: 100%; min-width: 0; table-layout: fixed; }
   .agent-ticket-table .agent-ticket-col--number { width: 15%; }
-  .agent-ticket-table .agent-ticket-col--title { width: 25%; }
+  .agent-ticket-table .agent-ticket-col--title { width: auto; }
   .agent-ticket-table .agent-ticket-col--requester { width: 13%; }
   .agent-ticket-table .agent-ticket-col--category { width: 10%; }
   .agent-ticket-table .agent-ticket-col--priority { width: 9%; }
   .agent-ticket-table .agent-ticket-col--status { width: 10%; }
-  .agent-ticket-table .agent-ticket-col--created { width: 12%; }
+  .agent-ticket-table .agent-ticket-col--created { width: 165px; }
   .agent-ticket-table .agent-ticket-col--action { width: 6%; }
   .agent-ticket-table th, .agent-ticket-table td { padding-inline: 7px; }
 }
@@ -897,13 +899,13 @@ html:has(.dashboard-shell) { scroll-padding-top: 98px; }
   .admin-ticket-table-wrap { overflow-x: visible; }
   .admin-ticket-table { width: 100%; min-width: 0; table-layout: fixed; }
   .admin-ticket-table .admin-ticket-col--number { width: 13%; }
-  .admin-ticket-table .admin-ticket-col--title { width: 20%; }
+  .admin-ticket-table .admin-ticket-col--title { width: auto; }
   .admin-ticket-table .admin-ticket-col--requester { width: 11%; }
   .admin-ticket-table .admin-ticket-col--category { width: 9%; }
   .admin-ticket-table .admin-ticket-col--priority { width: 8%; }
   .admin-ticket-table .admin-ticket-col--status { width: 9%; }
   .admin-ticket-table .admin-ticket-col--agent { width: 11%; }
-  .admin-ticket-table .admin-ticket-col--created { width: 9%; }
+  .admin-ticket-table .admin-ticket-col--created { width: 165px; }
   .admin-ticket-table .admin-ticket-col--action { width: 10%; }
   .admin-ticket-table th, .admin-ticket-table td { padding-inline: 7px; }
 }
