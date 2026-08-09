@@ -45,11 +45,17 @@ export function AgentWorkloadCard({ agent, ticketPath }) {
           {agent.capacityState === 'Over Capacity' && <p className="workload-card__warning">Existing workload exceeds the current limit.</p>}
         </div>
       </div>
-      <dl className="workload-card__metrics">
-        <div className="workload-card__metric"><dt className="workload-card__metric-label">Assigned</dt><dd className="workload-card__metric-value">{agent.assigned}</dd></div>
-        <div className="workload-card__metric"><dt className="workload-card__metric-label">In Progress</dt><dd className="workload-card__metric-value">{agent.inProgress}</dd></div>
-        <div className="workload-card__metric"><dt className="workload-card__metric-label">Pending</dt><dd className="workload-card__metric-value">{agent.pending}</dd></div>
-      </dl>
+      <div className="workload-card__metrics">
+        {[['Assigned', agent.assigned], ['In Progress', agent.inProgress], ['Pending', agent.pending]].map(([status, count]) =>
+          ticketPath ? (
+            <Link className="workload-card__metric" to={`${ticketPath}?status=${encodeURIComponent(status)}`} key={status} aria-label={`View ${status} tickets for ${agent.name}`}>
+              <span className="workload-card__metric-label">{status}</span><strong className="workload-card__metric-value">{count}</strong>
+            </Link>
+          ) : (
+            <div className="workload-card__metric" key={status}><span className="workload-card__metric-label">{status}</span><strong className="workload-card__metric-value">{count}</strong></div>
+          ),
+        )}
+      </div>
       {ticketPath && <footer className="workload-card__footer"><Link className="table-action" to={ticketPath}>View tickets</Link></footer>}
     </article>
   )

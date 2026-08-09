@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   Bell,
   ClipboardCheck,
+  ChevronDown,
   CircleUserRound,
   FileClock,
   FilePlus2,
@@ -36,7 +37,6 @@ const employeeNavigation = [
   { id: 'tickets', to: '/employee/tickets', label: 'My Tickets', icon: Ticket },
   { id: 'create', to: '/employee/tickets/create', label: 'Create Ticket', icon: FilePlus2 },
   { id: 'notifications', to: '/employee/notifications', label: 'Notifications', icon: Bell },
-  { id: 'profile', to: '/employee/profile', label: 'Profile', icon: CircleUserRound },
 ]
 
 const agentNavigation = [
@@ -44,7 +44,6 @@ const agentNavigation = [
   { id: 'tickets', to: '/agent/tickets/assigned', label: 'Assigned Tickets', icon: Ticket },
   { id: 'open-tickets', to: '/agent/tickets/open', label: 'Open Tickets', icon: Inbox },
   { id: 'notifications', to: '/agent/notifications', label: 'Notifications', icon: Bell },
-  { id: 'profile', to: '/agent/profile', label: 'Profile', icon: CircleUserRound },
 ]
 
 const adminNavigation = [
@@ -53,11 +52,11 @@ const adminNavigation = [
   { id: 'my-tickets', to: '/admin/my-tickets', label: 'My Tickets', icon: Files },
   { id: 'create', to: '/admin/tickets/create', label: 'Create Ticket', icon: FilePlus2 },
   { id: 'assignments', to: '/admin/assignments', label: 'Ticket Assignments', icon: ClipboardCheck },
+  { id: 'workload', to: '/admin/workload', label: 'Team Workload', icon: BarChart3 },
   { id: 'users', to: '/admin/users', label: 'Users', icon: Users },
   { id: 'categories', to: '/admin/categories', label: 'Categories', icon: Tags },
   { id: 'activity', to: '/admin/audit-log', label: 'System Audit Log', icon: FileClock },
   { id: 'notifications', to: '/admin/notifications', label: 'Notifications', icon: Bell },
-  { id: 'profile', to: '/admin/profile', label: 'Profile', icon: CircleUserRound },
 ]
 
 const managerNavigation = [
@@ -68,7 +67,6 @@ const managerNavigation = [
   { id: 'audit-log', to: '/manager/audit-log', label: 'System Audit Log', icon: FileClock },
   
   { id: 'notifications', to: '/manager/notifications', label: 'Notifications', icon: Bell },
-  { id: 'profile', to: '/manager/profile', label: 'Profile', icon: CircleUserRound },
 ]
 
 function isNavigationActive(id, pathname, roleArea) {
@@ -77,6 +75,7 @@ function isNavigationActive(id, pathname, roleArea) {
   if (id === 'create') return pathname === `${base}/tickets/create`
   if (id === 'drafts') return pathname.startsWith(`${base}/tickets/drafts`)
   if (id === 'my-tickets') return pathname.startsWith(`${base}/my-tickets`)
+  if (id === 'workload') return pathname.startsWith(`${base}/workload`)
   if (id === 'tickets' && roleArea === 'agent')
     return pathname === `${base}/tickets` || pathname === `${base}/tickets/assigned`
   if (id === 'open-tickets') return pathname === `${base}/tickets/open`
@@ -106,12 +105,12 @@ function getPageTitle(pathname, roleArea) {
     const titles = {
       '/manager/tickets': 'All Tickets',
       '/manager/assignments': 'Ticket Assignments',
-      '/manager/workload': 'Team Workload',
       '/manager/audit-log': 'System Audit Log',
 
       '/manager/notifications': 'Notifications',
       '/manager/profile': 'Profile',
     }
+    if (pathname.startsWith('/manager/workload')) return 'Team Workload'
     return titles[pathname] ?? 'Dashboard'
   }
   if (roleArea === 'admin') {
@@ -123,12 +122,14 @@ function getPageTitle(pathname, roleArea) {
     const titles = {
       '/admin/tickets': 'All Tickets',
       '/admin/assignments': 'Ticket Assignments',
+      '/admin/workload': 'Team Workload',
       '/admin/users': 'Users',
       '/admin/categories': 'Ticket Categories',
       '/admin/audit-log': 'System Audit Log',
       '/admin/notifications': 'Notifications',
       '/admin/profile': 'Profile',
     }
+    if (pathname.startsWith('/admin/workload')) return 'Team Workload'
     return titles[pathname] ?? 'Dashboard'
   }
   if (roleArea === 'agent') {
@@ -152,6 +153,8 @@ function getPageTitle(pathname, roleArea) {
 function DashboardLayout() {
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
+  const accountMenuRef = useRef(null)
   const mainRef = useRef(null)
   const mainRectBeforeToggleRef = useRef(null)
   const mainTransitionRef = useRef(null)
@@ -217,6 +220,27 @@ function DashboardLayout() {
 
   useEffect(() => () => mainTransitionRef.current?.cancel(), [])
 
+  useEffect(() => {
+    function closeAccountMenu(event) {
+      if (event.type === 'keydown' && event.key !== 'Escape') return
+      if (event.type === 'pointerdown' && accountMenuRef.current?.contains(event.target)) return
+      setIsAccountMenuOpen(false)
+    }
+    function closeForOtherHeaderMenu(event) {
+      if (event.detail !== 'account') setIsAccountMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', closeAccountMenu)
+    document.addEventListener('keydown', closeAccountMenu)
+    window.addEventListener('resolvehub:header-menu-open', closeForOtherHeaderMenu)
+    return () => {
+      document.removeEventListener('pointerdown', closeAccountMenu)
+      document.removeEventListener('keydown', closeAccountMenu)
+      window.removeEventListener('resolvehub:header-menu-open', closeForOtherHeaderMenu)
+    }
+  }, [])
+
+  useEffect(() => setIsAccountMenuOpen(false), [location.pathname])
+
   function toggleDesktopSidebar() {
     mainTransitionRef.current?.cancel()
     mainRectBeforeToggleRef.current = mainRef.current?.getBoundingClientRect() ?? null
@@ -224,8 +248,17 @@ function DashboardLayout() {
   }
 
   function logout() {
+    setIsAccountMenuOpen(false)
     clearStoredAuth()
     navigate('/login', { replace: true })
+  }
+
+  function toggleAccountMenu() {
+    setIsAccountMenuOpen((current) => {
+      const next = !current
+      if (next) window.dispatchEvent(new CustomEvent('resolvehub:header-menu-open', { detail: 'account' }))
+      return next
+    })
   }
 
   function updateUser(updates) {
@@ -295,16 +328,6 @@ function DashboardLayout() {
             )
           })}
         </nav>
-        <button
-          type="button"
-          className="sidebar-link sidebar__logout"
-          onClick={logout}
-          aria-label="Logout"
-          title={isDesktopCollapsed ? 'Logout' : undefined}
-        >
-          <LogOut size={19} aria-hidden="true" />
-          <span className="sidebar-text">Logout</span>
-        </button>
       </aside>
 
       <div ref={mainRef} className="dashboard-main">
@@ -320,19 +343,33 @@ function DashboardLayout() {
           </button>
           <h1>{pageTitle}</h1>
           <NotificationBell roleArea={roleArea} />
-          <Link className="topbar__user" to={`/${roleArea}/profile`} aria-label={`Open ${fullName || roleLabel} profile`}>
-            <UserAvatar
-              className="avatar"
-              firstName={user?.firstName}
-              lastName={user?.lastName}
-              imagePath={user?.profileImagePath}
-              aria-hidden="true"
-            />
-            <span>
-              <strong>{fullName || user?.email || roleLabel}</strong>
-              <small>{roleLabel}</small>
-            </span>
-          </Link>
+          <div className="account-menu" ref={accountMenuRef}>
+            <button
+              className="topbar__user"
+              type="button"
+              onClick={toggleAccountMenu}
+              aria-label={`Open ${fullName || roleLabel} account menu`}
+              aria-haspopup="menu"
+              aria-expanded={isAccountMenuOpen}
+            >
+              <UserAvatar
+                className="avatar"
+                firstName={user?.firstName}
+                lastName={user?.lastName}
+                imagePath={user?.profileImagePath}
+                aria-hidden="true"
+              />
+              <span className="topbar__identity">
+                <strong>{fullName || user?.email || roleLabel}</strong>
+                <small>{roleLabel}</small>
+              </span>
+              <ChevronDown className={`account-menu__chevron ${isAccountMenuOpen ? 'account-menu__chevron--open' : ''}`} size={15} aria-hidden="true" />
+            </button>
+            {isAccountMenuOpen && <div className="account-dropdown" role="menu">
+              <Link role="menuitem" to={`/${roleArea}/profile`} onClick={() => setIsAccountMenuOpen(false)}><CircleUserRound size={16} />Profile</Link>
+              <button role="menuitem" className="account-dropdown__logout" type="button" onClick={logout}><LogOut size={16} />Logout</button>
+            </div>}
+          </div>
         </header>
         <div className="dashboard-scroll">
           <main className="dashboard-content">

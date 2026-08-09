@@ -43,6 +43,7 @@ public sealed class AdminTicketFilterDto
     public int? RequesterId { get; init; }
     public bool? UnassignedOnly { get; init; }
     public bool? AssignedOnly { get; init; }
+    public bool? ActiveWorkloadOnly { get; init; }
     public DateTime? FromDate { get; init; }
     public DateTime? ToDate { get; init; }
     public DateTimeOffset? FromUtc { get; init; }

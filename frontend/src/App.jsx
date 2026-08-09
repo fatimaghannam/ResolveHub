@@ -28,6 +28,7 @@ import AdminUserDetailsPage from './pages/AdminUserDetailsPage.jsx'
 import { ADMIN_ROLE, EMPLOYEE_ROLE, IT_AGENT_ROLE, MANAGER_ROLE } from './services/authStorage.js'
 import ManagerDashboardPage from './pages/ManagerDashboardPage.jsx'
 import ManagerWorkloadPage from './pages/ManagerWorkloadPage.jsx'
+import AgentWorkloadTicketsPage from './pages/AgentWorkloadTicketsPage.jsx'
 
 
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage.jsx'))
@@ -92,6 +93,7 @@ function App() {
           <Route path="tickets/:ticketReference" element={<AdminTicketDetailsPage roleArea="manager" />} />
           <Route path="assignments" element={<AdminAssignmentsPage roleArea="manager" />} />
           <Route path="workload" element={<ManagerWorkloadPage />} />
+          <Route path="workload/:agentId" element={<AgentWorkloadTicketsPage roleArea="manager" />} />
           <Route path="audit-log" element={<AdminActivityPage roleArea="manager" />} />
          <Route path="activity" element={<Navigate to="/manager/audit-log" replace />} />
           <Route path="notifications" element={<NotificationsPage roleArea="manager" />} />
@@ -115,6 +117,8 @@ function App() {
           <Route path="tickets/drafts/:id" element={<EditTicketDraftPage roleArea="admin" />} />
           <Route path="tickets/:ticketReference" element={<AdminTicketDetailsPage />} />
           <Route path="assignments" element={<AdminAssignmentsPage />} />
+          <Route path="workload" element={<ManagerWorkloadPage roleArea="admin" />} />
+          <Route path="workload/:agentId" element={<AgentWorkloadTicketsPage roleArea="admin" />} />
           <Route path="users" element={<AdminUsersPage />} />
           <Route path="users/:userId" element={<AdminUserDetailsPage />} />
           <Route path="categories" element={<AdminCategoriesPage />} />

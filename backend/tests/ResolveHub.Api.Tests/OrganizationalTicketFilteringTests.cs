@@ -16,6 +16,65 @@ public sealed class OrganizationalTicketFilteringTests
     private const string Password = "ValidPassword1!";
 
     [Fact]
+    public async Task WorkloadTicketFilters_MatchCardCounts_ForAdminAndManager()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        await factory.SeedTicketLookupsAsync();
+        var admin = await factory.CreateUserAsync(
+            "workload-admin@resolvehub.test", Password, RoleNames.Admin);
+        var manager = await factory.CreateUserAsync(
+            "workload-manager@resolvehub.test", Password, RoleNames.Manager);
+        var requester = await factory.CreateUserAsync(
+            "workload-requester@resolvehub.test", Password, RoleNames.Employee);
+        var agent = await factory.CreateUserAsync(
+            "workload-agent@resolvehub.test", Password, RoleNames.ITSupportAgent);
+        var otherAgent = await factory.CreateUserAsync(
+            "workload-other-agent@resolvehub.test", Password, RoleNames.ITSupportAgent);
+        using var requesterClient = await LoginAsync(factory, requester.Email!);
+        using var adminClient = await LoginAsync(factory, admin.Email!);
+        using var managerClient = await LoginAsync(factory, manager.Email!);
+
+        var assigned = await CreateTicketAsync(factory, requesterClient, "Assigned workload");
+        var progress = await CreateTicketAsync(factory, requesterClient, "Progress workload");
+        var pending = await CreateTicketAsync(factory, requesterClient, "Pending workload");
+        var resolved = await CreateTicketAsync(factory, requesterClient, "Resolved workload");
+        var other = await CreateTicketAsync(factory, requesterClient, "Other agent workload");
+        await factory.SetTicketStateAsync(assigned.Id, TicketStatusNames.Assigned, agent.Id);
+        await factory.SetTicketStateAsync(progress.Id, TicketStatusNames.InProgress, agent.Id);
+        await factory.SetTicketStateAsync(pending.Id, TicketStatusNames.Pending, agent.Id);
+        await factory.SetTicketStateAsync(resolved.Id, TicketStatusNames.Resolved, agent.Id);
+        await factory.SetTicketStateAsync(other.Id, TicketStatusNames.Assigned, otherAgent.Id);
+        var assignedStatusId = await StatusIdAsync(factory, TicketStatusNames.Assigned);
+
+        var adminWorkload = await adminClient.GetFromJsonAsync<
+            IReadOnlyCollection<AdminAgentWorkloadDto>>("/api/admin/users/agents");
+        var managerWorkload = await managerClient.GetFromJsonAsync<
+            IReadOnlyCollection<ManagerAgentWorkloadDto>>("/api/manager/workload");
+        var adminCard = adminWorkload!.Single(item => item.UserId == agent.Id);
+        var managerCard = managerWorkload!.Single(item => item.UserId == agent.Id);
+
+        foreach (var (client, roleArea) in new[]
+                 {
+                     (adminClient, "admin"), (managerClient, "manager")
+                 })
+        {
+            var active = await GetAsync(client,
+                $"agentUserId={agent.Id}&activeWorkloadOnly=true&pageSize=100", roleArea);
+            var assignedOnly = await GetAsync(client,
+                $"agentUserId={agent.Id}&statusId={assignedStatusId}&pageSize=100", roleArea);
+            Assert.Equal(3, active.TotalItems);
+            Assert.Equal(1, assignedOnly.TotalItems);
+            Assert.DoesNotContain(active.Items, item => item.Id == resolved.Id || item.Id == other.Id);
+        }
+
+        Assert.Equal(adminCard.ActiveTicketCount, managerCard.ActiveTicketCount);
+        Assert.Equal(3, adminCard.ActiveTicketCount);
+        Assert.Equal(1, adminCard.Assigned);
+        Assert.Equal(1, adminCard.InProgress);
+        Assert.Equal(1, adminCard.Pending);
+    }
+
+    [Fact]
     public async Task AdminAndManagerFilters_AreSqlBackedCombinedInclusiveAndDuplicateFree()
     {
         await using var factory = new ResolveHubApiFactory();

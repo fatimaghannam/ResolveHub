@@ -13,6 +13,9 @@ export const assignAdminTicket = (ticketReference, agentUserId) =>
 export const getAdminDashboard = (signal) =>
   apiRequest('/api/admin/dashboard', { signal })
 
+export const getAdminWorkload = (signal) =>
+  apiRequest('/api/admin/users/agents', { signal })
+
 export const getAdminTickets = (filters, signal) =>
   apiRequest(`/api/admin/tickets${toQueryString(filters)}`, { signal })
 

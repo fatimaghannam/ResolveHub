@@ -161,6 +161,9 @@ public sealed class AdminTicketService(
             query = query.Where(ticket => ticket.AssignedToUserAccountID == null);
         if (filter.AssignedOnly == true)
             query = query.Where(ticket => ticket.AssignedToUserAccountID != null);
+        if (filter.ActiveWorkloadOnly == true)
+            query = query.Where(ticket =>
+                TicketWorkloadRules.ActiveStatuses.Contains(ticket.TicketStatus.Name));
         query = query.ApplyUtcDateRange(filter.FromUtc,
             filter.ToUtcExclusive, ticket => ticket.CreatedDate);
         if (!filter.FromUtc.HasValue && filter.FromDate.HasValue)

@@ -30,14 +30,25 @@ function NotificationBell({ roleArea }) {
     function close(event) {
       if (!wrapperRef.current?.contains(event.target)) setOpen(false)
     }
+    function closeForOtherHeaderMenu(event) {
+      if (event.detail !== 'notifications') setOpen(false)
+    }
     document.addEventListener('pointerdown', close)
-    return () => { unsubscribe(); document.removeEventListener('pointerdown', close) }
+    window.addEventListener('resolvehub:header-menu-open', closeForOtherHeaderMenu)
+    return () => {
+      unsubscribe()
+      document.removeEventListener('pointerdown', close)
+      window.removeEventListener('resolvehub:header-menu-open', closeForOtherHeaderMenu)
+    }
   }, [])
 
   async function toggle() {
     const next = !open
     setOpen(next)
-    if (next) await load()
+    if (next) {
+      window.dispatchEvent(new CustomEvent('resolvehub:header-menu-open', { detail: 'notifications' }))
+      await load()
+    }
   }
 
   async function select(item) {
