@@ -1,13 +1,13 @@
 import {
-  CircleDot,
+  CircleCheckBig,
   ClipboardCheck,
   Clock3,
   FilePlus2,
-  ListChecks,
+  FolderOpen,
   Tags,
   Ticket,
   UserPlus,
-  UserRoundCheck,
+  UserRoundMinus,
   Users,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -26,10 +26,10 @@ import { formatLocalDateTime } from '../utils/dateTime.js'
 const statistics = [
   ['Total Users', 'totalUsers', Users, 'blue'],
   ['Total Tickets', 'totalTickets', Ticket, 'cyan'],
-  ['Open Tickets', 'openTickets', CircleDot, 'amber'],
+  ['Open Tickets', 'openTickets', FolderOpen, 'amber'],
   ['In Progress', 'inProgress', Clock3, 'blue'],
-  ['Unassigned Tickets', 'unassignedTickets', ListChecks, 'red'],
-  ['Resolved This Month', 'resolvedThisMonth', UserRoundCheck, 'green'],
+  ['Unassigned Tickets', 'unassignedTickets', UserRoundMinus, 'red'],
+  ['Resolved This Month', 'resolvedThisMonth', CircleCheckBig, 'green'],
 ]
 
 const quickActions = [

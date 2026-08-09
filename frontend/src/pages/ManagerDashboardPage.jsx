@@ -1,10 +1,10 @@
 import {
   AlertTriangle,
-  CircleDot,
+  CircleCheckBig,
   Clock3,
-  ListChecks,
-  ShieldAlert,
+  FolderOpen,
   Ticket,
+  UserRoundMinus,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
@@ -17,10 +17,10 @@ import { formatLocalDateTime } from '../utils/dateTime.js'
 
 const statistics = [
   ['Total Tickets', 'totalTickets', Ticket, 'blue'],
-  ['Open Tickets', 'openTickets', CircleDot, 'cyan'],
+  ['Open Tickets', 'openTickets', FolderOpen, 'cyan'],
   ['In Progress', 'inProgressTickets', Clock3, 'amber'],
-  ['Unassigned', 'unassignedTickets', ListChecks, 'red'],
-  ['Resolved This Month', 'resolvedThisMonth', ShieldAlert, 'green'],
+  ['Unassigned', 'unassignedTickets', UserRoundMinus, 'red'],
+  ['Resolved This Month', 'resolvedThisMonth', CircleCheckBig, 'green'],
   ['Critical Tickets', 'criticalTickets', AlertTriangle, 'red'],
 ]
 

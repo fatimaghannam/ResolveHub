@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   AlertTriangle,
-  CheckCircle2,
+  CircleCheckBig,
   CircleAlert,
   Clock3,
   ListChecks,
@@ -14,7 +14,7 @@ import { getAgentDashboard } from '../services/agentTicketService.js'
 import { formatLocalDateTime } from '../utils/dateTime.js'
 import { formatTicketReference } from '../utils/ticketReference.js'
 
-const statIcons = [ListChecks, Clock3, PauseCircle, AlertTriangle, CircleAlert, CheckCircle2]
+const statIcons = [ListChecks, Clock3, PauseCircle, AlertTriangle, CircleAlert, CircleCheckBig]
 const statDefinitions = [
   ['Active Assigned Tickets', 'activeAssignedTickets', 'blue'],
   ['In Progress', 'inProgress', 'cyan'],

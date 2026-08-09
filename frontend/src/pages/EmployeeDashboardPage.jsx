@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CheckCircle2, Clock3, FolderOpen, Ticket } from 'lucide-react'
+import { CircleCheckBig, Clock3, FolderOpen, Ticket } from 'lucide-react'
 import { Link, useOutletContext } from 'react-router-dom'
 import { getDashboard } from '../services/ticketService.js'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
@@ -33,7 +33,7 @@ function EmployeeDashboardPage() {
     ['Total Tickets', data.totalTickets, Ticket, 'blue'],
     ['Open', data.openTickets, FolderOpen, 'cyan'],
     ['In Progress', data.inProgressTickets, Clock3, 'amber'],
-    ['Resolved', data.resolvedTickets, CheckCircle2, 'green'],
+    ['Resolved', data.resolvedTickets, CircleCheckBig, 'green'],
   ]
 
   return (
