@@ -804,17 +804,22 @@ html:has(.dashboard-shell) { scroll-padding-top: 98px; }
 .assignment-request-status::before { width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: currentColor; content: ''; opacity: .8; }
 .assignment-request-actions { align-items: center; gap: 8px; flex-wrap: nowrap; }
 .assignment-approvals-table { table-layout: fixed; }
-.assignment-approvals-table .request-col--agent { width: 135px; }
-.assignment-approvals-table .request-col--workload { width: 82px; }
-.assignment-approvals-table .request-col--requester { width: 125px; }
-.assignment-approvals-table .request-col--date { width: 115px; }
-.assignment-approvals-table .request-col--action { width: 238px; }
-.assignment-approvals-table td { vertical-align: middle; }
+.assignment-approvals-table .request-col--agent { width: 165px; }
+.assignment-approvals-table .request-col--workload { width: 94px; }
+.assignment-approvals-table .request-col--requester { width: 155px; }
+.assignment-approvals-table .request-col--date { width: 128px; }
+.assignment-approvals-table .request-col--action { width: 106px; }
+.assignment-approvals-table th { white-space: nowrap; }
+.assignment-approvals-table th, .assignment-approvals-table td { padding-inline: 12px; vertical-align: middle; }
+.assignment-approvals-table .assignment-agent-name, .assignment-requester-name { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .assignment-workload { color: #354a63; font-weight: 700; white-space: nowrap; }
 .assignment-approvals-table .assignment-request-actions { width: max-content; display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; }
 .assignment-approval-action { width: auto; height: 34px; min-width: 0; min-height: 34px; justify-content: center; padding: 6px 11px; border-radius: 8px; font-size: .76rem; white-space: nowrap; }
 .assignment-approval-view-link { flex: 0 0 auto; font-size: .78rem; white-space: nowrap; }
 .assignment-approval-view-link:hover, .assignment-approval-view-link:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
+.assignment-review-menu__dropdown { width:172px; }
+.assignment-review-menu__approve { color:#176b47; }
+.assignment-review-menu__approve:hover,.assignment-review-menu__approve:focus-visible { background:#eaf7f0; }
 .assignment-action--disabled { opacity: .5; pointer-events: none; }
 .assignment-approval-action.button--danger-outline:hover { border-color: #d8948d; background: #fff5f4; }
 .assignment-approval-action.button--secondary:hover { border-color: #aebfd0; background: #f7f9fb; }
@@ -864,7 +869,7 @@ html:has(.dashboard-shell) { scroll-padding-top: 98px; }
   .admin-assignments-page-table .assignments-col--agent { width: 185px; }
   .admin-assignments-page-table .assignments-col--action { width: 84px; }
   .admin-assignments-page-table th,
-  .admin-assignments-page-table td { padding-inline: 9px; }
+  .admin-assignments-page-table td { padding-inline: 12px; }
   .admin-assignments-page-table th:nth-child(1),
   .admin-assignments-page-table td:nth-child(1),
   .admin-assignments-page-table th:nth-child(4),
@@ -1063,7 +1068,7 @@ html:has(.dashboard-shell) { scroll-padding-top: 98px; }
 @supports (grid-template-rows: subgrid) {
   .workload-grid--filterable .workload-card--capacity {
     display: grid;
-    grid-row: span 2;
+    grid-row: span 3;
     grid-template-rows: subgrid;
   }
   .workload-grid--filterable .workload-card__metrics {

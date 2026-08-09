@@ -20,7 +20,7 @@ export function AgentWorkloadSummary({ agent }) {
   )
 }
 
-export function AgentWorkloadCard({ agent, ticketPath }) {
+export function AgentWorkloadCard({ agent, ticketPath, navigationState }) {
   const progress = Math.min(100, (agent.activeTicketCount / agent.maxActiveTickets) * 100)
   const slotLabel = agent.remainingCapacity === 1 ? 'slot' : 'slots'
 
@@ -48,7 +48,7 @@ export function AgentWorkloadCard({ agent, ticketPath }) {
       <div className="workload-card__metrics">
         {[['Assigned', agent.assigned], ['In Progress', agent.inProgress], ['Pending', agent.pending]].map(([status, count]) =>
           ticketPath ? (
-            <Link className="workload-card__metric" to={`${ticketPath}?status=${encodeURIComponent(status)}`} key={status} aria-label={`View ${status} tickets for ${agent.name}`}>
+            <Link className="workload-card__metric" to={`${ticketPath}?status=${encodeURIComponent(status)}`} state={navigationState} key={status} aria-label={`View ${status} tickets for ${agent.name}`}>
               <span className="workload-card__metric-label">{status}</span><strong className="workload-card__metric-value">{count}</strong>
             </Link>
           ) : (
@@ -56,7 +56,7 @@ export function AgentWorkloadCard({ agent, ticketPath }) {
           ),
         )}
       </div>
-      {ticketPath && <footer className="workload-card__footer"><Link className="table-action" to={ticketPath}>View tickets</Link></footer>}
+      {ticketPath && <footer className="workload-card__footer"><Link className="table-action" to={ticketPath} state={navigationState}>View tickets</Link></footer>}
     </article>
   )
 }

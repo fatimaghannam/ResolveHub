@@ -1,6 +1,6 @@
 import { ArrowLeft } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States.jsx'
 import { TicketPriorityBadge, TicketStatusBadge } from '../components/tickets/TicketBadges.jsx'
 import { getAdminTickets, getAdminWorkload } from '../services/adminService.js'
@@ -12,6 +12,7 @@ const workloadStatuses = new Set(['Assigned', 'In Progress', 'Pending'])
 
 function AgentWorkloadTicketsPage({ roleArea }) {
   const { agentId } = useParams()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   const requestedStatus = searchParams.get('status')
   const status = workloadStatuses.has(requestedStatus) ? requestedStatus : null
@@ -58,9 +59,20 @@ function AgentWorkloadTicketsPage({ roleArea }) {
   const viewLabel = status ? `${status} Tickets` : 'Active Tickets'
   const agentName = agent?.name ?? ''
   const emptyStatus = (status ?? 'active').toLowerCase()
+  const fromAdminAssignments = roleArea === 'admin' &&
+    location.state?.from === 'admin-assignments-workload'
+  const backTarget = fromAdminAssignments
+    ? '/admin/assignments#it-agent-workload'
+    : `/${roleArea}/workload`
+  const backLabel = fromAdminAssignments ? 'Back to IT Agent Workload' : 'Back to Team Workload'
+  const ticketDetailsState = {
+    from: 'agent-workload-tickets',
+    backTo: `${location.pathname}${location.search}`,
+    origin: fromAdminAssignments ? 'admin-assignments-workload' : undefined,
+  }
 
   return <>
-    <Link className="back-link back-link--top" to={`/${roleArea}/workload`}><ArrowLeft size={18} />Back to Team Workload</Link>
+    <Link className="back-link back-link--top" to={backTarget}><ArrowLeft size={18} />{backLabel}</Link>
     <section className="page-heading"><h2>{agentName ? `${agentName} — ${viewLabel}` : viewLabel}</h2><p>Review this agent&apos;s current workload tickets.</p></section>
     {error && <ErrorState message={error} />}
     {!error && agent === null && <LoadingState message="Loading agent workload…" />}
@@ -77,7 +89,7 @@ function AgentWorkloadTicketsPage({ roleArea }) {
           <td><TicketPriorityBadge value={ticket.priorityName} /></td>
           <td><TicketStatusBadge value={ticket.statusName} /></td>
           <td>{formatLocalDateTime(ticket.createdDate)}</td>
-          <td><Link className="table-action" to={`/${roleArea}/tickets/${ticket.ticketReferenceNumber}`}>View</Link></td>
+          <td><Link className="table-action" to={`/${roleArea}/tickets/${ticket.ticketReferenceNumber}`} state={ticketDetailsState}>View</Link></td>
         </tr>)}</tbody>
       </table></div>
     </section>}
