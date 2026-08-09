@@ -295,6 +295,11 @@ function AdminAssignmentsPage({ roleArea = 'admin' }) {
         message: `${request.ticketReferenceNumber} was ${decision === 'approve' ? `assigned to ${request.requestedByName}` : 'left open and unassigned'}.`,
       })
     } catch (requestError) {
+      if (requestError.status === 409) {
+        setAgentAssignmentRequests((items) =>
+          items.filter((item) => item.id !== request.id))
+        setReload((value) => value + 1)
+      }
       setToast({ id: Date.now(), type: 'error', title: 'Review Failed', message: requestError.message })
     } finally {
       setReviewingRequest('')

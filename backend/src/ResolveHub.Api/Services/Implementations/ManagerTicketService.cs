@@ -193,7 +193,8 @@ public sealed class ManagerTicketService(
                 .ThenInclude(item => item.TicketStatus)
             .Include(item => item.RequestedByUserAccount)
             .SingleOrDefaultAsync(item => item.ID == requestId, token);
-        if (request is null) return new(TicketOperationStatus.NotFound);
+        if (request is null) return new(TicketOperationStatus.Conflict,
+            Message: "This assignment request is no longer available.");
         if (request.RequestedAgentUserAccountID.HasValue)
             return new(TicketOperationStatus.Forbidden,
                 Message: "Manager-created assignment requests require Administrator review.");
@@ -238,7 +239,7 @@ public sealed class ManagerTicketService(
                 }
                 var assignment = await adminTicketService.AssignAsync(
                     managerId, request.Ticket.TicketReferenceNumber,
-                    request.RequestedByUserAccountID, token);
+                    request.RequestedByUserAccountID, token, request.ID);
                 if (assignment.Status != TicketOperationStatus.Success)
                 {
                     if (transaction is not null)

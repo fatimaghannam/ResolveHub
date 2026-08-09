@@ -303,7 +303,8 @@ public sealed class AdminTicketService(
         int administratorId,
         string ticketReference,
         int? agentUserId,
-        CancellationToken token)
+        CancellationToken token,
+        int? preservedAgentRequestId = null)
     {
         IDbContextTransaction? transaction = null;
         if (dbContext.Database.IsRelational() &&
@@ -476,6 +477,17 @@ public sealed class AdminTicketService(
                     NotificationTypeNames.TicketReassigned, "Ticket reassigned",
                     $"{ticket.TicketReferenceNumber} is no longer assigned to you.",
                     ticket.TicketReferenceNumber, now, administratorId);
+
+            if (agentUserId.HasValue)
+            {
+                var obsoleteAgentRequests = await dbContext.TicketAssignmentRequests
+                    .Where(item => item.TicketID == ticket.ID &&
+                        item.RequestedAgentUserAccountID == null &&
+                        item.Status == AssignmentRequestStatusNames.Pending &&
+                        item.ID != preservedAgentRequestId)
+                    .ToListAsync(token);
+                dbContext.TicketAssignmentRequests.RemoveRange(obsoleteAgentRequests);
+            }
 
             await dbContext.SaveChangesAsync(token);
             if (transaction is not null)

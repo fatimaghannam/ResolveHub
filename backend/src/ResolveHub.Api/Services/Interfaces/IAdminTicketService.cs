@@ -19,7 +19,8 @@ public interface IAdminTicketService
         int administratorId,
         string ticketReference,
         int? agentUserId,
-        CancellationToken token);
+        CancellationToken token,
+        int? preservedAgentRequestId = null);
     Task<IReadOnlyCollection<DuplicateReviewDto>> GetPendingDuplicateReviewsAsync(
         CancellationToken token);
     Task<TicketServiceResult<bool>> ReviewDuplicateAsync(
