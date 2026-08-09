@@ -1,7 +1,8 @@
 import {
-  Activity, AlertCircle, Archive, ArrowRight, CheckCircle2, ChevronDown,
-  CirclePause, CirclePlay, Clock3, FileText, MessageSquareText, Paperclip,
-  RefreshCcw, Tag, UserRoundCheck,
+  Archive, ArrowRight, ArrowRightLeft, CheckCircle2, ChevronDown, CirclePause,
+  CirclePlay, CircleX, Clock3, Copy, FilePlus2, FileQuestion, History,
+  MessageSquareText, Paperclip, RefreshCcw, Tag, UserRoundCheck, UserRoundMinus,
+  UserRoundPlus,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getTicketActivity, getTicketActivitySummary } from '../../services/ticketActivityService.js'
@@ -18,17 +19,37 @@ const filterDefinitions = [
 ]
 
 const iconRules = [
-  [/created/i, FileText, 'created'], [/reassign|assign/i, UserRoundCheck, 'assignment'],
+  [/cancellation request approved/i, CheckCircle2, 'resolved'],
+  [/cancellation request rejected/i, CircleX, 'danger'],
+  [/cancellation request/i, FileQuestion, 'paused'],
+  [/assignment request approved/i, CheckCircle2, 'resolved'],
+  [/assignment request rejected/i, CircleX, 'danger'],
+  [/assignment request.*created|assignment requested/i, UserRoundPlus, 'assignment'],
+  [/agent released/i, UserRoundMinus, 'assignment'],
+  [/duplicate review approved/i, CheckCircle2, 'resolved'],
+  [/duplicate review rejected/i, CircleX, 'danger'],
+  [/duplicate review reported/i, Copy, 'status'],
+  [/reassign/i, ArrowRightLeft, 'assignment'], [/assign/i, UserRoundCheck, 'assignment'],
+  [/created/i, FilePlus2, 'created'],
   [/paused/i, CirclePause, 'paused'], [/resumed/i, RefreshCcw, 'work'],
   [/work started/i, CirclePlay, 'work'], [/resolved/i, CheckCircle2, 'resolved'],
-  [/closed/i, Archive, 'closed'], [/duplicate|cancelled/i, AlertCircle, 'danger'],
+  [/closed/i, Archive, 'closed'], [/duplicate/i, Copy, 'danger'], [/cancelled/i, CircleX, 'danger'],
   [/comment|reply/i, MessageSquareText, 'comment'], [/attachment/i, Paperclip, 'attachment'],
   [/reopened|status/i, RefreshCcw, 'status'], [/priority|category/i, Tag, 'status'],
 ]
 
-function activityVisual(type) {
+function activityVisual(item) {
+  const type = item.activityType
+  if (/status changed/i.test(type)) {
+    if (/resolved/i.test(item.newValue)) return { Icon: CheckCircle2, tone: 'resolved' }
+    if (/closed/i.test(item.newValue)) return { Icon: Archive, tone: 'closed' }
+    if (/cancelled/i.test(item.newValue)) return { Icon: CircleX, tone: 'danger' }
+    if (/pending/i.test(item.newValue)) return { Icon: CirclePause, tone: 'paused' }
+    if (/in progress/i.test(item.newValue)) return { Icon: Clock3, tone: 'default' }
+    if (/reopened|open/i.test(item.newValue)) return { Icon: RefreshCcw, tone: 'status' }
+  }
   const match = iconRules.find(([pattern]) => pattern.test(type))
-  return match ? { Icon: match[1], tone: match[2] } : { Icon: Activity, tone: 'default' }
+  return match ? { Icon: match[1], tone: match[2] } : { Icon: History, tone: 'default' }
 }
 
 const dateParts = formatActivityDate
@@ -83,7 +104,7 @@ function workActionLabel(type, active) {
 }
 
 function ActivityCard({ item, workContext }) {
-  const { Icon, tone } = activityVisual(item.activityType)
+  const { Icon, tone } = activityVisual(item)
   const occurred = dateParts(item.occurredAt)
   const isAssignment = /ticket assigned|ticket reassigned/i.test(item.activityType)
   const isClosed = /ticket closed/i.test(item.activityType)
@@ -266,7 +287,7 @@ export default function TicketActivityLog({ ticketReference }) {
         {Object.entries(groups).map(([label, items]) => <section className="activity-day" key={label}><h3><span>{label}</span></h3><div className="activity-day__events">{items.map((entry) => entry.type === 'assignment-group'
           ? <AssignmentRequestGroup group={entry} key={entry.id} />
           : <ActivityCard item={entry.item} workContext={sessionNumbers[entry.item.id]} key={entry.id} />)}</div></section>)}
-        {!visible.length && <div className="activity-timeline__empty"><Activity size={22} /><strong>{emptyMessages[filter]}</strong><span>New events will appear here automatically.</span></div>}
+        {!visible.length && <div className="activity-timeline__empty"><History size={22} /><strong>{emptyMessages[filter]}</strong><span>New events will appear here automatically.</span></div>}
       </div>}
     </div></div></div>
   </section>
