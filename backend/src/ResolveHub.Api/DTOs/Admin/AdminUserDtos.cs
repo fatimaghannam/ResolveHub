@@ -9,7 +9,7 @@ public sealed record AdminUserListItemDto(
 public sealed record AdminUserDetailsDto(
     int Id, string FirstName, string LastName, string Email,
     string Role, string? Department, string Status, DateTime CreatedDate,
-    DateTime? LastLoginDate);
+    DateTime? LastLoginDate, string? ProfileImagePath);
 
 public sealed record CreateAdminUserResultDto(
     AdminUserDetailsDto User, bool InvitationSent);

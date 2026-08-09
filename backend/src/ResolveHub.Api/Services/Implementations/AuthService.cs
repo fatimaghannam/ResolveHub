@@ -134,7 +134,8 @@ public sealed class AuthService : IAuthService
                 LastName: user.LastName,
                 Roles: roleCollection,
                 IsActive: user.IsActive,
-                CreatedDate: user.CreatedDate));
+                CreatedDate: user.CreatedDate,
+                ProfileImagePath: user.ProfileImagePath));
 
         _logger.LogInformation(
             "User {UserId} logged in successfully.",

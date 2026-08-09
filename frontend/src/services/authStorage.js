@@ -28,6 +28,15 @@ export function clearStoredAuth() {
   sessionStorage.removeItem(AUTH_STORAGE_KEY)
 }
 
+export function updateStoredUser(updates) {
+  const storage = localStorage.getItem(AUTH_STORAGE_KEY) ? localStorage : sessionStorage
+  const auth = getStoredAuth()
+  if (!auth?.user) return null
+  const updated = { ...auth, user: { ...auth.user, ...updates } }
+  storage.setItem(AUTH_STORAGE_KEY, JSON.stringify(updated))
+  return updated.user
+}
+
 export function isEmployee(auth) {
   return auth?.user?.roles?.includes(EMPLOYEE_ROLE) === true
 }

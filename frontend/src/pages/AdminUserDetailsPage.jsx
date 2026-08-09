@@ -5,6 +5,7 @@ import { EmptyState, ErrorState, LoadingState } from '../components/common/State
 import { getAdminUser } from '../services/adminService.js'
 import { accountStatusClassName, formatAccountStatus } from '../utils/accountStatus.js'
 import { formatLocalDateTime } from '../utils/dateTime.js'
+import UserAvatar from '../components/common/UserAvatar.jsx'
 
 function AdminUserDetailsPage() {
   const { userId } = useParams()
@@ -30,7 +31,6 @@ function AdminUserDetailsPage() {
   if (error) return <ErrorState message={error} />
   if (!user) return <LoadingState message="Loading user…" />
 
-  const initials = `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase()
   const fullName = `${user.firstName} ${user.lastName}`.trim()
   const displayStatus = formatAccountStatus(user.status)
   const showDepartment = user.role === 'Manager' || Boolean(user.department)
@@ -40,7 +40,13 @@ function AdminUserDetailsPage() {
       <section className="page-heading admin-user-details-heading"><h2>User Details</h2><p>View account information, access level, and current status.</p></section>
       <section className="panel admin-user-details-card">
         <header className="admin-user-identity">
-          <span className="profile-avatar admin-user-identity__avatar" aria-hidden="true">{initials}</span>
+          <UserAvatar
+            className="admin-user-identity__avatar"
+            firstName={user.firstName}
+            lastName={user.lastName}
+            imagePath={user.profileImagePath}
+            aria-hidden="true"
+          />
           <div className="admin-user-identity__content">
             <h3>{fullName}</h3>
             <a href={`mailto:${user.email}`}>{user.email}</a>

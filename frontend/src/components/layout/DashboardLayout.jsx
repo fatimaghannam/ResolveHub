@@ -25,7 +25,9 @@ import {
   isAdministrator,
   isItAgent,
   isManager,
+  updateStoredUser,
 } from '../../services/authStorage.js'
+import UserAvatar from '../common/UserAvatar.jsx'
 import '../../styles/dashboard.css'
 import NotificationBell from './NotificationBell.jsx'
 
@@ -155,8 +157,8 @@ function DashboardLayout() {
   const mainTransitionRef = useRef(null)
   const navigate = useNavigate()
   const location = useLocation()
-  const auth = getStoredAuth()
-  const user = auth?.user
+  const [user, setUser] = useState(() => getStoredAuth()?.user)
+  const auth = { ...getStoredAuth(), user }
   const agent = isItAgent(auth)
   const admin = isAdministrator(auth)
   const manager = isManager(auth)
@@ -224,6 +226,11 @@ function DashboardLayout() {
   function logout() {
     clearStoredAuth()
     navigate('/login', { replace: true })
+  }
+
+  function updateUser(updates) {
+    const updatedUser = updateStoredUser(updates)
+    if (updatedUser) setUser(updatedUser)
   }
 
   const pageTitle = getPageTitle(location.pathname, roleArea)
@@ -313,17 +320,23 @@ function DashboardLayout() {
           </button>
           <h1>{pageTitle}</h1>
           <NotificationBell roleArea={roleArea} />
-          <div className="topbar__user">
-            <span className="avatar">{user?.firstName?.[0]?.toUpperCase() ?? roleLabel[0]}</span>
+          <Link className="topbar__user" to={`/${roleArea}/profile`} aria-label={`Open ${fullName || roleLabel} profile`}>
+            <UserAvatar
+              className="avatar"
+              firstName={user?.firstName}
+              lastName={user?.lastName}
+              imagePath={user?.profileImagePath}
+              aria-hidden="true"
+            />
             <span>
               <strong>{fullName || user?.email || roleLabel}</strong>
               <small>{roleLabel}</small>
             </span>
-          </div>
+          </Link>
         </header>
         <div className="dashboard-scroll">
           <main className="dashboard-content">
-            <Outlet context={{ user, role: roleLabel }} />
+            <Outlet context={{ user, role: roleLabel, updateUser }} />
           </main>
         </div>
       </div>

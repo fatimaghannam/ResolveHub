@@ -121,7 +121,8 @@ public sealed class AdminUserService(
                 item.Id, item.FirstName, item.LastName, item.Email,
                 item.PasswordHash,
                 Department = item.Department == null ? null : item.Department.Name,
-                item.IsActive, item.CreatedDate, item.LastLoginDate
+                item.IsActive, item.CreatedDate, item.LastLoginDate,
+                item.ProfileImagePath
             })
             .SingleOrDefaultAsync(token);
         if (user is null) return null;
@@ -130,7 +131,7 @@ public sealed class AdminUserService(
         return new AdminUserDetailsDto(user.Id, user.FirstName, user.LastName,
             user.Email!, role, user.Department,
             AccountStatus(user.IsActive, user.PasswordHash), user.CreatedDate,
-            user.LastLoginDate);
+            user.LastLoginDate, user.ProfileImagePath);
     }
 
     public async Task<IReadOnlyCollection<AdminDepartmentDto>> GetDepartmentsAsync(
@@ -236,13 +237,13 @@ public sealed class AdminUserService(
             return new(TicketOperationStatus.Success,
                 new CreateAdminUserResultDto(
                     new AdminUserDetailsDto(user.Id, firstName, lastName, email, role,
-                        department?.Name, "Pending", now, null), false));
+                        department?.Name, "Pending", now, null, null), false));
         }
 
         return new(TicketOperationStatus.Success,
             new CreateAdminUserResultDto(
                 new AdminUserDetailsDto(user.Id, firstName, lastName, email, role,
-                    department?.Name, "Pending", now, null), true));
+                    department?.Name, "Pending", now, null, null), true));
     }
 
     public async Task<TicketServiceResult<bool>> ResendInvitationAsync(

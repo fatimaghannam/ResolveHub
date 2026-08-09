@@ -7,4 +7,5 @@ public sealed record AuthenticatedUserResponse(
     string LastName,
     IReadOnlyCollection<string> Roles,
     bool IsActive,
-    DateTime CreatedDate);
+    DateTime CreatedDate,
+    string? ProfileImagePath);

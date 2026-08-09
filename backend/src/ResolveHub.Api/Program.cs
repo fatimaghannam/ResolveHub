@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.RateLimiting; //Provides ASP.NET Core rate limiting f
 using Microsoft.Data.SqlClient; // provides SQL Server-specific classes and utilities
 using Microsoft.EntityFrameworkCore; //Provides entity framework core for communicating with the database
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens; //provides classes used to create and validate JWT security tokens
 using Microsoft.OpenApi; //provides OpenAPI classes used to describe the API in Swagger.
 using Resend; //Provides the resend email service used for sending emails
@@ -337,6 +338,7 @@ builder.Services.AddScoped<IManagerTicketService, ManagerTicketService>();
 builder.Services.AddScoped<IAssignmentApprovalService, AssignmentApprovalService>();
 builder.Services.AddScoped<ITicketCancellationRequestService, TicketCancellationRequestService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IProfilePhotoService, ProfilePhotoService>();
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
@@ -372,6 +374,15 @@ if (app.Environment.IsDevelopment()) //Enables Swagger/OpenAPI only during devel
 
 app.UseExceptionHandler();
 app.UseHttpsRedirection();
+var profileImageDirectory = Path.Combine(
+    app.Environment.ContentRootPath, "App_Data", "ProfileImages");
+Directory.CreateDirectory(profileImageDirectory);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(profileImageDirectory),
+    RequestPath = "/profile-images",
+    ServeUnknownFileTypes = false
+});
 app.UseCors(SecurityPolicyNames.FrontendCors);
 app.UseRateLimiter();
 app.UseAuthentication();
