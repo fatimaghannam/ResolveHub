@@ -558,3 +558,20 @@
   outline: 2px solid #2478ce;
   outline-offset: 3px;
 }
+
+[data-theme="dark"] .login-card {
+  color:var(--ink);
+  border-color:#3b4a5e;
+  background:rgba(20, 30, 44, .97);
+  box-shadow:0 20px 50px rgba(0,0,0,.38);
+}
+[data-theme="dark"] .login-card h1,
+[data-theme="dark"] .form-field label { color:#e6edf6; }
+[data-theme="dark"] .login-card__header p,
+[data-theme="dark"] .remember-me,
+[data-theme="dark"] .password-guidance,
+[data-theme="dark"] .login-card__footer { color:#a4b1c2; }
+[data-theme="dark"] .form-field input { color:#e6edf6; border-color:#46566a; background:#0f1926; }
+[data-theme="dark"] .form-field input::placeholder { color:#78889d; }
+[data-theme="dark"] .form-field input:disabled { background:#263140; }
+[data-theme="dark"] .login-card__footer { border-color:#344154; }

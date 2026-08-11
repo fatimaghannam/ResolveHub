@@ -11,6 +11,7 @@ import {
   isManager,
 } from '../../services/authStorage.js'
 import '../../styles/login.css'
+import { useTheme } from '../../theme/ThemeContext.jsx'
 
 function getLoginError(error) {
   if (error.status === 400) {
@@ -41,6 +42,7 @@ function getLoginError(error) {
 }
 
 function LoginPage() {
+  const { activateUserTheme, resetToAuthTheme } = useTheme()
   const location = useLocation()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
@@ -74,6 +76,7 @@ function LoginPage() {
 
       storage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authData))
       otherStorage.removeItem(AUTH_STORAGE_KEY)
+      activateUserTheme(authData.user)
 
       if (isEmployee(authData)) {
         navigate('/employee/dashboard', { replace: true })
@@ -85,6 +88,7 @@ function LoginPage() {
         navigate('/manager/dashboard', { replace: true })
       } else {
         clearStoredAuth()
+        resetToAuthTheme()
         setMessage('This account role is not supported in the dashboard yet.')
       }
     } catch (error) {

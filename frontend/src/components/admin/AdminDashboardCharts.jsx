@@ -14,7 +14,9 @@ import {
   YAxis,
 } from 'recharts'
 const tooltipStyle = {
-  border: '1px solid #dfe7f0',
+  color: 'var(--ink)',
+  backgroundColor: 'var(--surface-elevated)',
+  border: '1px solid var(--line)',
   borderRadius: 8,
   boxShadow: '0 8px 24px rgba(20, 39, 68, .1)',
 }
@@ -62,9 +64,9 @@ export function TicketTrendChart({ data: monthlyTicketTrend }) {
       <div className="chart-box" role="img" aria-label={`Created versus resolved tickets for the most recent six months. ${summary}.`}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={monthlyTicketTrend} margin={{ top: 8, right: 12, left: -18, bottom: 0 }}>
-            <CartesianGrid stroke="#e7edf4" strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="month" tick={{ fill: '#68778c', fontSize: 12 }} />
-            <YAxis allowDecimals={false} tick={{ fill: '#68778c', fontSize: 12 }} />
+            <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="month" tick={{ fill: 'var(--muted)', fontSize: 12 }} />
+            <YAxis allowDecimals={false} tick={{ fill: 'var(--muted)', fontSize: 12 }} />
             <Tooltip formatter={(value, name) => [`${value} tickets`, name]} contentStyle={tooltipStyle} />
             <Legend verticalAlign="bottom" />
             <Line name="Created Tickets" type="monotone" dataKey="created" stroke="#1769c2" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} isAnimationActive={false} />
@@ -88,9 +90,9 @@ export function TicketCategoryChart({ data }) {
       <div className="chart-box chart-box--category" role="img" aria-label={`Tickets by category, highest to lowest. ${summary}.`}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={ticketsByCategory} layout="vertical" margin={{ top: 0, right: 18, left: 18, bottom: 0 }}>
-            <CartesianGrid stroke="#e7edf4" strokeDasharray="3 3" horizontal={false} />
-            <XAxis type="number" allowDecimals={false} tick={{ fill: '#68778c', fontSize: 12 }} />
-            <YAxis type="category" dataKey="category" width={96} tick={{ fill: '#334359', fontSize: 12 }} />
+            <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" horizontal={false} />
+            <XAxis type="number" allowDecimals={false} tick={{ fill: 'var(--muted)', fontSize: 12 }} />
+            <YAxis type="category" dataKey="category" width={96} tick={{ fill: 'var(--ink)', fontSize: 12 }} />
             <Tooltip formatter={(value) => [`${value} tickets`, 'Tickets']} contentStyle={tooltipStyle} />
             <Bar dataKey="tickets" name="Tickets" fill="#1769c2" radius={[0, 5, 5, 0]} isAnimationActive={false} />
           </BarChart>

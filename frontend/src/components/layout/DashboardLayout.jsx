@@ -13,6 +13,8 @@ import {
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
+  Moon,
+  Sun,
   Tags,
   Ticket,
   Users,
@@ -31,6 +33,7 @@ import {
 import UserAvatar from '../common/UserAvatar.jsx'
 import '../../styles/dashboard.css'
 import NotificationBell from './NotificationBell.jsx'
+import { useTheme } from '../../theme/ThemeContext.jsx'
 
 const employeeNavigation = [
   { id: 'dashboard', to: '/employee/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -151,6 +154,7 @@ function getPageTitle(pathname, roleArea) {
 }
 
 function DashboardLayout() {
+  const { theme, toggleTheme, resetToAuthTheme } = useTheme()
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
@@ -250,6 +254,7 @@ function DashboardLayout() {
   function logout() {
     setIsAccountMenuOpen(false)
     clearStoredAuth()
+    resetToAuthTheme()
     navigate('/login', { replace: true })
   }
 
@@ -343,6 +348,16 @@ function DashboardLayout() {
             <Menu size={22} />
           </button>
           <h1>{pageTitle}</h1>
+          <button
+            className="theme-toggle"
+            type="button"
+            onClick={toggleTheme}
+            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            aria-pressed={theme === 'dark'}
+            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+          >
+            {theme === 'dark' ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}
+          </button>
           <NotificationBell roleArea={roleArea} />
           <div className="account-menu" ref={accountMenuRef}>
             <button

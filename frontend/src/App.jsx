@@ -1,5 +1,5 @@
-import { lazy, Suspense } from 'react'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { lazy, Suspense, useLayoutEffect } from 'react'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage.jsx'
 import LoginPage from './pages/auth/LoginPage.jsx'
 import ResetPasswordPage from './pages/auth/ResetPasswordPage.jsx'
@@ -29,13 +29,29 @@ import { ADMIN_ROLE, EMPLOYEE_ROLE, IT_AGENT_ROLE, MANAGER_ROLE } from './servic
 import ManagerDashboardPage from './pages/manager/ManagerDashboardPage.jsx'
 import ManagerWorkloadPage from './pages/shared/ManagerWorkloadPage.jsx'
 import AgentWorkloadTicketsPage from './pages/shared/AgentWorkloadTicketsPage.jsx'
+import { getStoredAuth } from './services/authStorage.js'
+import { useTheme } from './theme/ThemeContext.jsx'
 
 
 const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage.jsx'))
 
+function ThemeRouteSync() {
+  const { pathname } = useLocation()
+  const { activateUserTheme, resetToAuthTheme } = useTheme()
+  const isAuthRoute = ['/', '/login', '/forgot-password', '/reset-password'].includes(pathname)
+
+  useLayoutEffect(() => {
+    if (isAuthRoute) resetToAuthTheme()
+    else activateUserTheme(getStoredAuth()?.user)
+  }, [activateUserTheme, isAuthRoute, resetToAuthTheme])
+
+  return null
+}
+
 function App() {
   return (
     <BrowserRouter>
+      <ThemeRouteSync />
       <Routes>
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<LoginPage />} />
