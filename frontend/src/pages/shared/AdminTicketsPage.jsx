@@ -145,6 +145,7 @@ function AdminTicketsPage({ roleArea = 'admin' }) {
       const file = await exportAdminTickets(format, {
         search: filters.search, statusId: filters.status, categoryId: filters.category,
         priorityId: filters.priority, fromUtc, toUtcExclusive,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       })
       if (!file.blob.size) throw new Error('EMPTY_EXPORT')
       const objectUrl = URL.createObjectURL(file.blob)

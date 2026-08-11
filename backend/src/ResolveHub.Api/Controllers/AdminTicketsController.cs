@@ -64,7 +64,8 @@ public sealed class AdminTicketsController(
 
     [HttpGet("tickets/export/{format}")]
     public async Task<IActionResult> ExportTickets(
-        string format, [FromQuery] AdminTicketFilterDto filter, CancellationToken token)
+        string format, [FromQuery] AdminTicketFilterDto filter,
+        [FromQuery] string? timeZone, CancellationToken token)
     {
         if (format is not ("pdf" or "excel")) return NotFound();
         var report = await service.GetTicketReportAsync(filter, token);
@@ -72,11 +73,11 @@ public sealed class AdminTicketsController(
         var generatedAt = DateTimeOffset.UtcNow;
         var generatedBy = User.Identity?.Name ?? "Administrator";
         if (format == "pdf")
-            return File(reportService.CreatePdf(report, generatedBy, generatedAt),
-                "application/pdf", reportService.CreateFileName(report, "pdf", generatedAt));
-        return File(reportService.CreateExcel(report, generatedBy, generatedAt),
+            return File(reportService.CreatePdf(report, generatedBy, generatedAt, timeZone),
+                "application/pdf", reportService.CreateFileName(report, "pdf", generatedAt, timeZone));
+        return File(reportService.CreateExcel(report, generatedBy, generatedAt, timeZone),
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            reportService.CreateFileName(report, "xlsx", generatedAt));
+            reportService.CreateFileName(report, "xlsx", generatedAt, timeZone));
     }
 
     [HttpGet("tickets/{ticketReference}")]
