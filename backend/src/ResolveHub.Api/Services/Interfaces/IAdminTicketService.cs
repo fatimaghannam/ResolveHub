@@ -13,6 +13,8 @@ public interface IAdminTicketService
         CancellationToken token);
     Task<PagedResultDto<AdminTicketListItemDto>> GetTicketsAsync(
         AdminTicketFilterDto filter, CancellationToken token);
+    Task<AdminTicketReportDto> GetTicketReportAsync(
+        AdminTicketFilterDto filter, CancellationToken token);
     Task<AdminTicketDetailsDto?> GetTicketAsync(
         string ticketReference, CancellationToken token);
     Task<TicketServiceResult<bool>> AssignAsync(

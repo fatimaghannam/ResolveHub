@@ -36,8 +36,16 @@ export async function apiRequest(path, options = {}) {
     )
   }
 
-  if (response.ok && responseType === 'blob') {
-    return response.blob()
+  if (response.ok && (responseType === 'blob' || responseType === 'file')) {
+    const blob = await response.blob()
+    if (responseType === 'blob') return blob
+    const disposition = response.headers.get('Content-Disposition') ?? ''
+    const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1]
+    const quotedName = disposition.match(/filename="([^"]+)"/i)?.[1]
+    return {
+      blob,
+      fileName: encodedName ? decodeURIComponent(encodedName) : quotedName,
+    }
   }
 
   let body = null

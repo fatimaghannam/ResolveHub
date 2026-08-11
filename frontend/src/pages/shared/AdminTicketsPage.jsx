@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
+import { FileSpreadsheet, FileText } from 'lucide-react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import Pagination from '../../components/common/Pagination.jsx'
 import { EmptyState, ErrorState, LoadingState } from '../../components/common/States.jsx'
 import Toast from '../../components/common/Toast.jsx'
 import { TicketPriorityBadge, TicketStatusBadge } from '../../components/tickets/TicketBadges.jsx'
-import { getAdminTickets } from '../../services/adminService.js'
+import { exportAdminTickets, getAdminTickets } from '../../services/adminService.js'
 import { getManagerTickets } from '../../services/managerService.js'
 import { getCategories, getPriorities, getStatuses } from '../../services/ticketService.js'
 import {
@@ -63,6 +64,7 @@ function AdminTicketsPage({ roleArea = 'admin' }) {
   const [data, setData] = useState(null)
   const [lookups, setLookups] = useState({ statuses: [], categories: [], priorities: [] })
   const [error, setError] = useState('')
+  const [exporting, setExporting] = useState(null)
   const [toast, setToast] = useState(() => {
     const notification = location.state?.toast
     return notification ? { id: Date.now(), ...notification } : null
@@ -135,11 +137,40 @@ function AdminTicketsPage({ roleArea = 'admin' }) {
     setDateError('')
   }
 
+  async function exportTickets(format) {
+    if (roleArea !== 'admin' || !data?.totalItems || exporting) return
+    setExporting(format)
+    try {
+      const { fromUtc, toUtcExclusive } = getUtcDateRange(filters.fromDate, filters.toDate)
+      const file = await exportAdminTickets(format, {
+        search: filters.search, statusId: filters.status, categoryId: filters.category,
+        priorityId: filters.priority, fromUtc, toUtcExclusive,
+      })
+      if (!file.blob.size) throw new Error('EMPTY_EXPORT')
+      const objectUrl = URL.createObjectURL(file.blob)
+      const link = document.createElement('a')
+      link.href = objectUrl
+      link.download = file.fileName || `ResolveHub_Ticket_Report.${format === 'excel' ? 'xlsx' : 'pdf'}`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(objectUrl)
+    } catch {
+      setToast({ id: Date.now(), type: 'error', title: 'Export Failed', message: 'The ticket report could not be generated. Please try again.' })
+    } finally {
+      setExporting(null)
+    }
+  }
+
   return (
     <>
       {toast && <div className="app-toast-region"><Toast key={toast.id} type={toast.type} title={toast.title} message={toast.message} onDismiss={dismissToast} /></div>}
       <section className="page-heading page-heading--action">
         <div><h2>All Tickets</h2><p>Review, filter, and manage tickets across the organization.</p></div>
+        {roleArea === 'admin' && <div className="heading-actions" aria-label="Ticket report exports">
+          <button className="button button--secondary" type="button" onClick={() => exportTickets('pdf')} disabled={!data?.totalItems || exporting !== null} aria-label="Export filtered tickets as PDF"><FileText size={17} />{exporting === 'pdf' ? 'Exporting…' : 'Export PDF'}</button>
+          <button className="button button--secondary" type="button" onClick={() => exportTickets('excel')} disabled={!data?.totalItems || exporting !== null} aria-label="Export filtered tickets as Excel workbook"><FileSpreadsheet size={17} />{exporting === 'excel' ? 'Exporting…' : 'Export Excel'}</button>
+        </div>}
       </section>
       <form className="filter-panel ticket-filters" onSubmit={applyFilters}>
         <div className="ticket-filters__grid admin-ticket-filters">

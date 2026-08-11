@@ -22,6 +22,7 @@ using ResolveHub.Api.Services.Interfaces;
 using ResolveHub.Api.Settings; //gives access to confirmation setting classes such as JWT and frontend 
 
 var builder = WebApplication.CreateBuilder(args); //created the ASP.NET Core application builder used to configure services and application settings. 
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
 builder.Services.AddControllers(); //Add controllers allows ResolveHub to use API controllers
 builder.Services.AddProblemDetails(); //Add a standard format for returning API error information
@@ -331,6 +332,7 @@ builder.Services.AddScoped<ITicketDraftService, TicketDraftService>();
 builder.Services.AddScoped<ITicketCommentService, TicketCommentService>();
 builder.Services.AddScoped<IAgentTicketService, AgentTicketService>();
 builder.Services.AddScoped<IAdminTicketService, AdminTicketService>();
+builder.Services.AddScoped<IAdminTicketReportService, AdminTicketReportService>();
 builder.Services.AddScoped<IAdminUserService, AdminUserService>();
 builder.Services.AddScoped<IAdminCategoryService, AdminCategoryService>();
 builder.Services.AddScoped<ISystemAuditLogService, SystemAuditLogService>();

@@ -127,8 +127,39 @@ public sealed class AdminTicketService(
     public async Task<PagedResultDto<AdminTicketListItemDto>> GetTicketsAsync(
         AdminTicketFilterDto filter, CancellationToken token)
     {
-        var query = dbContext.Tickets.AsNoTracking()
-            .Where(ticket => !ticket.IsDeleted);
+        var query = BuildFilteredTicketQuery(filter);
+        var total = await query.CountAsync(token);
+        var items = await ProjectTicketList(ApplySorting(query, filter.SortBy, filter.SortDirection)
+            .Skip((filter.Page - 1) * filter.PageSize).Take(filter.PageSize)).ToListAsync(token);
+        return new(items, filter.Page, filter.PageSize, total,
+            Math.Max(1, (int)Math.Ceiling(total / (double)filter.PageSize)));
+    }
+
+    public async Task<AdminTicketReportDto> GetTicketReportAsync(
+        AdminTicketFilterDto filter, CancellationToken token)
+    {
+        var tickets = await ProjectTicketList(ApplySorting(
+            BuildFilteredTicketQuery(filter), filter.SortBy, filter.SortDirection))
+            .ToListAsync(token);
+        var status = filter.StatusId.HasValue
+            ? await dbContext.TicketStatuses.Where(item => item.ID == filter.StatusId)
+                .Select(item => item.Name).SingleOrDefaultAsync(token) ?? "All"
+            : "All";
+        var category = filter.CategoryId.HasValue
+            ? await dbContext.TicketCategories.Where(item => item.ID == filter.CategoryId)
+                .Select(item => item.Name).SingleOrDefaultAsync(token) ?? "All"
+            : "All";
+        var priority = filter.PriorityId.HasValue
+            ? await dbContext.TicketPriorities.Where(item => item.ID == filter.PriorityId)
+                .Select(item => item.Name).SingleOrDefaultAsync(token) ?? "All"
+            : "All";
+        return new(tickets, filter.Search?.Trim() ?? "All", status, category,
+            priority, filter.FromUtc, filter.ToUtcExclusive);
+    }
+
+    private IQueryable<Ticket> BuildFilteredTicketQuery(AdminTicketFilterDto filter)
+    {
+        var query = dbContext.Tickets.AsNoTracking().Where(ticket => !ticket.IsDeleted);
         var search = filter.Search?.Trim();
         if (!string.IsNullOrEmpty(search))
         {
@@ -174,11 +205,11 @@ public sealed class AdminTicketService(
             query = query.Where(ticket => ticket.CreatedDate < end);
         }
 
-        var total = await query.CountAsync(token);
-        query = ApplySorting(query, filter.SortBy, filter.SortDirection);
-        var items = await query
-            .Skip((filter.Page - 1) * filter.PageSize).Take(filter.PageSize)
-            .Select(ticket => new AdminTicketListItemDto(
+        return query;
+    }
+
+    private static IQueryable<AdminTicketListItemDto> ProjectTicketList(
+        IQueryable<Ticket> query) => query.Select(ticket => new AdminTicketListItemDto(
                 ticket.ID, ticket.TicketReferenceNumber, ticket.Title,
                 ticket.CreatedByUserAccountID,
                 ticket.CreatedByUserAccount.FirstName + " " + ticket.CreatedByUserAccount.LastName,
@@ -190,11 +221,7 @@ public sealed class AdminTicketService(
                     ticket.AssignedToUserAccount.FirstName + " " + ticket.AssignedToUserAccount.LastName,
                 ticket.CreatedDate, ticket.UpdatedDate,
                 ticket.OriginalTicket == null ? null :
-                    ticket.OriginalTicket.TicketReferenceNumber))
-            .ToListAsync(token);
-        return new(items, filter.Page, filter.PageSize, total,
-            Math.Max(1, (int)Math.Ceiling(total / (double)filter.PageSize)));
-    }
+                    ticket.OriginalTicket.TicketReferenceNumber));
 
     private static IQueryable<Ticket> ApplySorting(
         IQueryable<Ticket> query, string? sortBy, string? direction)

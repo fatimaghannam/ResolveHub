@@ -64,6 +64,15 @@ public sealed record AdminTicketListItemDto(
     DateTime CreatedDate, DateTime UpdatedDate,
     string? OriginalTicketReference);
 
+public sealed record AdminTicketReportDto(
+    IReadOnlyCollection<AdminTicketListItemDto> Tickets,
+    string Search,
+    string Status,
+    string Category,
+    string Priority,
+    DateTimeOffset? FromUtc,
+    DateTimeOffset? ToUtcExclusive);
+
 public sealed record AdminTicketDetailsDto(
     int Id, string TicketReferenceNumber, string Title, string Description,
     int RequesterId, string RequesterName, string RequesterEmail,

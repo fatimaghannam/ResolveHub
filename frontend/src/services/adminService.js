@@ -19,6 +19,11 @@ export const getAdminWorkload = (signal) =>
 export const getAdminTickets = (filters, signal) =>
   apiRequest(`/api/admin/tickets${toQueryString(filters)}`, { signal })
 
+export const exportAdminTickets = (format, filters) =>
+  apiRequest(`/api/admin/tickets/export/${format}${toQueryString(filters)}`, {
+    responseType: 'file',
+  })
+
 export const getAdminTicket = (ticketReference, signal) =>
   apiRequest(`/api/admin/tickets/${encodeURIComponent(ticketReference)}`, { signal })
 
