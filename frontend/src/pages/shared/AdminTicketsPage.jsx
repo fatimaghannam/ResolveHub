@@ -6,7 +6,7 @@ import { EmptyState, ErrorState, LoadingState } from '../../components/common/St
 import Toast from '../../components/common/Toast.jsx'
 import { TicketPriorityBadge, TicketStatusBadge } from '../../components/tickets/TicketBadges.jsx'
 import { exportAdminTickets, getAdminTickets } from '../../services/adminService.js'
-import { getManagerTickets } from '../../services/managerService.js'
+import { exportManagerTickets, getManagerTickets } from '../../services/managerService.js'
 import { getCategories, getPriorities, getStatuses } from '../../services/ticketService.js'
 import {
   getLocalQuickDateRange,
@@ -138,11 +138,12 @@ function AdminTicketsPage({ roleArea = 'admin' }) {
   }
 
   async function exportTickets(format) {
-    if (roleArea !== 'admin' || !data?.totalItems || exporting) return
+    if (!['admin', 'manager'].includes(roleArea) || !data?.totalItems || exporting) return
     setExporting(format)
     try {
       const { fromUtc, toUtcExclusive } = getUtcDateRange(filters.fromDate, filters.toDate)
-      const file = await exportAdminTickets(format, {
+      const exportForRole = roleArea === 'manager' ? exportManagerTickets : exportAdminTickets
+      const file = await exportForRole(format, {
         search: filters.search, statusId: filters.status, categoryId: filters.category,
         priorityId: filters.priority, fromUtc, toUtcExclusive,
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -168,7 +169,7 @@ function AdminTicketsPage({ roleArea = 'admin' }) {
       {toast && <div className="app-toast-region"><Toast key={toast.id} type={toast.type} title={toast.title} message={toast.message} onDismiss={dismissToast} /></div>}
       <section className="page-heading page-heading--action">
         <div><h2>All Tickets</h2><p>Review, filter, and manage tickets across the organization.</p></div>
-        {roleArea === 'admin' && <div className="heading-actions" aria-label="Ticket report exports">
+        {['admin', 'manager'].includes(roleArea) && <div className="heading-actions" aria-label="Ticket report exports">
           <button className="button button--secondary" type="button" onClick={() => exportTickets('pdf')} disabled={!data?.totalItems || exporting !== null} aria-label="Export filtered tickets as PDF"><FileText size={17} />{exporting === 'pdf' ? 'Exporting…' : 'Export PDF'}</button>
           <button className="button button--secondary" type="button" onClick={() => exportTickets('excel')} disabled={!data?.totalItems || exporting !== null} aria-label="Export filtered tickets as Excel workbook"><FileSpreadsheet size={17} />{exporting === 'excel' ? 'Exporting…' : 'Export Excel'}</button>
         </div>}

@@ -14,6 +14,7 @@ namespace ResolveHub.Api.Controllers;
 [Authorize(Roles = RoleNames.Manager)]
 public sealed class ManagerTicketsController(
     IManagerTicketService service,
+    IAdminTicketReportService reportService,
     IAssignmentApprovalService assignmentApprovalService,
     ITicketCancellationRequestService cancellationRequestService,
     ITicketCommentService commentService) : ControllerBase
@@ -26,6 +27,24 @@ public sealed class ManagerTicketsController(
     public async Task<ActionResult<PagedResultDto<AdminTicketListItemDto>>> Tickets(
         [FromQuery] AdminTicketFilterDto filter, CancellationToken token) =>
         Ok(await service.GetTicketsAsync(filter, token));
+
+    [HttpGet("tickets/export/{format}")]
+    public async Task<IActionResult> ExportTickets(
+        string format, [FromQuery] AdminTicketFilterDto filter,
+        [FromQuery] string? timeZone, CancellationToken token)
+    {
+        if (format is not ("pdf" or "excel")) return NotFound();
+        var report = await service.GetTicketReportAsync(filter, token);
+        if (report.Tickets.Count == 0) return NoContent();
+        var generatedAt = DateTimeOffset.UtcNow;
+        var generatedBy = User.Identity?.Name ?? "Manager";
+        if (format == "pdf")
+            return File(reportService.CreatePdf(report, generatedBy, generatedAt, timeZone),
+                "application/pdf", reportService.CreateFileName(report, "pdf", generatedAt, timeZone));
+        return File(reportService.CreateExcel(report, generatedBy, generatedAt, timeZone),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            reportService.CreateFileName(report, "xlsx", generatedAt, timeZone));
+    }
 
     [HttpGet("tickets/{ticketReference}")]
     public async Task<ActionResult<AdminTicketDetailsDto>> Ticket(

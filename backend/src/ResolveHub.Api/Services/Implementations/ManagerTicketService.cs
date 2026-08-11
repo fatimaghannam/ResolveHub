@@ -20,6 +20,10 @@ public sealed class ManagerTicketService(
         AdminTicketFilterDto filter, CancellationToken token) =>
         adminTicketService.GetTicketsAsync(filter, token);
 
+    public Task<AdminTicketReportDto> GetTicketReportAsync(
+        AdminTicketFilterDto filter, CancellationToken token) =>
+        adminTicketService.GetTicketReportAsync(filter, token);
+
     public Task<AdminTicketDetailsDto?> GetTicketAsync(
         string ticketReference, CancellationToken token) =>
         adminTicketService.GetTicketAsync(ticketReference, token);

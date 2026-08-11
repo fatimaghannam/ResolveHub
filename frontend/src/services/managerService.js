@@ -6,6 +6,11 @@ export const getManagerDashboard = (signal) =>
 export const getManagerTickets = (filters, signal) =>
   apiRequest(`/api/manager/tickets${toQueryString(filters)}`, { signal })
 
+export const exportManagerTickets = (format, filters) =>
+  apiRequest(`/api/manager/tickets/export/${format}${toQueryString(filters)}`, {
+    responseType: 'file',
+  })
+
 export const getManagerTicket = (ticketReference, signal) =>
   apiRequest(`/api/manager/tickets/${encodeURIComponent(ticketReference)}`, { signal })
 
