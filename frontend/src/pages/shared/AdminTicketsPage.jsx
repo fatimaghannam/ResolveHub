@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react'
-import { FilePlus2 } from 'lucide-react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import Pagination from '../../components/common/Pagination.jsx'
 import { EmptyState, ErrorState, LoadingState } from '../../components/common/States.jsx'
@@ -141,7 +140,6 @@ function AdminTicketsPage({ roleArea = 'admin' }) {
       {toast && <div className="app-toast-region"><Toast key={toast.id} type={toast.type} title={toast.title} message={toast.message} onDismiss={dismissToast} /></div>}
       <section className="page-heading page-heading--action">
         <div><h2>All Tickets</h2><p>Review, filter, and manage tickets across the organization.</p></div>
-        {roleArea === 'admin' && <Link className="button button--primary" to="/admin/tickets/create"><FilePlus2 size={17} />Create Ticket</Link>}
       </section>
       <form className="filter-panel ticket-filters" onSubmit={applyFilters}>
         <div className="ticket-filters__grid admin-ticket-filters">
