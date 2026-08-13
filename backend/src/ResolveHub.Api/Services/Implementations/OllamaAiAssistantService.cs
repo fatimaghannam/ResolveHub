@@ -88,8 +88,13 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
     public async Task<TicketServiceResult<AiChatResponse>> ChatAsync(int userId, string role, AiChatRequest request, CancellationToken token)
     {
         var latestUserMessage = request.Messages.LastOrDefault(message => message.Role == "user")?.Content;
-        if (TryGetConversationShortcut(latestUserMessage, out var shortcutResponse))
+        if (TryGetConversationShortcut(latestUserMessage, out var shortcutResponse) ||
+            TryGetCanonicalRoleResponse(latestUserMessage, out shortcutResponse) ||
+            TryGetCanonicalResolveHubOverview(latestUserMessage, out shortcutResponse))
             return new(TicketOperationStatus.Success, new(shortcutResponse));
+        var categoryShortcut = await GetCategoryShortcutAsync(latestUserMessage, role, token);
+        if (categoryShortcut is not null)
+            return new(TicketOperationStatus.Success, new(categoryShortcut));
 
         string? context = null;
         if (request.TicketId.HasValue)
@@ -100,12 +105,12 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
         var recentUserMessages = request.Messages.Where(x => x.Role == "user").TakeLast(4).ToArray();
         var history = string.Join("\n", recentUserMessages
             .Select(x => $"<untrusted-user-message>{x.Content}</untrusted-user-message>"));
-        var topicText = IsReferentialFollowUp(latestUserMessage)
-            ? string.Join("\n", recentUserMessages.Select(message => message.Content))
+        var topicText = IsReferentialFollowUp(latestUserMessage) && recentUserMessages.Length > 1
+            ? $"Previous user message: {recentUserMessages[^2].Content}\nCURRENT user message: {latestUserMessage}"
             : latestUserMessage;
         var trustedContext = await applicationContextBuilder.BuildAsync(role, request.PageContext, topicText, token);
         var answer = await AskTextAsync(AiChatSystemPrompt.Build(topicText),
-            $"{trustedContext}\nAuthorized ticket context, if provided by the backend: {context ?? "None"}\nRecent untrusted user messages:\n{history}",
+            $"{trustedContext}\nAuthorized ticket context, if provided by the backend: {context ?? "None"}\nRecent untrusted user messages for reference only:\n{history}\nCURRENT USER MESSAGE (answer this): <current-user-message>{latestUserMessage}</current-user-message>",
             "Chat", 0.2, 120, token);
         return new(TicketOperationStatus.Success, new(NormalizePlainText(answer)));
     }
@@ -170,18 +175,127 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
             "good morning" => "Good morning! How can I help you today?",
             "good afternoon" => "Good afternoon! How can I help you today?",
             "good evening" => "Good evening! How can I help you today?",
-            "thank you" or "thank you!" or "thanks" or "thanks!" or "okay thanks" or
+            "great" or "great!" => "Great!",
+            "nice" or "nice!" => "Nice!",
+            "perfect" or "perfect!" => "Perfect!",
+            "okay" or "okay!" or "ok" or "ok!" => "Okay!",
+            "got it" or "got it!" => "Great!",
+            "understood" or "understood!" => "Understood!",
+            "cool" or "cool!" => "Cool!",
+            "sounds good" or "sounds good!" => "Sounds good!",
+            "awesome" or "awesome!" => "Awesome!",
+            "thank you" or "thank you!" or "thank you so much" or "thank you so much!" or
+                "thanks" or "thanks!" or "okay thanks" or
                 "okay, thanks" or "got it, thank you" or "got it thank you" => "You're welcome!",
             _ => string.Empty
         };
         return response.Length > 0;
     }
 
+    private static bool TryGetCanonicalRoleResponse(string? message, out string response)
+    {
+        var value = message?.Trim().TrimEnd('?', '!', '.').Trim().ToLowerInvariant() ?? string.Empty;
+        var asksForRoleList = value.Contains("roles are there", StringComparison.Ordinal) ||
+            value.Contains("system roles", StringComparison.Ordinal) ||
+            value.Contains("users of this system", StringComparison.Ordinal) ||
+            value.Contains("users of the system", StringComparison.Ordinal) ||
+            value.Contains("types of users", StringComparison.Ordinal) ||
+            value is "who uses resolvehub" or "who are the users" or "who are resolvehub users" ||
+            (value.Contains("resolvehub roles", StringComparison.Ordinal) &&
+                (value.StartsWith("what", StringComparison.Ordinal) || value.StartsWith("which", StringComparison.Ordinal) ||
+                 value.StartsWith("tell", StringComparison.Ordinal) || value.StartsWith("list", StringComparison.Ordinal)));
+
+        response = asksForRoleList
+            ? "ResolveHub has four user roles: Employee, IT Agent, Manager, and Admin. Employees create and track tickets, IT Agents handle IT issues, Managers oversee workflows and approvals, and Admins manage users and broader system operations."
+            : (value.Contains("end user", StringComparison.Ordinal) || value.Contains("end-user", StringComparison.Ordinal)) && value.Contains("role", StringComparison.Ordinal)
+                ? "No. ResolveHub uses the Employee role rather than a role named End User."
+                : value.Contains("system administrator", StringComparison.Ordinal) && value.Contains("role", StringComparison.Ordinal)
+                    ? "No. The ResolveHub role is Admin, not System Administrator."
+                    : value is "tell me about managers" or "tell me about manager"
+                        ? "Managers oversee ticket workflows, handle applicable approvals and rejections, and have reporting capabilities according to ResolveHub permissions."
+                        : string.Empty;
+        return response.Length > 0;
+    }
+
+    private static bool TryGetCanonicalResolveHubOverview(string? message, out string response)
+    {
+        var value = message?.Trim().TrimEnd('?', '!', '.').Trim().ToLowerInvariant() ?? string.Empty;
+        var asksAboutAutomaticResolution = value.Contains("resolvehub", StringComparison.Ordinal) &&
+            value.Contains("automatic", StringComparison.Ordinal) &&
+            (value.Contains("solve", StringComparison.Ordinal) || value.Contains("repair", StringComparison.Ordinal));
+        var asksAboutPurpose = value is "what problems does resolvehub solve" or
+            "what is resolvehub used for" or "what does resolvehub help with" or
+            "why do we use resolvehub" or "what is the purpose of resolvehub" or
+            "why would a company use resolvehub" or "what is resolvehub";
+
+        response = asksAboutAutomaticResolution
+            ? "No. ResolveHub does not automatically repair IT problems; it helps Employees, IT Agents, Managers, and Admins report, assign, manage, track, communicate about, and resolve IT issues through the appropriate workflows."
+            : asksAboutPurpose
+                ? "ResolveHub helps organizations manage IT support efficiently by centralizing ticket creation, assignment, tracking, communication, and resolution. It also supports priorities, approvals, notifications, duplicate and cancellation workflows, and reporting for Managers and Admins."
+                : string.Empty;
+        return response.Length > 0;
+    }
+
+    private async Task<string?> GetCategoryShortcutAsync(string? message, string role, CancellationToken token)
+    {
+        var value = message?.Trim().TrimEnd('?', '!', '.').Trim().ToLowerInvariant() ?? string.Empty;
+        var asksForCategoryList = value.Contains("ticket types", StringComparison.Ordinal) ||
+            value.Contains("types of tickets", StringComparison.Ordinal) ||
+            value.Contains("ticket categories", StringComparison.Ordinal) ||
+            value.Contains("categories are available", StringComparison.Ordinal) ||
+            value.Contains("categories can i choose", StringComparison.Ordinal) ||
+            value.Contains("categories are there", StringComparison.Ordinal) ||
+            value.Contains("kind of ticket", StringComparison.Ordinal);
+        var asksForRecommendation = value.Contains("category should i", StringComparison.Ordinal) ||
+            value.Contains("which category", StringComparison.Ordinal) ||
+            value.Contains("ticket type should i", StringComparison.Ordinal) ||
+            value.Contains("which ticket type", StringComparison.Ordinal);
+        var isShortIssueDescription = value.Length <= 160 && !value.Contains("how do i fix", StringComparison.Ordinal) &&
+            !value.Contains("troubleshoot", StringComparison.Ordinal) &&
+            (ContainsAny(value, "wi-fi", "wifi", "suspicious email", "phishing email", "permission to access", "access to a shared folder") || asksForRecommendation);
+        if (!asksForCategoryList && !asksForRecommendation && !isShortIssueDescription) return null;
+
+        var categories = await db.TicketCategories.AsNoTracking().Where(x => x.IsActive)
+            .OrderBy(x => x.SortOrder).Select(x => x.Name).ToListAsync(token);
+        if (categories.Count == 0) return "No active ResolveHub ticket categories are currently available.";
+        if (asksForCategoryList)
+        {
+            var prefix = role == RoleNames.Employee ? "As an Employee, you can create tickets in these categories: " : "The active ResolveHub ticket categories are: ";
+            return $"{prefix}{JoinNaturalList(categories)}.";
+        }
+
+        var category = CategoryForIssue(value);
+        var actualCategory = categories.FirstOrDefault(x => string.Equals(x, category, StringComparison.OrdinalIgnoreCase));
+        return actualCategory is null ? null : $"Choose {actualCategory}.";
+    }
+
+    private static string? CategoryForIssue(string value)
+    {
+        if (ContainsAny(value, "phishing", "suspicious", "malware", "asking for my password", "unauthorized")) return "Security";
+        if (ContainsAny(value, "permission to access", "need access", "access to", "shared folder")) return "Access Request";
+        if (ContainsAny(value, "wi-fi", "wifi", "internet", "vpn", "network", "dns")) return "Network";
+        if (ContainsAny(value, "email", "mailbox", "receive company emails", "send email")) return "Email";
+        if (ContainsAny(value, "laptop", "screen", "monitor", "keyboard", "mouse", "printer", "hardware")) return "Hardware";
+        if (ContainsAny(value, "software", "microsoft word", "word keeps", "application", "app", "operating system")) return "Software";
+        return "Other";
+    }
+
+    private static bool ContainsAny(string value, params string[] terms) =>
+        terms.Any(term => value.Contains(term, StringComparison.OrdinalIgnoreCase));
+
+    private static string JoinNaturalList(IReadOnlyList<string> values) => values.Count switch
+    {
+        1 => values[0],
+        2 => $"{values[0]} and {values[1]}",
+        _ => $"{string.Join(", ", values.Take(values.Count - 1))}, and {values[^1]}"
+    };
+
     private static bool IsReferentialFollowUp(string? message)
     {
         if (string.IsNullOrWhiteSpace(message)) return false;
-        var value = $" {message.Trim().ToLowerInvariant()} ";
-        return value.Contains(" it ", StringComparison.Ordinal) ||
+        var trimmed = message.Trim();
+        var value = $" {trimmed.ToLowerInvariant()} ";
+        return System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"\b(?:it|It)\b") ||
             value.Contains(" that ", StringComparison.Ordinal) ||
             value.Contains(" this ", StringComparison.Ordinal) ||
             value.StartsWith(" what about ", StringComparison.Ordinal) ||
