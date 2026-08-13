@@ -18,7 +18,6 @@ async function sendAuthRequest(path, body) {
   try {
     responseBody = await response.json()
   } catch {
-    // A safe fallback is used below when an error response has no JSON body.
   }
 
   if (!response.ok) {

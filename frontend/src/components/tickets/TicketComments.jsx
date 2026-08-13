@@ -306,7 +306,6 @@ function CommentComposer({ canViewPrivate, onSubmit }) {
       setFiles([])
       if (textareaRef.current) textareaRef.current.style.height = 'auto'
     } catch {
-      // Preserve the draft so the user can retry.
     } finally { setSubmitting(false) }
   }
 

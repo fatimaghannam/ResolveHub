@@ -3,7 +3,6 @@ using ResolveHub.Api.Entities;
 
 namespace ResolveHub.Api.Data.Seed;
 
-// Development-only seed entry point for demonstration accounts and tickets.
 public static class DemoDataSeeder
 {
     public static Task SeedAsync(

@@ -153,8 +153,6 @@ public sealed class TicketService(ApplicationDbContext dbContext)
                 var now = DateTime.UtcNow;
                 var ticket = new Ticket
                 {
-                    // The temporary value is never committed or returned. The identity
-                    // value below is the concurrency-safe public numeric sequence.
                     TicketReferenceNumber = $"PENDING-{Guid.NewGuid():N}"[..32],
                     CreatedByUserAccountID = userId,
                     TicketCategoryID = request.TicketCategoryId,

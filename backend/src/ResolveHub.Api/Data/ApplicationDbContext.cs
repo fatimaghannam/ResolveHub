@@ -17,9 +17,6 @@ public sealed class ApplicationDbContext
         IdentityRoleClaim<int>,
         IdentityUserToken<int>>
 {
-    // SQL Server datetime2 preserves UTC clock ticks but not DateTime.Kind. Marking
-    // values as UTC when materializing makes System.Text.Json emit an unambiguous Z
-    // without altering historical values already stored as UTC.
     private static readonly ValueConverter<DateTime, DateTime> UtcDateTimeConverter =
         new(value => value, value => DateTime.SpecifyKind(value, DateTimeKind.Utc));
 
@@ -668,7 +665,6 @@ public sealed class ApplicationDbContext
         {
             entity.ToTable("UserAccountRole");
 
-            // ASP.NET Core Identity requires this composite primary key.
             entity.HasKey(userRole => new
             {
                 userRole.UserId,

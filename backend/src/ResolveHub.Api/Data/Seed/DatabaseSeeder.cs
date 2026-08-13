@@ -98,7 +98,6 @@ public static class DatabaseSeeder
         var userManager =
             serviceProvider.GetRequiredService<UserManager<UserAccount>>();
 
-        // Apply pending migrations during local development.
         await dbContext.Database.MigrateAsync();
 
         await ProductionSeeder.SeedAsync(dbContext, roleManager);

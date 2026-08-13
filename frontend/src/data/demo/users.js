@@ -1,4 +1,3 @@
-// Shared demo company directory used for presentations and UI development.
 export const usersMockData = [
   { id: 1, firstName: 'Ryan', lastName: 'Whitmore', email: 'ryan.whitmore@resolvehub.test', role: 'Administrator', department: 'Information Technology', status: 'Active', createdDate: '2026-02-20T09:00:00Z' },
   { id: 2, firstName: 'Natalie', lastName: 'Hayes', email: 'natalie.hayes@resolvehub.test', role: 'IT Support Agent', department: 'Information Technology', status: 'Active', createdDate: '2026-03-02T09:00:00Z' },

@@ -21,7 +21,7 @@ function NotificationBell({ roleArea }) {
   const [items, setItems] = useState([])
 
   async function load() {
-    try { setItems(await getNotifications(100)) } catch { /* Full page displays request errors. */ }
+    try { setItems(await getNotifications(100)) } catch { }
   }
 
   useEffect(() => {

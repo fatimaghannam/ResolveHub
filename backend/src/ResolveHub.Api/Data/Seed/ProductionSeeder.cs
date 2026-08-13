@@ -3,7 +3,6 @@ using ResolveHub.Api.Entities;
 
 namespace ResolveHub.Api.Data.Seed;
 
-// Production-safe seed entry point: system roles and ticket lookups only.
 public static class ProductionSeeder
 {
     public static Task SeedAsync(

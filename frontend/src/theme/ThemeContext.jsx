@@ -43,7 +43,6 @@ function applyTheme(theme) {
 try {
   localStorage.removeItem(LEGACY_THEME_STORAGE_KEY)
 } catch {
-  // Theme selection still works when storage is unavailable.
 }
 
 applyTheme(readInitialTheme())
@@ -58,7 +57,6 @@ export function ThemeProvider({ children }) {
     try {
       if (storageKey) localStorage.setItem(storageKey, normalizedTheme)
     } catch {
-      // The selected theme still applies when storage is unavailable.
     }
     setThemeState(normalizedTheme)
   }, [])

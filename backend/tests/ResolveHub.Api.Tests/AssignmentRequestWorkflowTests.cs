@@ -254,7 +254,6 @@ public sealed class AssignmentRequestWorkflowTests
             new { agentUserId = requestingAgent.Id });
         Assert.Equal(HttpStatusCode.Conflict, assignedElsewhere.StatusCode);
 
-        // Use the other Agent because the requesting Agent is at capacity.
         assignedElsewhere = await adminClient.PostAsJsonAsync(
             $"/api/admin/tickets/{staleTarget.TicketReferenceNumber}/assign",
             new { agentUserId = otherAgent.Id });
