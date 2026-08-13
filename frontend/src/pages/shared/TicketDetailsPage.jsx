@@ -7,6 +7,7 @@ import { TicketPriorityBadge, TicketStatusBadge } from '../../components/tickets
 import TicketAttachments from '../../components/tickets/TicketAttachments.jsx'
 import TicketComments from '../../components/tickets/TicketComments.jsx'
 import TicketHistorySection from '../../components/tickets/TicketHistorySection.jsx'
+import AiTicketTools from '../../components/ai/AiTicketTools.jsx'
 import {
   cancelTicket,
   downloadAttachment,
@@ -139,6 +140,7 @@ function TicketDetailsPage() {
       <section className="page-heading page-heading--action"><div><span className="eyebrow">{formatTicketReference(ticket)}</span><h2>{ticket.title}</h2><p>Created <time dateTime={ticket.createdDate} title="Displayed in your local time">{formatLocalDateTime(ticket.createdDate)}</time></p></div><div className="heading-actions">{ticket.canEdit && <Link className="button button--secondary" to={`/employee/tickets/${id}/edit`}>Edit</Link>}{ticket.canDelete && <button className="button button--danger-outline" onClick={() => setDialogOpen(true)}>Cancel Ticket</button>}</div></section>
       {!ticket.canEdit && <div className="inline-alert">This ticket can no longer be edited because work has already started.</div>}
       {ticket.statusName === 'Duplicate' && ticket.originalTicketReference && <section className="duplicate-info-panel" aria-labelledby="duplicate-info-title"><h2 id="duplicate-info-title">Duplicate Ticket</h2><p>This ticket was marked as a duplicate of:</p><Link className="duplicate-info-panel__link" to={`/employee/tickets/${ticket.originalTicketId}`}><strong>{ticket.originalTicketReference}</strong><span>{ticket.originalTicketTitle || 'View original ticket'}</span></Link></section>}
+      <AiTicketTools ticketId={ticket.id} />
       <div className="details-grid">
         <section className="panel details-main"><h2>Issue Description</h2><p className="ticket-description">{ticket.description}</p>
           {ticket.resolutionSummary && <div className="resolution-summary"><strong>Resolution summary</strong><p>{ticket.resolutionSummary}</p></div>}

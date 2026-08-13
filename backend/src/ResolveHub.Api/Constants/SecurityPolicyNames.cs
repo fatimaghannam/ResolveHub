@@ -8,4 +8,5 @@ public static class SecurityPolicyNames //This class stores the names of securit
         "ForgotPasswordRateLimit"; //limits repeated forgot-password requests
     public const string ResetPasswordRateLimit =
         "ResetPasswordRateLimit"; //limits repeated password-reset requests 
+    public const string AiRateLimit = "AiRateLimit";
 }

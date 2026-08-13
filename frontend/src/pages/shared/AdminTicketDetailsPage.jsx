@@ -8,6 +8,7 @@ import TicketComments from '../../components/tickets/TicketComments.jsx'
 import TicketAttachments from '../../components/tickets/TicketAttachments.jsx'
 import TicketActivityLog from '../../components/tickets/TicketActivityLog.jsx'
 import TicketHistorySection from '../../components/tickets/TicketHistorySection.jsx'
+import AiTicketTools from '../../components/ai/AiTicketTools.jsx'
 import {
   getAdminTicket,
   markAdminTicketDuplicate,
@@ -305,6 +306,7 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
       </section>
       {ticket.pendingDuplicateReview && !(roleArea === 'admin' && ticket.pendingDuplicateReview.reportedByAdministrator) && <div className="inline-alert"><span className="badge badge--pending-approval">Duplicate Review Pending</span></div>}
       {ticket.statusName === 'Duplicate' && ticket.originalTicketReference && <section className="duplicate-info-panel" aria-labelledby="duplicate-info-title"><h2 id="duplicate-info-title">Duplicate Ticket</h2><p>This ticket was marked as a duplicate of:</p><Link className="duplicate-info-panel__link" to={`/${roleArea}/tickets/${ticket.originalTicketReference}`}><strong>{ticket.originalTicketReference}</strong><span>{ticket.originalTicketTitle || 'View original ticket'}</span></Link>{(ticket.duplicateApprovedDate || ticket.duplicateApprovedByName) && <p className="duplicate-info-panel__meta">Approved{ticket.duplicateApprovedDate ? ` ${formatLocalDateTime(ticket.duplicateApprovedDate)}` : ''}{ticket.duplicateApprovedByName ? ` by ${ticket.duplicateApprovedByName}` : ''}</p>}</section>}
+      <AiTicketTools ticketId={ticket.id} allowTroubleshooting />
       <div className="details-grid">
         <section className="panel">
           <h2>Ticket Summary</h2>

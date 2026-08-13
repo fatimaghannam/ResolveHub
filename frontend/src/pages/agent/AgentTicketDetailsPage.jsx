@@ -12,6 +12,7 @@ import TicketComments from '../../components/tickets/TicketComments.jsx'
 import TicketAttachments from '../../components/tickets/TicketAttachments.jsx'
 import TicketActivityLog from '../../components/tickets/TicketActivityLog.jsx'
 import TicketHistorySection from '../../components/tickets/TicketHistorySection.jsx'
+import AiTicketTools from '../../components/ai/AiTicketTools.jsx'
 import {
   closeAgentTicket,
   downloadAgentTicketAttachment,
@@ -290,6 +291,7 @@ function AgentTicketDetailsPage() {
       {ticket.pendingCancellationRequest && <div className="inline-alert cancellation-request-banner" role="status"><strong>Cancellation Requested — Pending Manager Review</strong><span>Submitted {formatLocalDateTime(ticket.pendingCancellationRequest.requestedDate)}. The ticket remains {ticket.statusName} while the request is reviewed.</span></div>}
       {ticket.statusName === 'Pending' && ticket.currentPending && <section className="pending-info-panel" aria-labelledby="pending-info-title"><div><span className="pending-info-panel__indicator" aria-hidden="true" /><div><h2 id="pending-info-title">Work Pending</h2><p>{ticket.currentPending.reasonText}</p></div></div><dl><div><dt>Pending since</dt><dd>{formatLocalDateTime(ticket.currentPending.pendingSince)}</dd></div><div><dt>Set by</dt><dd>{ticket.currentPending.setByName}</dd></div>{ticket.currentPending.additionalNote && <div><dt>Additional note</dt><dd>{ticket.currentPending.additionalNote}</dd></div>}</dl></section>}
       {ticket.statusName === 'Duplicate' && ticket.originalTicketReference && <section className="duplicate-info-panel" aria-labelledby="duplicate-info-title"><h2 id="duplicate-info-title">Duplicate Ticket</h2><p>This ticket was marked as a duplicate of:</p><Link className="duplicate-info-panel__link" to={`/agent/tickets/${ticket.originalTicketReference}`}><strong>{ticket.originalTicketReference}</strong><span>{ticket.originalTicketTitle || 'View original ticket'}</span></Link></section>}
+      <AiTicketTools ticketId={ticket.id} allowTroubleshooting />
       <div className="details-grid">
         <section className="panel">
           <h2>Original Ticket Information</h2>

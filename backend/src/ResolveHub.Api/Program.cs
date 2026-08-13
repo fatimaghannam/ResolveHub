@@ -315,6 +315,10 @@ builder.Services.AddRateLimiter(options => //configures limits on how many reque
                     AutoReplenishment = true
                 });
         });
+    options.AddPolicy(SecurityPolicyNames.AiRateLimit, httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value ?? "anonymous",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0, AutoReplenishment = true }));
 });
 //Connects each interface to the service that implements it 
 builder.Services.AddSingleton<ITokenService, TokenService>();
@@ -341,6 +345,15 @@ builder.Services.AddScoped<IAssignmentApprovalService, AssignmentApprovalService
 builder.Services.AddScoped<ITicketCancellationRequestService, TicketCancellationRequestService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IProfilePhotoService, ProfilePhotoService>();
+builder.Services.AddScoped<IAiApplicationContextBuilder, AiApplicationContextBuilder>();
+builder.Services.AddOptions<OllamaSettings>().Bind(builder.Configuration.GetSection(OllamaSettings.SectionName))
+    .Validate(x => Uri.TryCreate(x.BaseUrl, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" && !string.IsNullOrWhiteSpace(x.Model) && x.TimeoutSeconds is >= 10 and <= 600, "Ollama settings are invalid.").ValidateOnStart();
+builder.Services.AddHttpClient<IAiAssistantService, OllamaAiAssistantService>((services, client) =>
+{
+    var settings = services.GetRequiredService<IOptions<OllamaSettings>>().Value;
+    client.BaseAddress = new Uri(settings.BaseUrl.TrimEnd('/') + "/");
+    client.Timeout = TimeSpan.FromSeconds(settings.TimeoutSeconds);
+});
 builder.Services.AddAuthorization();
 
 var app = builder.Build();

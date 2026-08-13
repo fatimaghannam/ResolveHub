@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Paperclip, Save, Send, Upload } from 'lucide-react'
+import { Bot, Paperclip, Save, Send, Upload } from 'lucide-react'
+import { analyzeTicket } from '../../services/aiService.js'
+import AiSuggestionCard from '../ai/AiSuggestionCard.jsx'
 import { getCategories, getPriorities } from '../../services/ticketService.js'
 import { ErrorState, LoadingState } from '../common/States.jsx'
 import Toast from '../common/Toast.jsx'
@@ -39,6 +41,9 @@ function TicketForm({
   const [saving, setSaving] = useState(false)
   const [savingDraft, setSavingDraft] = useState(false)
   const [toast, setToast] = useState(null)
+  const [aiSuggestion, setAiSuggestion] = useState(null)
+  const [aiBusy, setAiBusy] = useState(false)
+  const [aiError, setAiError] = useState('')
   const dismissToast = useCallback(() => setToast(null), [])
   const fileInput = useRef(null)
 
@@ -101,6 +106,14 @@ function TicketForm({
     })
     setFiles((current) => [...current, ...accepted])
     setFileErrors(nextErrors)
+  }
+
+  async function analyze() {
+    if (values.title.trim().length < 5 || values.description.trim().length < 10 || aiBusy) {
+      setAiError('Enter a title and at least 10 description characters first.'); return
+    }
+    try { setAiBusy(true); setAiError(''); setAiSuggestion(await analyzeTicket(values.title.trim(), values.description.trim())) }
+    catch (error) { setAiError(error.message) } finally { setAiBusy(false) }
   }
 
   async function submit(event) {
@@ -190,6 +203,14 @@ function TicketForm({
           <em>{errors.ticketPriorityId}</em>
         </label>
       </div>
+      <div className="ai-analysis-action">
+        <button type="button" className="button button--secondary" disabled={aiBusy} onClick={analyze}><Bot size={17} />{aiBusy ? 'Analyzing ticket…' : aiSuggestion ? 'Re-analyze' : 'Analyze with AI'}</button>
+        {aiError && <span className="ai-error" role="alert">{aiError}</span>}
+      </div>
+      {aiSuggestion && <AiSuggestionCard suggestion={aiSuggestion} onApply={() => {
+        setValues({ ...values, ticketCategoryId: String(aiSuggestion.suggestedCategoryId), ticketPriorityId: String(aiSuggestion.suggestedPriorityId) })
+        setErrors({ ...errors, ticketCategoryId: '', ticketPriorityId: '' })
+      }} />}
 
       <section className="attachment-field" aria-labelledby="attachment-title">
         <div><strong id="attachment-title">Attachments <small>(optional)</small></strong><p>PNG, JPG, PDF, DOCX, TXT, LOG or ZIP. Maximum 10 MB each — up to 5 files.</p></div>

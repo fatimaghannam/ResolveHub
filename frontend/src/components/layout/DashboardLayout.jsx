@@ -21,6 +21,7 @@ import {
   BarChart3,
   X,
 } from 'lucide-react'
+import AiAssistant from '../ai/AiAssistant.jsx'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   clearStoredAuth,
@@ -390,7 +391,8 @@ function DashboardLayout() {
         <div className="dashboard-scroll">
           <main className="dashboard-content">
             <Outlet context={{ user, role: roleLabel, updateUser }} />
-          </main>
+      </main>
+      <AiAssistant />
         </div>
       </div>
     </div>
