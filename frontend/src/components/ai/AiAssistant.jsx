@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Bot, Send, X } from 'lucide-react'
+import { Bot, RotateCcw, Send, X } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
 import { sendAiChat } from '../../services/aiService.js'
 
@@ -12,6 +12,7 @@ function AiAssistant() {
   const [error, setError] = useState('')
   const inputRef = useRef(null)
   const messagesRef = useRef(null)
+  const conversationVersionRef = useRef(0)
 
   useEffect(() => {
     if (open) inputRef.current?.focus({ preventScroll: true })
@@ -26,17 +27,32 @@ function AiAssistant() {
     event.preventDefault()
     const content = input.trim()
     if (!content || busy) return
+    const conversationVersion = conversationVersionRef.current
     const next = [...messages, { role: 'user', content }].slice(-10)
     setMessages(next); setInput(''); setError(''); setBusy(true)
     try {
       const result = await sendAiChat(next, null, getPageContext(pathname))
+      if (conversationVersion !== conversationVersionRef.current) return
       setMessages([...next, { role: 'assistant', content: result.message }].slice(-10))
-    } catch (err) { setError(err.message) } finally { setBusy(false) }
+    } catch (err) {
+      if (conversationVersion === conversationVersionRef.current) setError(err.message)
+    } finally {
+      if (conversationVersion === conversationVersionRef.current) setBusy(false)
+    }
+  }
+
+  function startNewChat() {
+    conversationVersionRef.current += 1
+    setMessages([])
+    setInput('')
+    setError('')
+    setBusy(false)
+    requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }))
   }
   return <>
     <button type="button" className="ai-launcher" onClick={() => setOpen(true)} aria-label="Open ResolveHub AI Assistant"><Bot size={21} /></button>
     {open && <aside className="ai-assistant" aria-label="ResolveHub AI Assistant">
-      <header><div><strong>ResolveHub AI Assistant</strong><small>Read-only help and guidance</small></div><button type="button" onClick={() => setOpen(false)} aria-label="Close assistant"><X size={19} /></button></header>
+      <header><div className="ai-assistant__brand"><img src="/favicon.png" alt="ResolveHub" draggable="false" /><div><strong>ResolveHub AI Assistant</strong><small>Read-only help and guidance</small></div></div><div className="ai-assistant__header-actions"><button type="button" className="ai-assistant__header-button ai-assistant__new-chat" onClick={startNewChat} aria-label="Start new chat" title="Start new chat"><RotateCcw size={19} /></button><button type="button" className="ai-assistant__header-button" onClick={() => setOpen(false)} aria-label="Close assistant"><X size={19} /></button></div></header>
       <div className="ai-assistant__messages" ref={messagesRef}>
         {messages.length === 0 && <p className="ai-assistant__welcome">Ask about ticket statuses, writing a clear request, or safe basic troubleshooting.</p>}
         {messages.map((message, index) => <div key={index} className={`ai-message ai-message--${message.role}`}>{message.content}</div>)}
