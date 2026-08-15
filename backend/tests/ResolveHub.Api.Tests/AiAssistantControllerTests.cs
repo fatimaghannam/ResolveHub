@@ -300,7 +300,7 @@ public sealed class AiAssistantControllerTests
         await using var db = Context();
         var handler = new CapturingHandler("{\"message\":{\"content\":\"Yes.\"}}");
 
-        await Service(db, handler).ChatAsync(1, RoleNames.Manager,
+        var result = await Service(db, handler).ChatAsync(1, RoleNames.Manager,
             new AiChatRequest { Messages = [
                 new AiChatMessage { Role = "user", Content = "How can I assign a ticket?" },
                 new AiChatMessage { Role = "assistant", Content = "Assignment instructions" },
@@ -317,16 +317,15 @@ public sealed class AiAssistantControllerTests
         await using var db = Context();
         var handler = new CapturingHandler("{\"message\":{\"content\":\"Pending is paused.\"}}");
 
-        await Service(db, handler).ChatAsync(1, RoleNames.Manager,
+        var result = await Service(db, handler).ChatAsync(1, RoleNames.Manager,
             new AiChatRequest { Messages = [
                 new AiChatMessage { Role = "user", Content = "How can I assign a ticket?" },
                 new AiChatMessage { Role = "assistant", Content = "Assignment instructions" },
                 new AiChatMessage { Role = "user", Content = "What does Pending mean?" }
             ] }, default);
 
-        Assert.Contains("Pending is paused", handler.Body);
-        Assert.DoesNotContain("For assignment questions", handler.Body);
-        Assert.DoesNotContain("Ticket creation is allowed only", handler.Body);
+        Assert.StartsWith("Pending means work is temporarily paused", result.Value!.Message);
+        Assert.Equal(0, handler.RequestCount);
     }
 
     [Fact]
@@ -402,16 +401,16 @@ public sealed class AiAssistantControllerTests
         Assert.DoesNotContain("Team Workload is the exact", handler.Body);
     }
 
-    /* Obsolete deterministic product-answer tests. Product questions now use the authoritative prompt pipeline.
     [Theory]
-    [InlineData("What are the users of this system?")]
-    [InlineData("What are the users of the system?")]
-    [InlineData("What roles are there?")]
+    [InlineData("Who are the users of ResolveHub?")]
+    [InlineData("Who are the users?")]
+    [InlineData("Who can use ResolveHub?")]
     [InlineData("Who uses ResolveHub?")]
     [InlineData("What types of users are there?")]
-    [InlineData("What are the system roles?")]
-    [InlineData("Who are the users?")]
-    [InlineData("Tell me the ResolveHub roles.")]
+    [InlineData("What user roles does ResolveHub have?")]
+    [InlineData("Who has access to ResolveHub?")]
+    [InlineData("What are the roles in ResolveHub?")]
+    [InlineData("What roles are there?")]
     public async Task Chat_RoleListQuestions_ReturnCanonicalRolesWithoutOllama(string question)
     {
         await using var db = Context();
@@ -420,31 +419,59 @@ public sealed class AiAssistantControllerTests
         var result = await Service(db, handler).ChatAsync(1, RoleNames.Employee,
             new AiChatRequest { Messages = [new AiChatMessage { Role = "user", Content = question }] }, default);
 
-        Assert.Contains("Employee, IT Agent, Manager, and Admin", result.Value!.Message);
-        Assert.DoesNotContain("End User", result.Value.Message);
-        Assert.DoesNotContain("IT Support Agent", result.Value.Message);
-        Assert.DoesNotContain("System Administrator", result.Value.Message);
-        Assert.DoesNotContain("Supervisor", result.Value.Message);
+        Assert.Equal("ResolveHub has four user roles: Employee, IT Support Agent, Manager, and Admin. Each role has different permissions and responsibilities.", result.Value!.Message);
         Assert.Equal(0, handler.RequestCount);
     }
 
+    [Fact]
+    public async Task Chat_RoleDetailsFollowUp_ReturnsAllRolesWithoutOllama()
+    {
+        await using var db = Context();
+        var handler = new CapturingHandler("{\"message\":{\"content\":\"Concise role details.\"}}");
+
+        var result = await Service(db, handler).ChatAsync(1, RoleNames.Employee,
+            new AiChatRequest { Messages =
+            [
+                new AiChatMessage { Role = "user", Content = "Who uses ResolveHub?" },
+                new AiChatMessage { Role = "assistant", Content = "ResolveHub has four user roles: Employee, IT Support Agent, Manager, and Admin. Each role has different permissions and responsibilities." },
+                new AiChatMessage { Role = "user", Content = "What does each role do?" }
+            ] }, default);
+
+        Assert.Equal(0, handler.RequestCount);
+        Assert.Contains("- Employee:", result.Value!.Message);
+        Assert.Contains("- IT Support Agent:", result.Value.Message);
+        Assert.Contains("- Manager:", result.Value.Message);
+        Assert.Contains("- Admin:", result.Value.Message);
+    }
+
     [Theory]
-    [InlineData("Is End User a ResolveHub role?", "No. ResolveHub uses the Employee role rather than a role named End User.")]
-    [InlineData("Is System Administrator a role?", "No. The ResolveHub role is Admin, not System Administrator.")]
-    [InlineData("Tell me about managers.", "Managers oversee ticket workflows, handle applicable approvals and rejections, and have reporting capabilities according to ResolveHub permissions.")]
-    public async Task Chat_CanonicalRoleClarifications_ReturnWithoutOllama(string question, string expected)
+    [InlineData(RoleNames.ITSupportAgent, "What does each role do?")]
+    [InlineData(RoleNames.Manager, "Explain all roles.")]
+    [InlineData(RoleNames.Employee, "What are the responsibilities of every role?")]
+    [InlineData(RoleNames.Admin, "What can each user role do?")]
+    [InlineData(RoleNames.ITSupportAgent, "What are the differences between the roles?")]
+    [InlineData(RoleNames.Manager, "What does Employee, IT Support Agent, Manager, and Admin do?")]
+    public async Task Chat_AllRolesQuestion_ReturnsFourCompleteRoleSummaries(
+        string authenticatedRole, string question)
     {
         await using var db = Context();
         var handler = new CapturingHandler("unused");
 
-        var result = await Service(db, handler).ChatAsync(1, RoleNames.Employee,
+        var result = await Service(db, handler).ChatAsync(1, authenticatedRole,
             new AiChatRequest { Messages = [new AiChatMessage { Role = "user", Content = question }] }, default);
 
-        Assert.Equal(expected, result.Value!.Message);
+        var answer = result.Value!.Message;
+        var bullets = answer.Split('\n').Where(line => line.StartsWith("- ", StringComparison.Ordinal)).ToArray();
+        Assert.Equal(4, bullets.Length);
+        Assert.StartsWith("ResolveHub has four roles:", answer);
+        Assert.StartsWith("- Employee:", bullets[0]);
+        Assert.StartsWith("- IT Support Agent:", bullets[1]);
+        Assert.StartsWith("- Manager:", bullets[2]);
+        Assert.StartsWith("- Admin:", bullets[3]);
+        Assert.False(answer.StartsWith("As an IT Support Agent", StringComparison.OrdinalIgnoreCase));
+        Assert.False(answer.TrimEnd().EndsWith("-", StringComparison.Ordinal));
         Assert.Equal(0, handler.RequestCount);
     }
-
-    */
 
     [Fact]
     public async Task Chat_RolePromptPipeline_SendsSystemThenTrustedContextThenCurrentUser()
@@ -456,15 +483,14 @@ public sealed class AiAssistantControllerTests
             new AiApplicationContextBuilder(db), new TestHostEnvironment());
 
         await service.ChatAsync(1, RoleNames.Employee,
-            new AiChatRequest { Messages = [new AiChatMessage { Role = "user", Content = "Describe each role's responsibilities" }] }, default);
+            new AiChatRequest { Messages = [new AiChatMessage { Role = "user", Content = "Describe ResolveHub access policies" }] }, default);
 
         Assert.True(handler.Body.IndexOf("\"role\":\"system\"", StringComparison.Ordinal) <
             handler.Body.IndexOf("\"role\":\"user\"", StringComparison.Ordinal));
         Assert.Contains("BEGIN TRUSTED LIVE RESOLVEHUB CONTEXT", handler.Body);
-        Assert.Contains("Employee, IT Agent, Manager, and Admin", handler.Body);
+        Assert.Contains("Employee, IT Support Agent, Manager, and Admin", handler.Body);
         Assert.Contains("CURRENT USER MESSAGE (answer this)", handler.Body);
-        Assert.Contains("Describe each role", handler.Body);
-        Assert.Contains("responsibilities", handler.Body);
+        Assert.Contains("Describe ResolveHub access policies", handler.Body);
         Assert.Contains("\"temperature\":0.2", handler.Body);
     }
 
@@ -477,12 +503,208 @@ public sealed class AiAssistantControllerTests
         await Service(db, handler).ChatAsync(1, RoleNames.Manager,
             new AiChatRequest { Messages = [new AiChatMessage { Role = "user", Content = "Explain an unknown ResolveHub fact" }] }, default);
 
-        foreach (var role in new[] { "Employee:", "IT Agent:", "Manager:", "Admin:" })
+        foreach (var role in new[] { "Employee:", "IT Support Agent:", "Manager:", "Admin:" })
             Assert.Contains(role, handler.Body);
         Assert.Contains("Employee: Dashboard, My Tickets, Create Ticket, Notifications", handler.Body);
-        Assert.Contains("IT Agent: Dashboard, Assigned Tickets, Open Tickets, Notifications", handler.Body);
+        Assert.Contains("IT Support Agent: Dashboard, Assigned Tickets, Open Tickets, Notifications", handler.Body);
         Assert.Contains("Manager: Dashboard, All Tickets, Ticket Assignments, Team Workload, System Audit Log, Notifications", handler.Body);
         Assert.Contains("Admin: Dashboard, All Tickets, My Tickets, Create Ticket, Ticket Assignments, Team Workload, Users, Categories, System Audit Log, Notifications", handler.Body);
+    }
+
+    [Theory]
+    [InlineData(RoleNames.Manager, "Can I create a ticket?", "No. Only Admins and Employees can create tickets in ResolveHub.")]
+    [InlineData(RoleNames.Manager, "Can I create tickets?", "No. Only Admins and Employees can create tickets in ResolveHub.")]
+    [InlineData(RoleNames.Manager, "How do I create a ticket?", "No. Only Admins and Employees can create tickets in ResolveHub.")]
+    [InlineData(RoleNames.Manager, "What type of ticket can I create?", "You cannot create tickets. Only Admins and Employees can create tickets in ResolveHub.")]
+    [InlineData(RoleNames.Manager, "What types of tickets can I create?", "You cannot create tickets. Only Admins and Employees can create tickets in ResolveHub.")]
+    [InlineData(RoleNames.Manager, "Which tickets can I create?", "You cannot create tickets. Only Admins and Employees can create tickets in ResolveHub.")]
+    [InlineData(RoleNames.ITSupportAgent, "Can I create a ticket?", "No. Only Admins and Employees can create tickets in ResolveHub.")]
+    [InlineData(RoleNames.ITSupportAgent, "Can I create tickets?", "No. Only Admins and Employees can create tickets in ResolveHub.")]
+    [InlineData(RoleNames.ITSupportAgent, "How do I create a ticket?", "No. Only Admins and Employees can create tickets in ResolveHub.")]
+    [InlineData(RoleNames.ITSupportAgent, "What type of ticket can I create?", "You cannot create tickets. Only Admins and Employees can create tickets in ResolveHub.")]
+    [InlineData(RoleNames.ITSupportAgent, "What types of tickets can I create?", "You cannot create tickets. Only Admins and Employees can create tickets in ResolveHub.")]
+    [InlineData(RoleNames.ITSupportAgent, "Which tickets can I create?", "You cannot create tickets. Only Admins and Employees can create tickets in ResolveHub.")]
+    public async Task Chat_UnauthorizedRoleCreationQuestions_ReturnOnlyPermissionDenial(
+        string role, string question, string expected)
+    {
+        await using var db = Context();
+        var handler = new CapturingHandler("unused");
+
+        var result = await Service(db, handler).ChatAsync(1, role,
+            new AiChatRequest { Messages = [new AiChatMessage { Role = "user", Content = question }] }, default);
+
+        Assert.Equal(expected, result.Value!.Message);
+        Assert.Equal(0, handler.RequestCount);
+        Assert.DoesNotContain("Hardware", result.Value.Message);
+        Assert.DoesNotContain("Category", result.Value.Message);
+        Assert.DoesNotContain("Create Ticket", result.Value.Message);
+        Assert.DoesNotContain("Title", result.Value.Message);
+    }
+
+    [Theory]
+    [InlineData(RoleNames.Manager, "Am I allowed to submit a support request?")]
+    [InlineData(RoleNames.ITSupportAgent, "Where can I open a ticket?")]
+    [InlineData(RoleNames.Manager, "Can managers create tickets?")]
+    [InlineData(RoleNames.ITSupportAgent, "Do IT agents have permission to create tickets?")]
+    public async Task Chat_UnauthorizedRoleSemanticCreationVariants_AreDenied(string role, string question)
+    {
+        await using var db = Context();
+        var handler = new CapturingHandler("unused");
+
+        var result = await Service(db, handler).ChatAsync(1, role,
+            new AiChatRequest { Messages = [new AiChatMessage { Role = "user", Content = question }] }, default);
+
+        Assert.Contains("Only Admins and Employees can create tickets in ResolveHub.", result.Value!.Message);
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Theory]
+    [InlineData(RoleNames.ITSupportAgent, "What does the Employee do?", "Employees can create and track their own tickets")]
+    [InlineData(RoleNames.Manager, "What can employees do?", "Employees can create and track their own tickets")]
+    [InlineData(RoleNames.Employee, "What does the Manager do?", "Managers can oversee organizational tickets")]
+    [InlineData(RoleNames.Employee, "Tell me about the Manager role.", "Managers can oversee organizational tickets")]
+    [InlineData(RoleNames.Manager, "What can an IT Support Agent do?", "IT Support Agents can view Open and assigned tickets")]
+    [InlineData(RoleNames.Employee, "What permissions does Admin have?", "Admins can create and oversee tickets")]
+    public async Task Chat_ExplicitNamedRole_OverridesAuthenticatedRole(
+        string authenticatedRole, string question, string expected)
+    {
+        await using var db = Context();
+        var handler = new CapturingHandler("unused");
+
+        var result = await Service(db, handler).ChatAsync(1, authenticatedRole,
+            new AiChatRequest { Messages = [new AiChatMessage { Role = "user", Content = question }] }, default);
+
+        Assert.StartsWith(expected, result.Value!.Message);
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Fact]
+    public async Task Chat_FirstPersonRoleQuestion_UsesAuthenticatedAdminRole()
+    {
+        await using var db = Context();
+        var handler = new CapturingHandler("unused");
+
+        var result = await Service(db, handler).ChatAsync(1, RoleNames.Admin,
+            new AiChatRequest { Messages = [new AiChatMessage { Role = "user", Content = "What can I do?" }] }, default);
+
+        Assert.StartsWith("Admins can create and oversee tickets", result.Value!.Message);
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Theory]
+    [InlineData(RoleNames.ITSupportAgent, "Can an Employee create tickets?", "Yes. Employees can create tickets in ResolveHub.")]
+    [InlineData(RoleNames.Employee, "Can a Manager create tickets?", "No. Managers cannot create tickets in ResolveHub. Only Admins and Employees can create tickets in ResolveHub.")]
+    [InlineData(RoleNames.Admin, "Can an IT Support Agent create tickets?", "No. IT Support Agents cannot create tickets in ResolveHub. Only Admins and Employees can create tickets in ResolveHub.")]
+    public async Task Chat_NamedRoleCreationPermission_UsesNamedRole(
+        string authenticatedRole, string question, string expected)
+    {
+        await using var db = Context();
+        var handler = new CapturingHandler("unused");
+
+        var result = await Service(db, handler).ChatAsync(1, authenticatedRole,
+            new AiChatRequest { Messages = [new AiChatMessage { Role = "user", Content = question }] }, default);
+
+        Assert.Equal(expected, result.Value!.Message);
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Theory]
+    [InlineData(RoleNames.Employee, "Employee")]
+    [InlineData(RoleNames.ITSupportAgent, "IT Support Agent")]
+    [InlineData(RoleNames.Manager, "Manager")]
+    [InlineData(RoleNames.Admin, "Admin")]
+    public async Task Chat_CurrentUserIdentity_UsesAuthenticatedRole(string role, string label)
+    {
+        await using var db = Context();
+        var handler = new CapturingHandler("unused");
+
+        foreach (var question in new[] { "Who am I?", "What is my role?" })
+        {
+            var result = await Service(db, handler).ChatAsync(1, role,
+                new AiChatRequest { Messages = [new AiChatMessage { Role = "user", Content = question }] }, default);
+            Assert.Equal($"Your ResolveHub role is {label}.", result.Value!.Message);
+        }
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Theory]
+    [InlineData(RoleNames.Employee, "Employees can create and track their own tickets")]
+    [InlineData(RoleNames.ITSupportAgent, "IT Support Agents can view Open and assigned tickets")]
+    [InlineData(RoleNames.Manager, "Managers can oversee organizational tickets")]
+    [InlineData(RoleNames.Admin, "Admins can create and oversee tickets")]
+    public async Task Chat_CurrentUserCapabilities_UseAuthenticatedRole(string role, string expected)
+    {
+        await using var db = Context();
+        var handler = new CapturingHandler("unused");
+
+        foreach (var question in new[] { "What can I do?", "What are my permissions?" })
+        {
+            var result = await Service(db, handler).ChatAsync(1, role,
+                new AiChatRequest { Messages = [new AiChatMessage { Role = "user", Content = question }] }, default);
+            Assert.StartsWith(expected, result.Value!.Message);
+        }
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Theory]
+    [InlineData(RoleNames.Employee)]
+    [InlineData(RoleNames.Admin)]
+    public async Task Chat_AuthorizedCurrentRoleCreationPermission_IsAffirmative(string role)
+    {
+        await using var db = Context();
+        var handler = new CapturingHandler("unused");
+
+        var result = await Service(db, handler).ChatAsync(1, role,
+            new AiChatRequest { Messages = [new AiChatMessage { Role = "user", Content = "Can I create tickets?" }] }, default);
+
+        Assert.StartsWith("Yes.", result.Value!.Message);
+        Assert.Contains("Employees and Admins can create tickets", result.Value.Message);
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Theory]
+    [InlineData("Who can create tickets?")]
+    [InlineData("who create ticket")]
+    [InlineData("Which roles can make tickets?")]
+    public async Task Chat_GeneralCreationQuestion_DoesNotUseFirstPersonDenial(string question)
+    {
+        await using var db = Context();
+        var handler = new CapturingHandler("unused");
+
+        var result = await Service(db, handler).ChatAsync(1, RoleNames.ITSupportAgent,
+            new AiChatRequest { Messages = [new AiChatMessage { Role = "user", Content = question }] }, default);
+
+        Assert.Equal("Only Admins and Employees can create tickets in ResolveHub.", result.Value!.Message);
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Theory]
+    [InlineData("What does Open mean?", "Open means the ticket is waiting to be assigned.")]
+    [InlineData("What does Pending mean?", "Pending means work is temporarily paused")]
+    [InlineData("What does Resolved mean?", "Resolved means the IT Support Agent completed the resolution")]
+    public async Task Chat_SingleStatusQuestion_AnswersOnlyRequestedStatus(string question, string expected)
+    {
+        await using var db = Context();
+        var handler = new CapturingHandler("unused");
+
+        var result = await Service(db, handler).ChatAsync(1, RoleNames.Employee,
+            new AiChatRequest { Messages = [new AiChatMessage { Role = "user", Content = question }] }, default);
+
+        Assert.StartsWith(expected, result.Value!.Message);
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Fact]
+    public async Task Chat_StatusList_UsesOnlyImplementedStatuses()
+    {
+        await using var db = Context();
+        var handler = new CapturingHandler("unused");
+
+        var result = await Service(db, handler).ChatAsync(1, RoleNames.Manager,
+            new AiChatRequest { Messages = [new AiChatMessage { Role = "user", Content = "What statuses exist?" }] }, default);
+
+        Assert.Equal("ResolveHub ticket statuses are Open, Assigned, In Progress, Pending, Resolved, Closed, Cancelled, and Duplicate.", result.Value!.Message);
+        Assert.Equal(0, handler.RequestCount);
     }
 
     /* Obsolete deterministic overview tests.
@@ -582,7 +804,7 @@ public sealed class AiAssistantControllerTests
             new AiChatRequest { Messages = [new AiChatMessage { Role = "user", Content = "Explain ResolveHub capabilities" }] }, default);
 
         Assert.Contains("IT Help Desk and Ticketing Management System", handler.Body);
-        Assert.Contains("Employee, IT Agent, Manager, and Admin", handler.Body);
+        Assert.Contains("Employee, IT Support Agent, Manager, and Admin", handler.Body);
         Assert.Contains("Complete every sentence/list", handler.Body);
         Assert.Equal(1, handler.RequestCount);
     }
