@@ -986,6 +986,107 @@ public sealed class AiAssistantControllerTests
         Assert.Equal(0, handler.RequestCount);
     }
 
+    [Theory]
+    [InlineData(RoleNames.Admin, "What is in the Employee sidebar?", "The Employee sidebar includes Dashboard, My Tickets, Create Ticket, and Notifications.")]
+    [InlineData(RoleNames.Employee, "What is in the IT Agent sidebar?", "The IT Support Agent sidebar includes Dashboard, Assigned Tickets, Open Tickets, and Notifications.")]
+    [InlineData(RoleNames.Employee, "What is in the Manager sidebar?", "The Manager sidebar includes Dashboard, All Tickets, Ticket Assignments, Team Workload, System Audit Log, and Notifications.")]
+    [InlineData(RoleNames.Manager, "What is in the Admin sidebar?", "The Admin sidebar includes Dashboard, All Tickets, My Tickets, Create Ticket, Ticket Assignments, Team Workload, Users, Categories, System Audit Log, and Notifications.")]
+    [InlineData(RoleNames.Employee, "Where can I find my tickets?", "Open My Tickets from the sidebar.")]
+    [InlineData(RoleNames.ITSupportAgent, "Where can I find my tickets?", "Open Assigned Tickets from the sidebar.")]
+    [InlineData(RoleNames.Manager, "Where can I find my tickets?", "Managers use All Tickets; there is no separate My Tickets page.")]
+    [InlineData(RoleNames.Admin, "Where can I find my tickets?", "Open My Tickets from the sidebar.")]
+    [InlineData(RoleNames.Manager, "Where can I find all tickets?", "Open All Tickets from the sidebar.")]
+    [InlineData(RoleNames.Employee, "Where can I find all tickets?", "Your role does not have access to All Tickets.")]
+    [InlineData(RoleNames.Employee, "Where can I find notifications?", "Open Notifications from the sidebar.")]
+    [InlineData(RoleNames.Manager, "Where can I find reports?", "Go to All Tickets, apply any filters you need, then use Export PDF or Export Excel.")]
+    [InlineData(RoleNames.Employee, "Where can I find reports?", "Your role does not have access to reports.")]
+    [InlineData(RoleNames.Admin, "Where can I find users?", "Open Users from the sidebar.")]
+    [InlineData(RoleNames.Manager, "Where can I find users?", "Your role does not have access to Users.")]
+    [InlineData(RoleNames.Admin, "Where can I find my profile?", "Open your account menu, then select Profile.")]
+    [InlineData(RoleNames.Employee, "Where can I see ticket details?", "Go to My Tickets and open the ticket you want to view.")]
+    [InlineData(RoleNames.ITSupportAgent, "Where can I see ticket details?", "Open the ticket from Assigned Tickets or Open Tickets.")]
+    [InlineData(RoleNames.Manager, "Where can I see ticket details?", "Go to All Tickets and select View on the ticket.")]
+    [InlineData(RoleNames.Employee, "Where can I see drafts?", "Go to My Tickets and select Drafts.")]
+    [InlineData(RoleNames.Manager, "Where can I see drafts?", "Your role does not have ticket drafts.")]
+    [InlineData(RoleNames.Admin, "Where can I see team workload?", "Open Team Workload from the sidebar.")]
+    [InlineData(RoleNames.ITSupportAgent, "Where can I see team workload?", "Your role does not have access to Team Workload.")]
+    [InlineData(RoleNames.Manager, "Where can I find the activity log?", "Open System Audit Log from the sidebar.")]
+    [InlineData(RoleNames.Employee, "Where can I find the activity log?", "Your role does not have access to the System Audit Log.")]
+    public async Task Chat_NavigationQuestions_UseActualRoleUi(string role, string question, string expected)
+    {
+        await using var db = Context();
+        var handler = new CapturingHandler("unused");
+
+        var result = await Service(db, handler).ChatAsync(1, role,
+            new AiChatRequest { Messages = [new AiChatMessage { Role = "user", Content = question }] }, default);
+
+        Assert.Equal(expected, result.Value!.Message);
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Fact]
+    public async Task Chat_PrivateCommentFollowUps_ResolveTopicAndAuthenticatedRole()
+    {
+        await using var db = Context();
+        var handler = new CapturingHandler("unused");
+        var service = Service(db, handler);
+        var firstAnswer = "Only the ticket creator and assigned IT Support Agent can view or add Private comments.";
+
+        var first = await service.ChatAsync(1, RoleNames.Admin, new AiChatRequest { Messages =
+            [new AiChatMessage { Role = "user", Content = "Who can see private comments?" }] }, default);
+        var second = await service.ChatAsync(1, RoleNames.Admin, new AiChatRequest { Messages =
+            [new AiChatMessage { Role = "user", Content = "Who can see private comments?" },
+             new AiChatMessage { Role = "assistant", Content = firstAnswer },
+             new AiChatMessage { Role = "user", Content = "Can Manager see it?" }] }, default);
+        var third = await service.ChatAsync(1, RoleNames.Admin, new AiChatRequest { Messages =
+            [new AiChatMessage { Role = "user", Content = "Who can see private comments?" },
+             new AiChatMessage { Role = "assistant", Content = firstAnswer },
+             new AiChatMessage { Role = "user", Content = "Can Manager see it?" },
+             new AiChatMessage { Role = "assistant", Content = "No. Managers cannot see private comments." },
+             new AiChatMessage { Role = "user", Content = "Can I see it?" }] }, default);
+
+        Assert.Equal(firstAnswer, first.Value!.Message);
+        Assert.Equal("No. Managers cannot see private comments.", second.Value!.Message);
+        Assert.Equal("Only if you created the ticket; otherwise, no.", third.Value!.Message);
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Theory]
+    [InlineData(RoleNames.Employee, "Can employees see them?", "Yes, on tickets they created.")]
+    [InlineData(RoleNames.Manager, "What about Manager?", "No. Managers cannot see private comments.")]
+    public async Task Chat_PrivateCommentPronounFollowUp_RetainsSubject(string role, string followUp, string expected)
+    {
+        await using var db = Context();
+        var handler = new CapturingHandler("unused");
+        var result = await Service(db, handler).ChatAsync(1, role, new AiChatRequest { Messages =
+            [new AiChatMessage { Role = "user", Content = "Who can see private comments?" },
+             new AiChatMessage { Role = "assistant", Content = "Private comments can only be seen by the ticket creator and assigned IT Support Agent." },
+             new AiChatMessage { Role = "user", Content = followUp }] }, default);
+
+        Assert.StartsWith(expected, result.Value!.Message);
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Fact]
+    public async Task Chat_ActionAndNavigationFollowUps_RetainSubject()
+    {
+        await using var db = Context();
+        var handler = new CapturingHandler("unused");
+        var service = Service(db, handler);
+        var approval = await service.ChatAsync(1, RoleNames.Admin, new AiChatRequest { Messages =
+            [new AiChatMessage { Role = "user", Content = "Who approves assignment requests?" },
+             new AiChatMessage { Role = "assistant", Content = "Managers and Admins approve assignment requests according to the request type." },
+             new AiChatMessage { Role = "user", Content = "Can I do that?" }] }, default);
+        var reports = await service.ChatAsync(1, RoleNames.Employee, new AiChatRequest { Messages =
+            [new AiChatMessage { Role = "user", Content = "Where can I find reports?" },
+             new AiChatMessage { Role = "assistant", Content = "Go to All Tickets and use Export PDF or Export Excel." },
+             new AiChatMessage { Role = "user", Content = "Can employees access it?" }] }, default);
+
+        Assert.Equal("Yes. Admins can approve Manager assignment requests.", approval.Value!.Message);
+        Assert.Equal("No. Ticket report and export access is available to Managers and Admins.", reports.Value!.Message);
+        Assert.Equal(0, handler.RequestCount);
+    }
+
     [Fact]
     public async Task Chat_ModelOutput_DoesNotReturnDanglingNumberedMarker()
     {

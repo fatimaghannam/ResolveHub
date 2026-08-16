@@ -91,24 +91,27 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
         var latestUserMessage = request.Messages.LastOrDefault(message => message.Role == "user")?.Content;
         if (TryGetAssistantConversationAnswer(latestUserMessage, out var conversationAnswer))
             return new(TicketOperationStatus.Success, new(conversationAnswer));
-        if (TryGetProductAnswer(latestUserMessage, out var productAnswer))
+        var contextualMessage = ResolveContextualFollowUp(request.Messages, latestUserMessage);
+        if (TryGetNavigationAnswer(contextualMessage, role, out var navigationAnswer))
+            return new(TicketOperationStatus.Success, new(navigationAnswer));
+        if (TryGetProductAnswer(contextualMessage, out var productAnswer))
             return new(TicketOperationStatus.Success, new(productAnswer));
-        if (TryGetAllRolesAnswer(latestUserMessage, out var allRolesAnswer))
+        if (TryGetAllRolesAnswer(contextualMessage, out var allRolesAnswer))
             return new(TicketOperationStatus.Success, new(allRolesAnswer));
-        if (TryGetGeneralPermissionAnswer(latestUserMessage, out var generalPermissionAnswer))
+        if (TryGetGeneralPermissionAnswer(contextualMessage, out var generalPermissionAnswer))
             return new(TicketOperationStatus.Success, new(generalPermissionAnswer));
-        if (TryGetRoleCapabilityAnswer(latestUserMessage, role, out var roleAnswer))
+        if (TryGetRoleCapabilityAnswer(contextualMessage, role, out var roleAnswer))
             return new(TicketOperationStatus.Success, new(roleAnswer));
-        if (TryGetCriticalCreationAnswer(latestUserMessage, role, out var creationAnswer))
+        if (TryGetCriticalCreationAnswer(contextualMessage, role, out var creationAnswer))
             return new(TicketOperationStatus.Success, new(creationAnswer));
-        if (TryGetTicketCategoriesAnswer(latestUserMessage) is { } categoriesAnswer)
+        if (TryGetTicketCategoriesAnswer(contextualMessage) is { } categoriesAnswer)
             return new(TicketOperationStatus.Success, new(categoriesAnswer));
-        if (TryGetStatusAnswer(latestUserMessage, out var statusAnswer))
+        if (TryGetStatusAnswer(contextualMessage, out var statusAnswer))
             return new(TicketOperationStatus.Success, new(statusAnswer));
-        if (IsGeneralUserRolesQuestion(latestUserMessage))
+        if (IsGeneralUserRolesQuestion(contextualMessage))
             return new(TicketOperationStatus.Success, new(
                 "ResolveHub has four user roles: Employee, IT Support Agent, Manager, and Admin. Each role has different permissions and responsibilities."));
-        if (TryGetConversationShortcut(latestUserMessage, out var shortcutResponse))
+        if (TryGetConversationShortcut(contextualMessage, out var shortcutResponse))
             return new(TicketOperationStatus.Success, new(shortcutResponse));
 
         string? context = null;
@@ -117,12 +120,16 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
             context = await GetTicketContextAsync(userId, role, request.TicketId.Value, token);
             if (context is null) return new(TicketOperationStatus.NotFound);
         }
-        var recentUserMessages = request.Messages.Where(x => x.Role == "user").TakeLast(4).ToArray();
-        var history = string.Join("\n", recentUserMessages
-            .Select(x => $"<untrusted-user-message>{x.Content}</untrusted-user-message>"));
-        var topicText = IsReferentialFollowUp(latestUserMessage) && recentUserMessages.Length > 1
-            ? $"Previous user message: {recentUserMessages[^2].Content}\nCURRENT user message: {latestUserMessage}"
-            : latestUserMessage;
+        var allMessages = request.Messages.ToArray();
+        var firstRecentUserIndex = allMessages.Select((message, index) => (message, index))
+            .Where(item => item.message.Role == "user").TakeLast(4).Select(item => item.index).FirstOrDefault();
+        var recentMessages = allMessages.Skip(firstRecentUserIndex).ToArray();
+        var history = string.Join("\n", recentMessages.Select(x =>
+            $"<untrusted-{x.Role}-message>{x.Content}</untrusted-{x.Role}-message>"));
+        var previousUserMessage = request.Messages.Where(message => message.Role == "user").SkipLast(1).LastOrDefault()?.Content;
+        var topicText = contextualMessage == latestUserMessage && IsReferentialFollowUp(latestUserMessage) && previousUserMessage is not null
+            ? $"Previous user message: {previousUserMessage}\nCURRENT user message: {latestUserMessage}"
+            : contextualMessage;
         var trustedContext = await applicationContextBuilder.BuildAsync(role, request.PageContext, topicText, token);
         var answer = await AskTextAsync(AiChatSystemPrompt.Build(topicText),
             $"{trustedContext}\nAuthorized ticket context, if provided by the backend: {context ?? "None"}\nRecent untrusted user messages for reference only:\n{history}\nCURRENT USER MESSAGE (answer this): <current-user-message>{latestUserMessage}</current-user-message>",
@@ -236,12 +243,98 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
         if (string.IsNullOrWhiteSpace(message)) return false;
         var trimmed = message.Trim();
         var value = $" {trimmed.ToLowerInvariant()} ";
-        return System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"\b(?:it|It)\b") ||
-            value.Contains(" that ", StringComparison.Ordinal) ||
-            value.Contains(" this ", StringComparison.Ordinal) ||
+        return Regex.IsMatch(trimmed, @"\b(?:it|that|this|them|those|they)\b", RegexOptions.IgnoreCase) ||
             value.StartsWith(" what about ", StringComparison.Ordinal) ||
             value.StartsWith(" does ", StringComparison.Ordinal) ||
             value.StartsWith(" and ", StringComparison.Ordinal);
+    }
+    private static string? ResolveContextualFollowUp(IReadOnlyCollection<AiChatMessage> messages, string? latest)
+    {
+        if (string.IsNullOrWhiteSpace(latest) || !IsReferentialFollowUp(latest) || messages.Count < 2)
+            return latest;
+
+        var priorText = string.Join(" ", messages.Take(messages.Count - 1).TakeLast(6)
+            .Select(message => message.Content)).ToLowerInvariant();
+        var topic = priorText.Contains("private comment", StringComparison.Ordinal) ? "private comments"
+            : priorText.Contains("report", StringComparison.Ordinal) || priorText.Contains("export pdf", StringComparison.Ordinal) ? "reports"
+            : priorText.Contains("approve", StringComparison.Ordinal) && priorText.Contains("assignment", StringComparison.Ordinal) ? "approve assignment requests"
+            : null;
+        if (topic == "private comments")
+        {
+            var role = Regex.Match(latest, @"\b(?:employee|manager|admin|administrator|it agent|it support agent)s?\b",
+                RegexOptions.IgnoreCase);
+            if (role.Success && Regex.IsMatch(latest, @"^(?:what about|and)\b", RegexOptions.IgnoreCase))
+                return $"Can {role.Value} see private comments?";
+        }
+        return topic is null ? latest : $"{latest} regarding {topic}";
+    }
+
+    private static bool TryGetNavigationAnswer(string? message, string authenticatedRole, out string response)
+    {
+        response = string.Empty;
+        if (string.IsNullOrWhiteSpace(message)) return false;
+        var value = Regex.Replace(message.ToLowerInvariant(), @"[^a-z0-9]+", " ").Trim();
+
+        if (Regex.IsMatch(value, @"\b(?:what is|what s|what items? are|show me what is)\b.*\bsidebar\b"))
+        {
+            var role = Regex.IsMatch(value, @"\bemployees?\b") ? RoleNames.Employee
+                : Regex.IsMatch(value, @"\b(?:it (?:support )?|support )agents?\b") ? RoleNames.ITSupportAgent
+                : Regex.IsMatch(value, @"\bmanagers?\b") ? RoleNames.Manager
+                : Regex.IsMatch(value, @"\b(?:admins?|administrators?)\b") ? RoleNames.Admin
+                : authenticatedRole;
+            response = role switch
+            {
+                RoleNames.Employee => "The Employee sidebar includes Dashboard, My Tickets, Create Ticket, and Notifications.",
+                RoleNames.ITSupportAgent => "The IT Support Agent sidebar includes Dashboard, Assigned Tickets, Open Tickets, and Notifications.",
+                RoleNames.Manager => "The Manager sidebar includes Dashboard, All Tickets, Ticket Assignments, Team Workload, System Audit Log, and Notifications.",
+                RoleNames.Admin => "The Admin sidebar includes Dashboard, All Tickets, My Tickets, Create Ticket, Ticket Assignments, Team Workload, Users, Categories, System Audit Log, and Notifications.",
+                _ => string.Empty
+            };
+            return response.Length > 0;
+        }
+
+        if (!Regex.IsMatch(value, @"\bwhere\b|\bfind\b")) return false;
+        if (Regex.IsMatch(value, @"\bnotifications?\b")) response = "Open Notifications from the sidebar.";
+        else if (Regex.IsMatch(value, @"\b(?:reports?|export)\b"))
+            response = authenticatedRole is RoleNames.Manager or RoleNames.Admin
+                ? "Go to All Tickets, apply any filters you need, then use Export PDF or Export Excel."
+                : "Your role does not have access to reports.";
+        else if (Regex.IsMatch(value, @"\busers?\b"))
+            response = authenticatedRole == RoleNames.Admin ? "Open Users from the sidebar." : "Your role does not have access to Users.";
+        else if (Regex.IsMatch(value, @"\b(?:my )?profile\b")) response = "Open your account menu, then select Profile.";
+        else if (Regex.IsMatch(value, @"\bdrafts?\b"))
+            response = authenticatedRole is RoleNames.Employee or RoleNames.Admin
+                ? "Go to My Tickets and select Drafts."
+                : "Your role does not have ticket drafts.";
+        else if (Regex.IsMatch(value, @"\bteam workload\b|\bworkload\b"))
+            response = authenticatedRole is RoleNames.Manager or RoleNames.Admin
+                ? "Open Team Workload from the sidebar."
+                : "Your role does not have access to Team Workload.";
+        else if (Regex.IsMatch(value, @"\b(?:activity log|audit log|system log)\b"))
+            response = authenticatedRole is RoleNames.Manager or RoleNames.Admin
+                ? "Open System Audit Log from the sidebar."
+                : "Your role does not have access to the System Audit Log.";
+        else if (Regex.IsMatch(value, @"\bticket (?:details|activity|history)\b"))
+            response = authenticatedRole switch
+            {
+                RoleNames.Employee => "Go to My Tickets and open the ticket you want to view.",
+                RoleNames.ITSupportAgent => "Open the ticket from Assigned Tickets or Open Tickets.",
+                RoleNames.Manager or RoleNames.Admin => "Go to All Tickets and select View on the ticket.",
+                _ => string.Empty
+            };
+        else if (Regex.IsMatch(value, @"\ball tickets\b"))
+            response = authenticatedRole is RoleNames.Manager or RoleNames.Admin
+                ? "Open All Tickets from the sidebar."
+                : "Your role does not have access to All Tickets.";
+        else if (Regex.IsMatch(value, @"\bmy tickets\b|\bmy assigned tickets\b"))
+            response = authenticatedRole switch
+            {
+                RoleNames.Employee or RoleNames.Admin => "Open My Tickets from the sidebar.",
+                RoleNames.ITSupportAgent => "Open Assigned Tickets from the sidebar.",
+                RoleNames.Manager => "Managers use All Tickets; there is no separate My Tickets page.",
+                _ => string.Empty
+            };
+        return response.Length > 0;
     }
     private static bool IsGeneralUserRolesQuestion(string? message)
     {
@@ -474,6 +567,7 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
 
         response = role switch
         {
+            RoleNames.Employee when approveAssignment => "No. Employees cannot approve assignment requests.",
             RoleNames.Employee when assignment => "No. Employees cannot assign tickets or request self-assignment.",
             RoleNames.Employee when close => "No. Employees cannot close tickets. Closing an eligible Resolved ticket is part of the assigned IT Support Agent workflow.",
             RoleNames.Employee when directCancel => "Yes, but only their own eligible Open unassigned ticket.",
@@ -483,6 +577,7 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
             RoleNames.Employee when attachments => "Yes. Employees can upload permitted ticket and comment attachments on their own tickets according to the attachment rules.",
             RoleNames.Employee when privateComments => "Yes, on tickets they created. Private comments are visible only to the ticket creator and assigned IT Support Agent.",
             RoleNames.Employee when duplicate => "No. Employees cannot report duplicate tickets.",
+            RoleNames.ITSupportAgent when approveAssignment => "No. IT Support Agents cannot approve assignment requests.",
             RoleNames.ITSupportAgent when assignment => "No, not directly. An IT Support Agent can request assignment to an eligible Open unassigned ticket, and a Manager must approve or reject the request.",
             RoleNames.ITSupportAgent when requestAssignment => "Yes. An IT Support Agent can request assignment to an eligible Open unassigned ticket.",
             RoleNames.ITSupportAgent when anyTicket => "No. IT Support Agents can view the eligible Open queue, but can perform ticket-work and status actions only on tickets assigned to them.",
@@ -492,6 +587,7 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
             RoleNames.ITSupportAgent when reports || exportReports => "No. Ticket report and export access is available to Managers and Admins.",
             RoleNames.ITSupportAgent when duplicate => "No. IT Support Agents cannot report duplicate tickets.",
             RoleNames.ITSupportAgent when comments => "Yes. IT Support Agents can add permitted comments to tickets they can access; Private comments require them to be the assigned Agent.",
+            RoleNames.ITSupportAgent when privateComments => "Yes, if you are the assigned IT Support Agent for that ticket.",
             RoleNames.Manager when approveAssignment => "Yes. Managers can approve IT Support Agent self-assignment requests. Manager-created assignment requests are approved or rejected by an Admin.",
             RoleNames.Manager when rejectAssignment => "Yes. Managers can reject IT Support Agent self-assignment requests. Manager-created assignment requests are reviewed by an Admin.",
             RoleNames.Manager when assignment => "No, not directly. A Manager selects an IT Support Agent and submits an assignment request; an Admin approves or rejects it.",
@@ -503,8 +599,10 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
             RoleNames.Manager when otherTickets => "Yes. Managers can view authorized organization-wide tickets through All Tickets.",
             RoleNames.Manager when manageUsers => "No. User management is Admin-only.",
             RoleNames.Manager when comments => "Yes. Managers can add Public comments to tickets they are authorized to access.",
+            RoleNames.Manager when privateComments => "No. Managers cannot see private comments.",
+            RoleNames.Admin when approveAssignment => "Yes. Admins can approve Manager assignment requests.",
             RoleNames.Admin when assignment => "Yes. An Admin can directly assign or reassign an eligible ticket to an active IT Support Agent, subject to capacity and workflow rules.",
-            RoleNames.Admin when privateComments => "No. Admin access alone does not allow Private comments; they remain visible only to the ticket creator and assigned IT Support Agent.",
+            RoleNames.Admin when privateComments => "Only if you created the ticket; otherwise, no.",
             RoleNames.Admin when duplicate => "Yes. An Admin can directly mark a confirmed ticket as Duplicate and review duplicate reports submitted by Managers.",
             RoleNames.Admin when changeRoles => "No, not for an existing user. An Admin selects a role when creating a user, but there is no endpoint for changing an existing user's role.",
             RoleNames.Admin when manageUsers => "Yes. Admins can view and create users, send or resend invitations, and activate or deactivate accounts.",
