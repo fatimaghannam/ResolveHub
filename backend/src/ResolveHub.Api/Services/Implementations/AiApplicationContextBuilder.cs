@@ -31,7 +31,7 @@ public sealed class AiApplicationContextBuilder(ApplicationDbContext db) : IAiAp
             [RoleNames.Employee] = new HashSet<string> { "dashboard", "my-tickets", "create-ticket", "ticket-details", "notifications", "profile" },
             [RoleNames.ITSupportAgent] = new HashSet<string> { "dashboard", "assigned-tickets", "open-tickets", "ticket-details", "notifications", "profile" },
             [RoleNames.Manager] = new HashSet<string> { "dashboard", "all-tickets", "ticket-details", "ticket-assignments", "team-workload", "audit-log", "notifications", "profile" },
-            [RoleNames.Admin] = new HashSet<string> { "dashboard", "all-tickets", "my-tickets", "ticket-details", "ticket-assignments", "team-workload", "users", "categories", "audit-log", "notifications", "profile" }
+            [RoleNames.Admin] = new HashSet<string> { "dashboard", "all-tickets", "my-tickets", "create-ticket", "ticket-details", "ticket-assignments", "team-workload", "users", "categories", "audit-log", "notifications", "profile" }
         };
 
     public async Task<string> BuildAsync(string role, string? pageContext, string? currentQuestion, CancellationToken token)

@@ -304,7 +304,7 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
             - Employee: Creates and tracks their own tickets, manages eligible drafts and ticket details, adds permitted comments and attachments, and follows ticket updates.
             - IT Support Agent: Requests assignment to eligible Open tickets, works assigned tickets through resolution and closure, adds permitted comments and attachments, and requests cancellation when needed.
             - Manager: Monitors organizational tickets and team workload, submits assignment requests for Admin approval, reviews IT Support Agent assignment and cancellation requests, reports suspected duplicates, and exports reports.
-            - Admin: Oversees tickets, directly assigns or reassigns work, approves Manager assignment requests, reviews duplicates, manages users and categories, and accesses reports and the System Audit Log.
+            - Admin: Creates and oversees tickets, directly assigns or reassigns work, approves Manager assignment requests, reviews duplicates, manages users and categories, and accesses reports and the System Audit Log.
             """;
         return true;
     }
@@ -341,7 +341,9 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
         if (IsTicketCreationPermissionQuestion(message, out var asksAboutTicketTypes) &&
             (hasExplicitRole || Regex.IsMatch(value, @"\b(?:i|me|my)\b")))
         {
-            response = asksAboutTicketTypes && ResolveHubAssistantKnowledge.CanCreateTickets(targetRole)
+            response = IsCreationInstructionsQuestion(value) && ResolveHubAssistantKnowledge.CanCreateTickets(targetRole)
+                ? ResolveHubAssistantKnowledge.TicketCreationInstructions
+                : asksAboutTicketTypes && ResolveHubAssistantKnowledge.CanCreateTickets(targetRole)
                 ? $"As {RoleArticle(targetRole)} {RoleSingular(targetRole)}, you can create tickets with a title, description, category, priority, and optional attachments."
                 : ResolveHubAssistantKnowledge.TicketCreationPermissionAnswer(targetRole,
                     IsDirectYesNoCreationQuestion(value));
@@ -369,14 +371,14 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
             RoleNames.Employee => "Employees cannot assign tickets, perform IT Support Agent status work, view organization-wide tickets, review assignment or cancellation requests, report duplicates, access reports or the System Audit Log, or manage users and categories.",
             RoleNames.ITSupportAgent => "IT Support Agents cannot create tickets, directly assign themselves tickets, approve assignment or cancellation requests, report duplicates, access ticket reports or the System Audit Log, or manage users and categories.",
             RoleNames.Manager => "Managers cannot create tickets, directly assign an IT Support Agent, manage users or categories, or perform IT Support Agent ticket-work status transitions.",
-            RoleNames.Admin => "Admins cannot create tickets, do not automatically gain access to Private comments unless they are the assigned IT Support Agent, and cannot change an existing user's role in the current implementation.",
+            RoleNames.Admin => "Admins do not automatically gain access to Private comments unless they are the ticket creator or assigned IT Support Agent, and cannot change an existing user's role in the current implementation.",
             _ => string.Empty
         } : targetRole switch
         {
             RoleNames.Employee => "Employees can create and track their own tickets, use drafts, edit or cancel eligible Open unassigned tickets, add permitted comments and attachments, and view their ticket history and notifications.",
             RoleNames.ITSupportAgent => "IT Support Agents can view Assigned Tickets and eligible Open Tickets, request assignment, work assigned tickets through permitted status transitions, resolve or close eligible tickets, request cancellation, and use permitted comments, attachments, history, and notifications.",
             RoleNames.Manager => "Managers can view organization-wide tickets, monitor team workload, submit assignment requests, review IT Support Agent assignment and cancellation requests, report suspected duplicates, use reports and exports, and access the System Audit Log.",
-            RoleNames.Admin => "Admins can view tickets, directly assign or reassign IT Support Agents, review Manager assignment requests, manage duplicate workflows, manage users and categories, use reports and exports, monitor workload, and access the System Audit Log.",
+            RoleNames.Admin => "Admins can create and view tickets, directly assign or reassign IT Support Agents, review Manager assignment requests, manage duplicate workflows, manage users and categories, use reports and exports, monitor workload, and access the System Audit Log.",
             _ => string.Empty
         };
         return response.Length > 0;
@@ -556,6 +558,8 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
             @"\b(?:can|may)\b|\b(?:allowed|permission)\b|\bdo i have\b.*\b(?:option|access)\b");
     private static bool IsDirectYesNoCreationQuestion(string value) =>
         Regex.IsMatch(value, @"^(?:can|may|am|do)\b");
+    private static bool IsCreationInstructionsQuestion(string value) =>
+        Regex.IsMatch(value, @"^(?:how|where)\b");
     private static bool TryGetStatusAnswer(string? message, out string response)
     {
         response = string.Empty;
