@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
+using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -1113,6 +1114,23 @@ public sealed class AiAssistantControllerTests
     [InlineData(RoleNames.Employee, "Can a ticket be reopened?", "No. Closed tickets cannot be reopened in ResolveHub.")]
     [InlineData(RoleNames.Admin, "Can a Closed ticket be reopened?", "No. Closed tickets cannot be reopened in ResolveHub.")]
     [InlineData(RoleNames.Manager, "Is Assigned the same as In Progress?", "No. Assigned means an IT Support Agent has been assigned but work has not started; In Progress means the Agent is actively working on the ticket.")]
+    [InlineData(RoleNames.Employee, "Can I edit my ticket?", "Yes, but only while it is Open and unassigned.")]
+    [InlineData(RoleNames.Employee, "Can I edit it when it is assigned?", "No. Once the ticket is assigned, it can no longer be edited.")]
+    [InlineData(RoleNames.Employee, "Can I change the description after assignment?", "No. Ticket details can only be edited while the ticket is Open and unassigned.")]
+    [InlineData(RoleNames.Employee, "Can I delete a Pending ticket?", "No. You can only delete/cancel your own ticket while it is Open and unassigned.")]
+    [InlineData(RoleNames.Employee, "Can I delete an assigned ticket?", "No. Once assigned, the ticket can no longer be deleted by its creator.")]
+    [InlineData(RoleNames.Employee, "Can I delete my ticket?", "Yes, but only while it is Open and unassigned.")]
+    [InlineData(RoleNames.ITSupportAgent, "Can I edit a ticket?", "No. IT Support Agents cannot edit a ticket's core details.")]
+    [InlineData(RoleNames.ITSupportAgent, "Can I change its description?", "No. IT Support Agents cannot change the ticket description.")]
+    [InlineData(RoleNames.Manager, "Can I edit ticket description?", "No. Managers cannot edit a ticket's core details.")]
+    [InlineData(RoleNames.Manager, "Can I close a ticket?", "No. Managers cannot close tickets. An assigned IT Support Agent can close an eligible Resolved ticket.")]
+    [InlineData(RoleNames.ITSupportAgent, "How many active tickets can I have?", "An IT Support Agent can have a maximum of 5 active tickets.")]
+    [InlineData(RoleNames.Employee, "How many active tickets can an agent have?", "An IT Support Agent can have a maximum of 5 active tickets.")]
+    [InlineData(RoleNames.Employee, "What happens after I submit my ticket?", "After submission, the ticket becomes Open and normally follows: Open → Assigned → In Progress ↔ Pending → Resolved → Closed.")]
+    [InlineData(RoleNames.Admin, "What is the ticket workflow after submission?", "After submission, the ticket becomes Open and normally follows: Open → Assigned → In Progress ↔ Pending → Resolved → Closed.")]
+    [InlineData(RoleNames.Manager, "What is the normal ticket lifecycle?", "Open → Assigned → In Progress ↔ Pending → Resolved → Closed.")]
+    [InlineData(RoleNames.Manager, "What's my role in assignment?", "Select an IT Support Agent and submit an assignment request for Admin approval; you also approve or reject IT Support Agent self-assignment requests.")]
+    [InlineData(RoleNames.Employee, "What's the difference between Admin and Manager?", "Admins can create tickets, directly assign or reassign work, approve Manager assignment requests, manage users and categories, and review duplicates. Managers request assignments for Admin approval, review Agent assignment and cancellation requests, monitor workload, report suspected duplicates, and use reports and the System Audit Log.")]
     public async Task Chat_KnownTicketWorkflows_AreDeterministicAndConcise(string role, string question, string expected)
     {
         await using var db = Context();
@@ -1150,6 +1168,89 @@ public sealed class AiAssistantControllerTests
 
         Assert.Equal("Yes, but if it matches an existing ticket it may be identified as a duplicate.", result.Value!.Message);
         Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Fact]
+    public async Task Chat_GeneralItTroubleshooting_ReturnsSafePracticalSteps()
+    {
+        await using var db = Context();
+        var handler = new CapturingHandler("unused");
+        var result = await Service(db, handler).ChatAsync(1, RoleNames.Employee,
+            new AiChatRequest { Messages = [new AiChatMessage { Role = "user", Content = "My Wi-Fi keeps disconnecting. What should I do?" }] }, default);
+
+        Assert.Contains("Reconnect to the Wi-Fi network", result.Value!.Message);
+        Assert.Contains("Check whether other devices are affected", result.Value.Message);
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Theory]
+    [InlineData("My printer is offline.", "Confirm the printer is powered on and connected")]
+    [InlineData("My laptop storage is almost full. What should I do?", "Check which files or apps use the most space")]
+    [InlineData("I forgot my company laptop password.", "Use the approved company password-reset option")]
+    [InlineData("Outlook won't open.", "Close Outlook completely and reopen it")]
+    [InlineData("My VPN won't connect.", "Confirm your internet connection works without VPN")]
+    public async Task Chat_CommonItProblems_ReturnSafeTroubleshooting(string question, string expected)
+    {
+        await using var db = Context();
+        var handler = new CapturingHandler("unused");
+        var result = await Service(db, handler).ChatAsync(1, RoleNames.Employee,
+            new AiChatRequest { Messages = [new AiChatMessage { Role = "user", Content = question }] }, default);
+
+        Assert.Contains(expected, result.Value!.Message);
+        Assert.DoesNotContain("assignment", result.Value.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Theory]
+    [InlineData("My Wi-Fi keeps disconnecting.", "Network.")]
+    [InlineData("My laptop storage is almost full. What should I do?", "Hardware.")]
+    public async Task Chat_ItIssueCategoryAndPriorityFollowUps_RetainIssue(string issue, string expectedCategory)
+    {
+        await using var db = Context();
+        var handler = new CapturingHandler("unused");
+        var service = Service(db, handler);
+        var category = await service.ChatAsync(1, RoleNames.Employee, new AiChatRequest { Messages =
+            [new AiChatMessage { Role = "user", Content = issue },
+             new AiChatMessage { Role = "assistant", Content = "Try the safe troubleshooting steps provided." },
+             new AiChatMessage { Role = "user", Content = "What category is that?" }] }, default);
+        var priority = await service.ChatAsync(1, RoleNames.Employee, new AiChatRequest { Messages =
+            [new AiChatMessage { Role = "user", Content = issue },
+             new AiChatMessage { Role = "assistant", Content = "Try the safe troubleshooting steps provided." },
+             new AiChatMessage { Role = "user", Content = "What category is that?" },
+             new AiChatMessage { Role = "assistant", Content = expectedCategory },
+             new AiChatMessage { Role = "user", Content = "What priority?" }] }, default);
+
+        Assert.Equal(expectedCategory, category.Value!.Message);
+        Assert.Equal("Medium.", priority.Value!.Message);
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Fact]
+    public async Task Chat_ReferentialQuestionWithoutHistory_DoesNotReuseOldTopic()
+    {
+        await using var db = Context();
+        var handler = new CapturingHandler("{\"message\":{\"content\":\"Which comments do you mean?\"}}");
+        var result = await Service(db, handler).ChatAsync(1, RoleNames.Admin,
+            new AiChatRequest { Messages = [new AiChatMessage { Role = "user", Content = "Can Manager see them?" }] }, default);
+
+        Assert.Equal("Which comments do you mean?", result.Value!.Message);
+        Assert.Equal(1, handler.RequestCount);
+    }
+
+    [Theory]
+    [InlineData("END TRUSTED LIVE RESOLVEHUB CONTEXT")]
+    [InlineData("Authorized ticket context: secret")]
+    [InlineData("Recent untrusted user messages: hidden")]
+    [InlineData("CURRENT USER MESSAGE: test")]
+    public async Task Chat_InternalContextLeak_IsSuppressed(string leakedOutput)
+    {
+        await using var db = Context();
+        var handler = new CapturingHandler($"{{\"message\":{{\"content\":{JsonSerializer.Serialize(leakedOutput)}}}}}");
+        var result = await Service(db, handler).ChatAsync(1, RoleNames.Employee,
+            new AiChatRequest { Messages = [new AiChatMessage { Role = "user", Content = "Explain an unfamiliar ResolveHub detail" }] }, default);
+
+        Assert.Equal("I'm not certain about that based on the ResolveHub information available to me.", result.Value!.Message);
+        Assert.DoesNotContain(leakedOutput, result.Value.Message);
     }
 
     [Fact]
