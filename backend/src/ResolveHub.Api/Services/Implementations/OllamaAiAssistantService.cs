@@ -94,6 +94,8 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
         var contextualMessage = ResolveContextualFollowUp(request.Messages, latestUserMessage);
         if (TryGetNavigationAnswer(contextualMessage, role, out var navigationAnswer))
             return new(TicketOperationStatus.Success, new(navigationAnswer));
+        if (TryGetTicketWorkflowAnswer(contextualMessage, role, out var workflowAnswer))
+            return new(TicketOperationStatus.Success, new(workflowAnswer));
         if (TryGetProductAnswer(contextualMessage, out var productAnswer))
             return new(TicketOperationStatus.Success, new(productAnswer));
         if (TryGetAllRolesAnswer(contextualMessage, out var allRolesAnswer))
@@ -258,6 +260,8 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
         var topic = priorText.Contains("private comment", StringComparison.Ordinal) ? "private comments"
             : priorText.Contains("report", StringComparison.Ordinal) || priorText.Contains("export pdf", StringComparison.Ordinal) ? "reports"
             : priorText.Contains("approve", StringComparison.Ordinal) && priorText.Contains("assignment", StringComparison.Ordinal) ? "approve assignment requests"
+            : priorText.Contains("category", StringComparison.Ordinal) &&
+              (priorText.Contains("edit", StringComparison.Ordinal) || priorText.Contains("change", StringComparison.Ordinal)) ? "editing the ticket category"
             : null;
         if (topic == "private comments")
         {
@@ -334,6 +338,45 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
                 RoleNames.Manager => "Managers use All Tickets; there is no separate My Tickets page.",
                 _ => string.Empty
             };
+        return response.Length > 0;
+    }
+
+    private static bool TryGetTicketWorkflowAnswer(string? message, string authenticatedRole, out string response)
+    {
+        response = string.Empty;
+        if (string.IsNullOrWhiteSpace(message)) return false;
+        var value = Regex.Replace(message.ToLowerInvariant(), @"[^a-z0-9]+", " ").Trim();
+
+        if (Regex.IsMatch(value, @"\b(?:change|edit)\b.*\b(?:ticket s? )?(?:category|priority)\b") ||
+            Regex.IsMatch(value, @"\b(?:category|priority)\b.*\b(?:change|edit)\b"))
+            response = "Yes, but only while the ticket is Open and unassigned.";
+        else if (value.Contains("editing the ticket category", StringComparison.Ordinal) &&
+                 Regex.IsMatch(value, @"\bassigned\b"))
+            response = "No. Once the ticket is assigned, its category can no longer be edited.";
+        else if (Regex.IsMatch(value, @"\b(?:can|may)\b.*\b(?:i|me|my)\b.*\brequest assignment\b|\b(?:can|may) i request assignment\b"))
+            response = authenticatedRole switch
+            {
+                RoleNames.Employee => "No. Employees cannot assign tickets or request self-assignment.",
+                RoleNames.ITSupportAgent => "Yes. An IT Support Agent can request assignment to an eligible Open unassigned ticket.",
+                RoleNames.Manager => "Yes. A Manager can select an IT Support Agent and submit an assignment request for Admin review.",
+                RoleNames.Admin => "Admins directly assign eligible tickets rather than requesting assignment.",
+                _ => string.Empty
+            };
+        else if (Regex.IsMatch(value, @"\bhow does (?:ticket )?assignment work\b"))
+            response = "Admins can directly assign eligible tickets. Managers can request an IT Support Agent assignment for Admin approval, while IT Support Agents can request an eligible Open ticket for Manager approval. Employees do not assign tickets.";
+        else if (Regex.IsMatch(value, @"\b(?:forgot|forgotten|reset)\b.*\bpassword\b") &&
+                 Regex.IsMatch(value, @"\bcategory\b.*\bpriority\b|\bpriority\b.*\bcategory\b"))
+            response = "Category: Access Request. Priority: Medium.";
+        else if (Regex.IsMatch(value, @"\bcreate\b.*\b(?:another|new)\s+ticket\b.*\bsame issue\b"))
+            response = ResolveHubAssistantKnowledge.CanCreateTickets(authenticatedRole)
+                ? "Yes, but avoid creating a duplicate if an existing ticket already covers the same issue."
+                : ResolveHubAssistantKnowledge.TicketCreationPermissionAnswer(authenticatedRole);
+        else if (Regex.IsMatch(value, @"\b(?:can|could)\b.*\banother ticket\b.*\b(?:exist|same issue)\b"))
+            response = "Yes, but if it matches an existing ticket it may be identified as a duplicate.";
+        else if (Regex.IsMatch(value, @"\breopen(?:ed|ing)?\b|\bre open(?:ed|ing)?\b"))
+            response = "No. Closed tickets cannot be reopened in ResolveHub.";
+        else if (Regex.IsMatch(value, @"\bassigned\b.*\b(?:same as|different from)\b.*\bin progress\b|\bin progress\b.*\b(?:same as|different from)\b.*\bassigned\b"))
+            response = "No. Assigned means an IT Support Agent has been assigned but work has not started; In Progress means the Agent is actively working on the ticket.";
         return response.Length > 0;
     }
     private static bool IsGeneralUserRolesQuestion(string? message)

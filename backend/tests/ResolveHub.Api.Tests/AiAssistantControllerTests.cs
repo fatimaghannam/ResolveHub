@@ -1088,6 +1088,71 @@ public sealed class AiAssistantControllerTests
     }
 
     [Fact]
+    public async Task Chat_TicketCategoryEditingFollowUp_RetainsSubject()
+    {
+        await using var db = Context();
+        var handler = new CapturingHandler("unused");
+        var service = Service(db, handler);
+        var first = await service.ChatAsync(1, RoleNames.Employee, new AiChatRequest { Messages =
+            [new AiChatMessage { Role = "user", Content = "Can I change a ticket's category later?" }] }, default);
+        var second = await service.ChatAsync(1, RoleNames.Employee, new AiChatRequest { Messages =
+            [new AiChatMessage { Role = "user", Content = "Can I change a ticket's category later?" },
+             new AiChatMessage { Role = "assistant", Content = "Yes, but only while the ticket is Open and unassigned." },
+             new AiChatMessage { Role = "user", Content = "What if it is assigned?" }] }, default);
+
+        Assert.Equal("Yes, but only while the ticket is Open and unassigned.", first.Value!.Message);
+        Assert.Equal("No. Once the ticket is assigned, its category can no longer be edited.", second.Value!.Message);
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Theory]
+    [InlineData(RoleNames.Employee, "How does assignment work?", "Admins can directly assign eligible tickets. Managers can request an IT Support Agent assignment for Admin approval, while IT Support Agents can request an eligible Open ticket for Manager approval. Employees do not assign tickets.")]
+    [InlineData(RoleNames.Employee, "Can I request assignment?", "No. Employees cannot assign tickets or request self-assignment.")]
+    [InlineData(RoleNames.ITSupportAgent, "Can I request assignment?", "Yes. An IT Support Agent can request assignment to an eligible Open unassigned ticket.")]
+    [InlineData(RoleNames.Employee, "Forgot my company laptop password. What category and priority?", "Category: Access Request. Priority: Medium.")]
+    [InlineData(RoleNames.Employee, "Can a ticket be reopened?", "No. Closed tickets cannot be reopened in ResolveHub.")]
+    [InlineData(RoleNames.Admin, "Can a Closed ticket be reopened?", "No. Closed tickets cannot be reopened in ResolveHub.")]
+    [InlineData(RoleNames.Manager, "Is Assigned the same as In Progress?", "No. Assigned means an IT Support Agent has been assigned but work has not started; In Progress means the Agent is actively working on the ticket.")]
+    public async Task Chat_KnownTicketWorkflows_AreDeterministicAndConcise(string role, string question, string expected)
+    {
+        await using var db = Context();
+        var handler = new CapturingHandler("unused");
+        var result = await Service(db, handler).ChatAsync(1, role,
+            new AiChatRequest { Messages = [new AiChatMessage { Role = "user", Content = question }] }, default);
+
+        Assert.Equal(expected, result.Value!.Message);
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Theory]
+    [InlineData(RoleNames.Employee, "Yes, but avoid creating a duplicate if an existing ticket already covers the same issue.")]
+    [InlineData(RoleNames.Admin, "Yes, but avoid creating a duplicate if an existing ticket already covers the same issue.")]
+    [InlineData(RoleNames.Manager, "No. As a Manager, you can't create tickets in ResolveHub.")]
+    [InlineData(RoleNames.ITSupportAgent, "No. As an IT Support Agent, you can't create tickets in ResolveHub.")]
+    public async Task Chat_SameIssueTicketCreation_UsesAuthenticatedRole(string role, string expected)
+    {
+        await using var db = Context();
+        var handler = new CapturingHandler("unused");
+        var result = await Service(db, handler).ChatAsync(1, role,
+            new AiChatRequest { Messages = [new AiChatMessage { Role = "user", Content = "Can I create another ticket for the same issue?" }] }, default);
+
+        Assert.Equal(expected, result.Value!.Message);
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Fact]
+    public async Task Chat_GeneralSameIssueQuestion_DoesNotUseAuthenticatedRole()
+    {
+        await using var db = Context();
+        var handler = new CapturingHandler("unused");
+        var result = await Service(db, handler).ChatAsync(1, RoleNames.Manager,
+            new AiChatRequest { Messages = [new AiChatMessage { Role = "user", Content = "Can another ticket exist for the same issue?" }] }, default);
+
+        Assert.Equal("Yes, but if it matches an existing ticket it may be identified as a duplicate.", result.Value!.Message);
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Fact]
     public async Task Chat_ModelOutput_DoesNotReturnDanglingNumberedMarker()
     {
         await using var db = Context();
