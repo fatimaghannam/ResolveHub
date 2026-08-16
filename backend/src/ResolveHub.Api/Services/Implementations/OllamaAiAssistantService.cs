@@ -91,8 +91,6 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
         var latestUserMessage = request.Messages.LastOrDefault(message => message.Role == "user")?.Content;
         if (TryGetAssistantConversationAnswer(latestUserMessage, out var conversationAnswer))
             return new(TicketOperationStatus.Success, new(conversationAnswer));
-        if (await TryGetTicketCategoriesAnswerAsync(latestUserMessage, token) is { } categoriesAnswer)
-            return new(TicketOperationStatus.Success, new(categoriesAnswer));
         if (TryGetProductAnswer(latestUserMessage, out var productAnswer))
             return new(TicketOperationStatus.Success, new(productAnswer));
         if (TryGetAllRolesAnswer(latestUserMessage, out var allRolesAnswer))
@@ -103,6 +101,8 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
             return new(TicketOperationStatus.Success, new(roleAnswer));
         if (TryGetCriticalCreationAnswer(latestUserMessage, role, out var creationAnswer))
             return new(TicketOperationStatus.Success, new(creationAnswer));
+        if (TryGetTicketCategoriesAnswer(latestUserMessage) is { } categoriesAnswer)
+            return new(TicketOperationStatus.Success, new(categoriesAnswer));
         if (TryGetStatusAnswer(latestUserMessage, out var statusAnswer))
             return new(TicketOperationStatus.Success, new(statusAnswer));
         if (IsGeneralUserRolesQuestion(latestUserMessage))
@@ -269,7 +269,7 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
         var value = Regex.Replace(message.ToLowerInvariant(), @"[^a-z0-9]+", " ").Trim();
         var mentionsTicket = Regex.IsMatch(value, @"\b(?:tickets?|support requests?)\b");
         var mentionsCreation = Regex.IsMatch(value,
-            @"\b(?:create|creating|creation|make|making|raise|raising|file|filing|submit|submitting)\b") ||
+            @"\b(?:create|created|creating|creation|make|made|making|raise|raised|raising|file|filed|filing|submit|submitted|submitting)\b") ||
             Regex.IsMatch(value, @"\bopen(?:ing)?\s+(?:a\s+|new\s+)?(?:support\s+)?(?:ticket|request)\b");
         if (!mentionsTicket || !mentionsCreation) return false;
 
@@ -304,7 +304,7 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
             - Employee: Creates and tracks their own tickets, manages eligible drafts and ticket details, adds permitted comments and attachments, and follows ticket updates.
             - IT Support Agent: Requests assignment to eligible Open tickets, works assigned tickets through resolution and closure, adds permitted comments and attachments, and requests cancellation when needed.
             - Manager: Monitors organizational tickets and team workload, submits assignment requests for Admin approval, reviews IT Support Agent assignment and cancellation requests, reports suspected duplicates, and exports reports.
-            - Admin: Creates and oversees tickets, directly assigns or reassigns work, approves Manager assignment requests, reviews duplicates, manages users and categories, and accesses reports and the System Audit Log.
+            - Admin: Oversees tickets, directly assigns or reassigns work, approves Manager assignment requests, reviews duplicates, manages users and categories, and accesses reports and the System Audit Log.
             """;
         return true;
     }
@@ -338,13 +338,13 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
             return true;
         }
 
-        if (hasExplicitRole && IsTicketCreationPermissionQuestion(message, out _) &&
-            (targetRole is RoleNames.Manager or RoleNames.ITSupportAgent ||
-             IsYesNoCreationPermissionQuestion(value)))
+        if (IsTicketCreationPermissionQuestion(message, out var asksAboutTicketTypes) &&
+            (hasExplicitRole || Regex.IsMatch(value, @"\b(?:i|me|my)\b")))
         {
-            response = targetRole is RoleNames.Employee or RoleNames.Admin
-                ? $"Yes. {RoleLabel(targetRole)} can create tickets in ResolveHub."
-                : $"No. {RoleLabel(targetRole)} cannot create tickets in ResolveHub. Only Admins and Employees can create tickets in ResolveHub.";
+            response = asksAboutTicketTypes && ResolveHubAssistantKnowledge.CanCreateTickets(targetRole)
+                ? $"As {RoleArticle(targetRole)} {RoleSingular(targetRole)}, you can create tickets with a title, description, category, priority, and optional attachments."
+                : ResolveHubAssistantKnowledge.TicketCreationPermissionAnswer(targetRole,
+                    IsDirectYesNoCreationQuestion(value));
             return true;
         }
 
@@ -369,14 +369,14 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
             RoleNames.Employee => "Employees cannot assign tickets, perform IT Support Agent status work, view organization-wide tickets, review assignment or cancellation requests, report duplicates, access reports or the System Audit Log, or manage users and categories.",
             RoleNames.ITSupportAgent => "IT Support Agents cannot create tickets, directly assign themselves tickets, approve assignment or cancellation requests, report duplicates, access ticket reports or the System Audit Log, or manage users and categories.",
             RoleNames.Manager => "Managers cannot create tickets, directly assign an IT Support Agent, manage users or categories, or perform IT Support Agent ticket-work status transitions.",
-            RoleNames.Admin => "Admins do not automatically gain access to Private comments unless they are the ticket creator or assigned IT Support Agent, and they cannot change an existing user's role in the current implementation.",
+            RoleNames.Admin => "Admins cannot create tickets, do not automatically gain access to Private comments unless they are the assigned IT Support Agent, and cannot change an existing user's role in the current implementation.",
             _ => string.Empty
         } : targetRole switch
         {
             RoleNames.Employee => "Employees can create and track their own tickets, use drafts, edit or cancel eligible Open unassigned tickets, add permitted comments and attachments, and view their ticket history and notifications.",
             RoleNames.ITSupportAgent => "IT Support Agents can view Assigned Tickets and eligible Open Tickets, request assignment, work assigned tickets through permitted status transitions, resolve or close eligible tickets, request cancellation, and use permitted comments, attachments, history, and notifications.",
             RoleNames.Manager => "Managers can view organization-wide tickets, monitor team workload, submit assignment requests, review IT Support Agent assignment and cancellation requests, report suspected duplicates, use reports and exports, and access the System Audit Log.",
-            RoleNames.Admin => "Admins can create and view tickets, directly assign or reassign IT Support Agents, review Manager assignment requests, manage duplicate workflows, manage users and categories, use reports and exports, monitor workload, and access the System Audit Log.",
+            RoleNames.Admin => "Admins can view tickets, directly assign or reassign IT Support Agents, review Manager assignment requests, manage duplicate workflows, manage users and categories, use reports and exports, monitor workload, and access the System Audit Log.",
             _ => string.Empty
         };
         return response.Length > 0;
@@ -395,7 +395,7 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
             _ when Regex.IsMatch(value, @"\badd\b.*\bcomments?\b") =>
                 "Employees, IT Support Agents, Managers, and Admins can add permitted comments to tickets they are authorized to access. Private comments are limited to the ticket creator and assigned IT Support Agent.",
             _ when Regex.IsMatch(value, @"\bcreate|submit|open|make\b.*\btickets?\b") =>
-                "Only Admins and Employees can create tickets in ResolveHub.",
+                ResolveHubAssistantKnowledge.TicketCreationRolesAnswer,
             _ when Regex.IsMatch(value, @"\bassign\b.*\btickets?\b") =>
                 "Admins can directly assign or reassign eligible tickets. Managers can submit assignment requests for Admin review, and IT Support Agents can request assignment for Manager review.",
             _ when Regex.IsMatch(value, @"\bclose\b.*\btickets?\b") =>
@@ -412,19 +412,15 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
         };
         return response.Length > 0;
     }
-    private async Task<string?> TryGetTicketCategoriesAnswerAsync(string? message, CancellationToken token)
+    private static string? TryGetTicketCategoriesAnswer(string? message)
     {
         if (string.IsNullOrWhiteSpace(message)) return null;
         var value = Regex.Replace(message.ToLowerInvariant(), @"[^a-z0-9]+", " ").Trim();
         var asksForCategories = Regex.IsMatch(value,
-            @"\b(?:ticket categories|categories (?:exist|are there|does .* have)|what categories|types? of tickets (?:are|is|does)|ticket types? (?:are|does|in)|kinds? of tickets (?:are|in))\b");
+            @"\b(?:ticket categories|categories (?:exist|are there|does .* have)|what categories|types? of tickets (?:can be created|are|is|does)|ticket types? (?:are available|are|does|in)|kinds? of tickets (?:are|in))\b");
         if (!asksForCategories || Regex.IsMatch(value, @"\b(?:i|me|my)\b")) return null;
 
-        var categories = await db.TicketCategories.AsNoTracking().Where(category => category.IsActive)
-            .OrderBy(category => category.SortOrder).Select(category => category.Name).ToListAsync(token);
-        if (categories.Count == 0)
-            categories = ["Hardware", "Software", "Network", "Email", "Access Request", "Security", "Other"];
-        return $"ResolveHub ticket categories are {NaturalList(categories)}.";
+        return "ResolveHub includes Hardware, Software, Network, Account Access, Email, and Other IT-related tickets.";
     }
     private static bool TryGetProductAnswer(string? message, out string response)
     {
@@ -518,13 +514,6 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
         };
         return response.Length > 0;
     }
-    private static string NaturalList(IReadOnlyList<string> values) => values.Count switch
-    {
-        0 => string.Empty,
-        1 => values[0],
-        2 => $"{values[0]} and {values[1]}",
-        _ => $"{string.Join(", ", values.Take(values.Count - 1))}, and {values[^1]}"
-    };
     private static bool TryGetCriticalCreationAnswer(
         string? message, string authenticatedRole, out string response)
     {
@@ -537,27 +526,36 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
             @"\bwho\b.*\b(?:create|make|open|raise|file|submit)\b|\b(?:what|which)\s+roles?\b.*\b(?:create|make|submit)\b");
         if (asksGenerallyWhoCanCreate)
         {
-            response = "Only Admins and Employees can create tickets in ResolveHub.";
+            response = ResolveHubAssistantKnowledge.TicketCreationRolesAnswer;
+            return true;
+        }
+
+        if (asksAboutTicketTypes && Regex.IsMatch(value, @"\b(?:i|me|my)\b"))
+        {
+            response = ResolveHubAssistantKnowledge.CanCreateTickets(authenticatedRole)
+                ? $"As {RoleArticle(authenticatedRole)} {RoleSingular(authenticatedRole)}, you can create tickets with a title, description, category, priority, and optional attachments."
+                : ResolveHubAssistantKnowledge.TicketCreationPermissionAnswer(authenticatedRole, false);
             return true;
         }
 
         if (!Regex.IsMatch(value, @"\b(?:i|me|my)\b")) return false;
 
-        if (authenticatedRole is RoleNames.Manager or RoleNames.ITSupportAgent)
+        if (!ResolveHubAssistantKnowledge.CanCreateTickets(authenticatedRole))
         {
-            response = asksAboutTicketTypes
-                ? "You cannot create tickets. Only Admins and Employees can create tickets in ResolveHub."
-                : "No. Only Admins and Employees can create tickets in ResolveHub.";
+            response = ResolveHubAssistantKnowledge.TicketCreationPermissionAnswer(authenticatedRole,
+                IsDirectYesNoCreationQuestion(value));
             return true;
         }
 
         if (!IsYesNoCreationPermissionQuestion(value)) return false;
-        response = "Yes. Employees and Admins can create tickets in ResolveHub.";
+        response = ResolveHubAssistantKnowledge.TicketCreationPermissionAnswer(authenticatedRole);
         return true;
     }
     private static bool IsYesNoCreationPermissionQuestion(string value) =>
         Regex.IsMatch(value,
             @"\b(?:can|may)\b|\b(?:allowed|permission)\b|\bdo i have\b.*\b(?:option|access)\b");
+    private static bool IsDirectYesNoCreationQuestion(string value) =>
+        Regex.IsMatch(value, @"^(?:can|may|am|do)\b");
     private static bool TryGetStatusAnswer(string? message, out string response)
     {
         response = string.Empty;
@@ -622,6 +620,8 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
         RoleNames.Admin => "Admin",
         _ => role
     };
+    private static string RoleArticle(string role) =>
+        role is RoleNames.Employee or RoleNames.ITSupportAgent or RoleNames.Admin ? "an" : "a";
     private static string NormalizePlainText(string value)
     {
         var normalized = value.Replace("**", "", StringComparison.Ordinal)
