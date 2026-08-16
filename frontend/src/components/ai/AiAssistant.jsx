@@ -6,6 +6,7 @@ import { sendAiChat } from '../../services/aiService.js'
 function AiAssistant() {
   const { pathname } = useLocation()
   const [open, setOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -13,6 +14,12 @@ function AiAssistant() {
   const inputRef = useRef(null)
   const messagesRef = useRef(null)
   const conversationVersionRef = useRef(0)
+
+  useEffect(() => {
+    if (!mounted) return
+    const frame = requestAnimationFrame(() => setOpen(true))
+    return () => cancelAnimationFrame(frame)
+  }, [mounted])
 
   useEffect(() => {
     if (open) inputRef.current?.focus({ preventScroll: true })
@@ -50,8 +57,10 @@ function AiAssistant() {
     requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }))
   }
   return <>
-    <button type="button" className="ai-launcher" onClick={() => setOpen(true)} aria-label="Open ResolveHub AI Assistant"><Bot size={21} /></button>
-    {open && <aside className="ai-assistant" aria-label="ResolveHub AI Assistant">
+    <button type="button" className="ai-launcher" onClick={() => setMounted(true)} aria-label="Open ResolveHub AI Assistant"><Bot size={21} /></button>
+    {mounted && <aside className={`ai-assistant${open ? ' ai-assistant--open' : ''}`} aria-label="ResolveHub AI Assistant" onTransitionEnd={(event) => {
+      if (!open && event.target === event.currentTarget && event.propertyName === 'opacity') setMounted(false)
+    }}>
       <header><div className="ai-assistant__brand"><img src="/favicon.png" alt="ResolveHub" draggable="false" /><div><strong>ResolveHub AI Assistant</strong><small>Read-only help and guidance</small></div></div><div className="ai-assistant__header-actions"><button type="button" className="ai-assistant__header-button ai-assistant__new-chat" onClick={startNewChat} aria-label="Start new chat" title="Start new chat"><RotateCcw size={19} /></button><button type="button" className="ai-assistant__header-button" onClick={() => setOpen(false)} aria-label="Close assistant"><X size={19} /></button></div></header>
       <div className="ai-assistant__messages" ref={messagesRef}>
         {messages.length === 0 && <p className="ai-assistant__welcome">Ask about ticket statuses, writing a clear request, or safe basic troubleshooting.</p>}
