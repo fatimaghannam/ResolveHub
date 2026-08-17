@@ -22,6 +22,8 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly string _model = options.Value.Model;
+    private readonly bool _isCloud = !string.IsNullOrWhiteSpace(options.Value.ApiKey);
+    private readonly string? _apiKey = options.Value.ApiKey;
 
     public async Task<TicketAnalysisResponse> AnalyzeAsync(AnalyzeTicketRequest request, CancellationToken token)
     {
@@ -55,7 +57,7 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
             var categoryReason = OptionalReason(value.CategoryReason);
             var priorityReason = OptionalReason(value.PriorityReason);
             if (categoryReason is null || priorityReason is null)
-                logger.LogWarning("Ollama ticket analysis omitted an optional explanation. CategoryReasonPresent={CategoryReasonPresent}; PriorityReasonPresent={PriorityReasonPresent}. The validated recommendation will still be returned.", categoryReason is not null, priorityReason is not null);
+                throw new AiProviderException("Ollama returned an incomplete ticket analysis.");
 
             logger.LogInformation("Ollama ticket analysis validated against ResolveHub lookups. CategoryId={CategoryId}; PriorityId={PriorityId}.", category.ID, priority.ID);
             return new(category.ID, category.Name, priority.ID, priority.Name, categoryReason, priorityReason);
@@ -156,7 +158,10 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
     private async Task<T> AskJsonAsync<T>(string system, string user, object schema,
         string operation, int numPredict, CancellationToken token)
     {
-        var content = await SendAsync(system, user, schema, operation, 0.1, numPredict, token);
+        var structuredSystem = _isCloud
+            ? $"{system}\nReturn ONLY valid JSON matching this schema: {JsonSerializer.Serialize(schema, JsonOptions)} No Markdown, no code fences, and no explanatory text before or after the JSON."
+            : system;
+        var content = NormalizeJson(await SendAsync(structuredSystem, user, _isCloud ? null : schema, operation, 0.1, numPredict, token, _isCloud));
         logger.LogDebug("Ollama returned non-empty structured assistant content for {ResponseType}.", typeof(T).Name);
         try
         {
@@ -174,13 +179,22 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
         double temperature, int numPredict, CancellationToken token) =>
         SendAsync(system, user, null, operation, temperature, numPredict, token);
     private async Task<string> SendAsync(string system, string user, object? format,
-        string operation, double temperature, int numPredict, CancellationToken token)
+        string operation, double temperature, int numPredict, CancellationToken token, bool omitFormat = false)
     {
         var stopwatch = Stopwatch.StartNew();
         try
         {
-            var response = await httpClient.PostAsJsonAsync("api/chat", new { model = _model, stream = false, keep_alive = "30m", options = new { temperature, num_predict = numPredict }, format, messages = new[] { new { role = "system", content = system }, new { role = "user", content = user } } }, token);
-            if (!response.IsSuccessStatusCode) throw new AiProviderException("Ollama is unavailable.");
+            object request = omitFormat
+                ? new { model = _model, stream = false, keep_alive = "30m", options = new { temperature, num_predict = numPredict }, messages = new[] { new { role = "system", content = system }, new { role = "user", content = user } } }
+                : new { model = _model, stream = false, keep_alive = "30m", options = new { temperature, num_predict = numPredict }, format, messages = new[] { new { role = "system", content = system }, new { role = "user", content = user } } };
+            var response = await httpClient.PostAsJsonAsync("api/chat", request, token);
+            if (!response.IsSuccessStatusCode)
+            {
+                var responseBody = await response.Content.ReadAsStringAsync(token);
+                logger.LogWarning("Ollama returned non-success response. StatusCode={StatusCode}; Reason={Reason}; Body={Body}",
+                    (int)response.StatusCode, response.ReasonPhrase, SanitizeProviderError(responseBody, _apiKey));
+                throw new AiProviderException("Ollama is unavailable.");
+            }
             var body = await response.Content.ReadFromJsonAsync<OllamaResponse>(JsonOptions, token);
             if (string.IsNullOrWhiteSpace(body?.Message?.Content)) throw new AiProviderException("Ollama returned an empty response.");
             if (environment.IsDevelopment())
@@ -193,6 +207,21 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException) { logger.LogWarning(ex, "Ollama request failed."); throw new AiProviderException("Ollama is unavailable.", ex); }
     }
     private static double ToMilliseconds(long nanoseconds) => Math.Round(nanoseconds / 1_000_000d, 1);
+    private static string NormalizeJson(string content)
+    {
+        var value = content.Trim();
+        var fenced = Regex.Match(value, @"\A```(?:json)?\s*(?<json>[\s\S]*?)\s*```\z", RegexOptions.IgnoreCase);
+        return fenced.Success ? fenced.Groups["json"].Value.Trim() : value;
+    }
+    private static string SanitizeProviderError(string content, string? apiKey)
+    {
+        var value = content.Trim();
+        if (!string.IsNullOrWhiteSpace(apiKey))
+            value = value.Replace(apiKey, "[REDACTED]", StringComparison.Ordinal);
+        value = Regex.Replace(value, @"(?i)(bearer\s+)[^\s,;\""']+", "$1[REDACTED]");
+        value = Regex.Replace(value, @"(?i)(\""?(?:api[_-]?key|authorization|access[_-]?token|secret)\""?\s*[:=]\s*\""?)[^\s,;\""'}]+", "$1[REDACTED]");
+        return string.IsNullOrWhiteSpace(value) ? "(empty)" : Limit(value, 1500);
+    }
     private static string Limit(string value, int length) => value.Trim()[..Math.Min(value.Trim().Length, length)];
     private static string? OptionalReason(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : Limit(value, 500);

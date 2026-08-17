@@ -430,3 +430,10 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# ResolveHub API deployment/debug artifacts
+/backend/src/ResolveHub.Api/publish/
+/backend/src/ResolveHub.Api/resolvehub-api.zip
+/backend/src/ResolveHub.Api/resolvehub-logs*.zip
+/backend/src/ResolveHub.Api/resolvehub-logs*/
+/backend/src/ResolveHub.Api/ollama-test.json

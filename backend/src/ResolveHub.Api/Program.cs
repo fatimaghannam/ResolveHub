@@ -351,8 +351,17 @@ builder.Services.AddOptions<OllamaSettings>().Bind(builder.Configuration.GetSect
 builder.Services.AddHttpClient<IAiAssistantService, OllamaAiAssistantService>((services, client) =>
 {
     var settings = services.GetRequiredService<IOptions<OllamaSettings>>().Value;
+
     client.BaseAddress = new Uri(settings.BaseUrl.TrimEnd('/') + "/");
     client.Timeout = TimeSpan.FromSeconds(settings.TimeoutSeconds);
+
+    if (!string.IsNullOrWhiteSpace(settings.ApiKey))
+    {
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue(
+                "Bearer",
+                settings.ApiKey);
+    }
 });
 builder.Services.AddAuthorization();
 

@@ -129,6 +129,44 @@ public sealed class AiAssistantControllerTests
         Assert.Equal("Hardware", result.SuggestedCategoryName);
         Assert.Equal("Medium", result.SuggestedPriorityName);
         Assert.DoesNotContain("Maximum active tickets", handler.Body);
+        using var request = JsonDocument.Parse(handler.Body);
+        Assert.Equal(JsonValueKind.Object, request.RootElement.GetProperty("format").ValueKind);
+    }
+
+    [Fact]
+    public async Task Analyze_CloudUsesPromptSchemaAndAcceptsFencedJson()
+    {
+        await using var db = Context();
+        db.TicketCategories.Add(new TicketCategory { Name = "Hardware", IsActive = true });
+        db.TicketPriorities.Add(new TicketPriority { Name = "Medium", IsActive = true });
+        await db.SaveChangesAsync();
+        var handler = new CapturingHandler("{\"message\":{\"content\":\"```json\\n{\\\"category\\\":\\\"Hardware\\\",\\\"priority\\\":\\\"Medium\\\",\\\"categoryReason\\\":\\\"Storage issue\\\",\\\"priorityReason\\\":\\\"Performance impact\\\"}\\n```\"}}");
+
+        var result = await Service(db, handler, new OllamaSettings { ApiKey = "test-cloud-key" }).AnalyzeAsync(
+            new AnalyzeTicketRequest { Title = "Laptop storage full", Description = "Less than five GB remains." }, default);
+
+        Assert.Equal("Hardware", result.SuggestedCategoryName);
+        using var request = JsonDocument.Parse(handler.Body);
+        Assert.False(request.RootElement.TryGetProperty("format", out _));
+        var systemPrompt = request.RootElement.GetProperty("messages")[0].GetProperty("content").GetString();
+        Assert.Contains("Return ONLY valid JSON matching this schema", systemPrompt);
+        Assert.Contains("No Markdown, no code fences", systemPrompt);
+    }
+
+    [Fact]
+    public async Task Analyze_CloudMalformedJsonFailsSafely()
+    {
+        await using var db = Context();
+        db.TicketCategories.Add(new TicketCategory { Name = "Hardware", IsActive = true });
+        db.TicketPriorities.Add(new TicketPriority { Name = "Medium", IsActive = true });
+        await db.SaveChangesAsync();
+        var handler = new CapturingHandler("{\"message\":{\"content\":\"not json\"}}");
+
+        var exception = await Assert.ThrowsAsync<AiProviderException>(() => Service(db, handler,
+            new OllamaSettings { ApiKey = "test-cloud-key" }).AnalyzeAsync(
+            new AnalyzeTicketRequest { Title = "Laptop issue", Description = "Storage is full." }, default));
+
+        Assert.Contains("malformed structured output", exception.Message);
     }
 
     [Fact]
@@ -147,7 +185,22 @@ public sealed class AiAssistantControllerTests
     }
 
     [Fact]
-    public async Task Analyze_ReturnsValidatedRecommendation_WhenExplanationsAreMissing()
+    public async Task Analyze_RejectsInventedPriorityAfterDeserialization()
+    {
+        await using var db = Context();
+        db.TicketCategories.Add(new TicketCategory { Name = "Hardware", IsActive = true });
+        db.TicketPriorities.Add(new TicketPriority { Name = "Medium", IsActive = true });
+        await db.SaveChangesAsync();
+        var handler = new CapturingHandler("{\"message\":{\"content\":\"{\\\"category\\\":\\\"Hardware\\\",\\\"priority\\\":\\\"Urgent\\\",\\\"categoryReason\\\":\\\"Reason\\\",\\\"priorityReason\\\":\\\"Reason\\\"}\"}}");
+
+        var exception = await Assert.ThrowsAsync<AiProviderException>(() => Service(db, handler).AnalyzeAsync(
+            new AnalyzeTicketRequest { Title = "Laptop storage full", Description = "Less than five GB remains." }, default));
+
+        Assert.Contains("invalid ticket priority", exception.Message);
+    }
+
+    [Fact]
+    public async Task Analyze_RejectsRecommendation_WhenExplanationsAreMissing()
     {
         await using var db = Context();
         db.TicketCategories.Add(new TicketCategory { Name = "Hardware", IsActive = true });
@@ -155,13 +208,10 @@ public sealed class AiAssistantControllerTests
         await db.SaveChangesAsync();
         var handler = new CapturingHandler("{\"message\":{\"content\":\"{\\\"category\\\":\\\"Hardware\\\",\\\"priority\\\":\\\"Medium\\\"}\"}}");
 
-        var result = await Service(db, handler).AnalyzeAsync(new AnalyzeTicketRequest
-            { Title = "Laptop storage full", Description = "Less than five GB of disk space remains." }, default);
+        var exception = await Assert.ThrowsAsync<AiProviderException>(() => Service(db, handler).AnalyzeAsync(
+            new AnalyzeTicketRequest { Title = "Laptop storage full", Description = "Less than five GB of disk space remains." }, default));
 
-        Assert.Equal("Hardware", result.SuggestedCategoryName);
-        Assert.Equal("Medium", result.SuggestedPriorityName);
-        Assert.Null(result.CategoryReason);
-        Assert.Null(result.PriorityReason);
+        Assert.Contains("incomplete ticket analysis", exception.Message);
     }
 
     [Fact]
@@ -1328,9 +1378,9 @@ public sealed class AiAssistantControllerTests
             new TicketCategory { Name = name, IsActive = true, SortOrder = index + 1 }));
     }
 
-    private static OllamaAiAssistantService Service(ApplicationDbContext db, HttpMessageHandler handler) =>
+    private static OllamaAiAssistantService Service(ApplicationDbContext db, HttpMessageHandler handler, OllamaSettings? settings = null) =>
         new(new HttpClient(handler) { BaseAddress = new Uri("http://localhost/") }, db,
-            Options.Create(new OllamaSettings()), NullLogger<OllamaAiAssistantService>.Instance,
+            Options.Create(settings ?? new OllamaSettings()), NullLogger<OllamaAiAssistantService>.Instance,
             new StubContextBuilder("context"), new TestHostEnvironment());
 
     private static AiAssistantController Controller(IAiAssistantService service)
