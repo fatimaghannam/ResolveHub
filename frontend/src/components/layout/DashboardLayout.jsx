@@ -151,6 +151,7 @@ function getPageTitle(pathname, roleArea) {
   if (pathname.match(/\/tickets\/\d+$/)) return 'Ticket Details'
   if (pathname.endsWith('/tickets')) return 'My Tickets'
   if (pathname.endsWith('/dashboard')) return 'Dashboard'
+  if (pathname === '/employee/profile') return 'Profile'
   return 'Notifications'
 }
 
