@@ -20,7 +20,7 @@
       rgba(2, 15, 36, 0.04) 55%,
       rgba(2, 15, 36, 0.14) 100%
     ),
-    url("../assets/resolvehub-login-background.png");
+    url("/resolvehub-login-background.webp");
 
   background-repeat: no-repeat;
   background-size: cover;
