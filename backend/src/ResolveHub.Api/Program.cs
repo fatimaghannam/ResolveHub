@@ -38,11 +38,13 @@ var connectionString = //Gets the SQL Server connection string from the applicat
     builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException( //Stops the application if the database connection string is missing 
         "Connection string 'DefaultConnection' was not found.");
-//NOTE: ApplicationDbContext is the bridge between the C# backend and SQL Server (DbContext represents the database inside the C# application)
-builder.Services.AddDbContext<ApplicationDbContext>(options => //Registers ResolveHub's Entity framework database context
-{
-    options.UseSqlServer(connectionString); //configures entity framework core to use SQL server 
-});
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseSqlServer(
+        connectionString,
+        sqlOptions =>
+        {
+            sqlOptions.EnableRetryOnFailure();
+        }));
 
 builder.Services.AddDataProtection(); //data and tokens protection
 
