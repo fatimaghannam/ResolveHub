@@ -384,6 +384,11 @@ if (!app.Environment.IsEnvironment("Testing"))
         app.Services,
         app.Configuration,
         app.Environment);
+
+    await PresentationDemoDataSeeder.RunAsync(
+        app.Services,
+        app.Configuration,
+        app.Logger);
 }
 
 if (app.Environment.IsDevelopment()) //Enables Swagger/OpenAPI only during development 
