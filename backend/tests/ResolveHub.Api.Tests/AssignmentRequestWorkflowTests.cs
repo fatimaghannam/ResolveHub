@@ -429,6 +429,36 @@ public sealed class AssignmentRequestWorkflowTests
     }
 
     [Fact]
+    public async Task AdminComments_AllFilter_ReturnsEmptyPageForTicketWithNoComments()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        await factory.SeedTicketLookupsAsync();
+        var employee = await factory.CreateUserAsync(
+            "empty-comments-owner@resolvehub.test", Password, RoleNames.Employee);
+        var admin = await factory.CreateUserAsync(
+            "empty-comments-admin@resolvehub.test", Password, RoleNames.Admin);
+        using var employeeClient = await LoginAsync(factory, employee.Email!);
+        using var adminClient = await LoginAsync(factory, admin.Email!);
+        var ticket = await CreateTicketAsync(factory, employeeClient);
+
+        var response = await adminClient.GetAsync(
+            $"/api/admin/tickets/{ticket.TicketReferenceNumber}/comments" +
+            "?visibility=All&page=1&pageSize=5");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var page = (await response.Content
+            .ReadFromJsonAsync<TicketCommentPageDto>())!;
+        Assert.Empty(page.Items);
+        Assert.Equal(1, page.Page);
+        Assert.Equal(5, page.PageSize);
+        Assert.Equal(0, page.TotalThreads);
+        Assert.Equal(0, page.TotalVisibleComments);
+        Assert.Equal(0, page.PublicCount);
+        Assert.Equal(0, page.PrivateCount);
+        Assert.False(page.HasMore);
+    }
+
+    [Fact]
     public async Task CommentVisibility_IsEnforcedForEveryAuthorizedViewer()
     {
         await using var factory = new ResolveHubApiFactory();

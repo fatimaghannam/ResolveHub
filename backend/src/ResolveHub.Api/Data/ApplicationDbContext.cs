@@ -148,7 +148,8 @@ public sealed class ApplicationDbContext
             entity.Property(item => item.Title).HasMaxLength(150).IsRequired();
             entity.Property(item => item.Message).HasMaxLength(1000).IsRequired();
             entity.Property(item => item.TicketReferenceNumber).HasMaxLength(32);
-            entity.Property(item => item.CreatedDate).HasColumnType("datetime2");
+            entity.Property(item => item.CreatedDate)
+                .HasConversion(UtcDateTimeConverter).HasColumnType("datetime2");
             entity.HasIndex(item => new { item.UserAccountID, item.IsRead, item.CreatedDate });
             entity.HasOne(item => item.UserAccount).WithMany(user => user.Notifications)
                 .HasForeignKey(item => item.UserAccountID).OnDelete(DeleteBehavior.Cascade);

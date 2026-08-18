@@ -39,7 +39,8 @@ public sealed class NotificationEndpointTests
                     Type = "Test",
                     Title = $"For {user.Id}",
                     Message = "Recipient isolation test",
-                    CreatedDate = DateTime.UtcNow
+                    CreatedDate = DateTime.SpecifyKind(
+                        DateTime.UtcNow, DateTimeKind.Unspecified)
                 });
             await db.SaveChangesAsync();
         }
@@ -60,9 +61,10 @@ public sealed class NotificationEndpointTests
                 .ReadFromJsonAsync<List<NotificationPayload>>();
             var notification = Assert.Single(notifications!);
             Assert.Equal($"For {user.Id}", notification.Title);
+            Assert.Equal(DateTimeKind.Utc, notification.CreatedDate.Kind);
         }
     }
 
     private sealed record LoginPayload(string AccessToken);
-    private sealed record NotificationPayload(string Title);
+    private sealed record NotificationPayload(string Title, DateTime CreatedDate);
 }

@@ -3,16 +3,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { getNotifications, markAllNotificationsRead, markNotificationRead } from '../../services/notificationService.js'
 import { notifyNotificationsChanged, subscribeToNotificationsChanged } from '../../services/notificationEvents.js'
+import { formatRelativeTime } from '../../utils/dateTime.js'
 import { notificationTarget } from '../../utils/notificationRoutes.js'
-
-function relativeTime(value) {
-  const minutes = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60000))
-  if (minutes < 1) return 'Just now'
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
-}
 
 function NotificationBell({ roleArea }) {
   const navigate = useNavigate()
@@ -75,7 +67,7 @@ function NotificationBell({ roleArea }) {
       <header><strong>Notifications</strong>{unread > 0 && <button type="button" onClick={markAll}>Mark all as read</button>}</header>
       <div>{unreadItems.length === 0 ? <div className="notification-dropdown__empty"><strong>You're all caught up.</strong><span>No unread notifications.</span></div> : unreadItems.slice(0, 5).map((item) =>
         <button className={item.isRead ? '' : 'is-unread'} type="button" key={item.id} onClick={() => select(item)}>
-          {!item.isRead && <i className="notification-unread-dot" />}<span><strong>{item.title}</strong><time>{relativeTime(item.createdDate)}</time></span>
+          {!item.isRead && <i className="notification-unread-dot" />}<span><strong>{item.title}</strong><time>{formatRelativeTime(item.createdDate)}</time></span>
         </button>)}</div>
       <Link to={`/${roleArea}/notifications`} onClick={() => setOpen(false)}>View all notifications</Link>
     </div>}
