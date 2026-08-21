@@ -384,7 +384,10 @@ if (!app.Environment.IsEnvironment("Testing"))
         app.Services,
         app.Configuration,
         app.Environment);
+}
 
+if (app.Environment.IsDevelopment())
+{
     await PresentationDemoDataSeeder.RunAsync(
         app.Services,
         app.Configuration,
