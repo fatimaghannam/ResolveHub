@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { ClipboardCheck, Inbox } from 'lucide-react'
-import { EmptyState, ErrorState, LoadingState } from '../../components/common/States.jsx'
+import { ErrorState, LoadingState } from '../../components/common/States.jsx'
 import Toast from '../../components/common/Toast.jsx'
-import { TicketPriorityBadge } from '../../components/tickets/TicketBadges.jsx'
-import { AgentWorkloadCard } from '../../components/tickets/AgentWorkload.jsx'
+import { TicketPriorityBadge, TicketStatusBadge } from '../../components/tickets/TicketBadges.jsx'
+import { AgentWorkloadPreview } from '../../components/tickets/AgentWorkload.jsx'
 import { assignAdminTicket, getAdminAssignmentRequests, getAdminAssignments, reviewAdminAssignmentRequest } from '../../services/adminService.js'
 import {
   assignManagerTicket,
@@ -33,12 +33,6 @@ const blankFilters = {
   toDate: '',
 }
 const dateRangeOptions = STANDARD_DATE_RANGE_OPTIONS
-const initialWorkloadFilters = {
-  search: '',
-  capacityState: '',
-  workload: '',
-  sortBy: 'name-asc',
-}
 
 function AssignmentEmptyState({ type = 'requests', title, message }) {
   const Icon = type === 'tickets' ? Inbox : ClipboardCheck
@@ -63,7 +57,6 @@ function AdminAssignmentsPage({ roleArea = 'admin' }) {
   const [filters, setFilters] = useState(blankFilters)
   const [lookups, setLookups] = useState({ categories: [], priorities: [] })
   const [dateError, setDateError] = useState('')
-  const [workloadFilters, setWorkloadFilters] = useState(initialWorkloadFilters)
   const [assignmentRequests, setAssignmentRequests] = useState([])
   const [agentAssignmentRequests, setAgentAssignmentRequests] = useState([])
   const [agentAssignmentRequestError, setAgentAssignmentRequestError] = useState('')
@@ -403,43 +396,6 @@ function AdminAssignmentsPage({ roleArea = 'admin' }) {
     if (roleArea !== 'manager' || location.hash !== '#cancellation-requests' || !data) return
     cancellationRequestsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [data, location.hash, roleArea])
-  const filteredAgentWorkloads = useMemo(() => {
-    if (roleArea !== 'admin') return agentWorkloads
-    const search = workloadFilters.search.trim().toLowerCase()
-    const filtered = agentWorkloads.filter((agent) => {
-      const matchesSearch = !search ||
-        agent.name.toLowerCase().includes(search) ||
-        agent.email.toLowerCase().includes(search)
-      const matchesStatus = !workloadFilters.capacityState ||
-        agent.capacityState === workloadFilters.capacityState
-      const matchesWorkload = !workloadFilters.workload ||
-        (workloadFilters.workload === 'has-capacity'
-          ? !agent.isAtCapacity
-          : agent.isAtCapacity)
-      return matchesSearch && matchesStatus && matchesWorkload
-    })
-    return filtered.toSorted((left, right) => {
-      switch (workloadFilters.sortBy) {
-        case 'name-desc':
-          return right.name.localeCompare(left.name)
-        case 'workload-asc':
-          return left.activeTicketCount - right.activeTicketCount ||
-            left.name.localeCompare(right.name)
-        case 'workload-desc':
-          return right.activeTicketCount - left.activeTicketCount ||
-            left.name.localeCompare(right.name)
-        case 'remaining-desc':
-          return right.remainingCapacity - left.remainingCapacity ||
-            left.name.localeCompare(right.name)
-        case 'remaining-asc':
-          return left.remainingCapacity - right.remainingCapacity ||
-            left.name.localeCompare(right.name)
-        default:
-          return left.name.localeCompare(right.name)
-      }
-    })
-  }, [agentWorkloads, roleArea, workloadFilters])
-
   return (
     <>
       <section className="page-heading"><h2>Ticket Assignments</h2><p>Assign unassigned requests and review current IT Agent workloads.</p></section>
@@ -483,7 +439,7 @@ function AdminAssignmentsPage({ roleArea = 'admin' }) {
       </section>}
       {roleArea === 'manager' && <section id="cancellation-requests" ref={cancellationRequestsSectionRef} className="panel dashboard-section assignment-management-section">
         <div className="panel__heading assignment-section-heading"><div><h2>Cancellation Requests</h2><p>Review requests from IT Agents assigned to active tickets.</p></div><span className="assignment-section-count">{pendingCancellationRequests.length} pending</span></div>
-        {cancellationRequestError ? <div className="inline-alert inline-alert--error" role="alert">{cancellationRequestError}</div> : pendingCancellationRequests.length === 0 ? <AssignmentEmptyState title="No cancellation requests awaiting review." message="New requests from IT Agents will appear here." /> : <div className="cancellation-requests-table-wrap"><table className="ticket-table cancellation-requests-table"><colgroup><col className="cancellation-col--ticket" /><col className="cancellation-col--agent" /><col className="cancellation-col--ticket-status" /><col className="cancellation-col--requested" /><col className="cancellation-col--request-status" /><col className="cancellation-col--actions" /></colgroup><thead><tr><th>Ticket</th><th>Assigned Agent</th><th>Status</th><th>Requested</th><th>Request Status</th><th>Review</th></tr></thead><tbody>{pendingCancellationRequests.map((request) => <tr key={request.id}><td><span className="cancellation-ticket-identity"><strong>{request.ticketReferenceNumber}</strong><small>{request.ticketTitle}</small></span></td><td className="cancellation-request-agent">{request.requestedByAgentName}</td><td className="cancellation-request-ticket-status">{request.currentTicketStatus}</td><td>{formatLocalDateTime(request.requestedDate)}</td><td><span className={`badge assignment-request-status assignment-request-status--${request.status.toLowerCase()}`}>{request.status}</span></td><td><div className="cancellation-request-actions">{request.status === 'Pending' && <div className="cancellation-action-menu"><button className="button button--primary button--compact cancellation-action-menu__trigger" type="button" aria-haspopup="menu" aria-expanded={openCancellationMenu === request.id} onClick={(event) => toggleCancellationMenu(request.id, event)}>Review <span aria-hidden="true">▼</span></button>{openCancellationMenu === request.id && cancellationMenuPosition && createPortal(<div className="cancellation-action-menu__dropdown" style={cancellationMenuPosition} role="menu"><Link className="cancellation-action-menu__item" role="menuitem" to={`/manager/tickets/${request.ticketReferenceNumber}`} state={{ from: 'cancellation-requests', cancellationRequest: request }} onClick={() => setOpenCancellationMenu(null)}>View Ticket</Link><div className="cancellation-action-menu__divider" role="separator" /><button className="cancellation-action-menu__item cancellation-action-menu__item--danger" type="button" role="menuitem" onClick={() => { setOpenCancellationMenu(null); setCancellationReview({ request, decision: 'cancel' }) }}>Approve &amp; Cancel</button><button className="cancellation-action-menu__item" type="button" role="menuitem" onClick={() => { setOpenCancellationMenu(null); setCancellationReview({ request, decision: 'reassign' }) }}>Approve &amp; Reassign</button><div className="cancellation-action-menu__divider" role="separator" /><button className="cancellation-action-menu__item cancellation-action-menu__item--danger" type="button" role="menuitem" onClick={() => { setOpenCancellationMenu(null); setCancellationReview({ request, decision: 'reject' }) }}>Reject</button></div>, document.body)}</div>}</div></td></tr>)}</tbody></table></div>}
+        {cancellationRequestError ? <div className="inline-alert inline-alert--error" role="alert">{cancellationRequestError}</div> : pendingCancellationRequests.length === 0 ? <AssignmentEmptyState title="No cancellation requests awaiting review." message="New requests from IT Agents will appear here." /> : <div className="cancellation-requests-table-wrap"><table className="ticket-table cancellation-requests-table"><colgroup><col className="cancellation-col--ticket" /><col className="cancellation-col--agent" /><col className="cancellation-col--ticket-status" /><col className="cancellation-col--requested" /><col className="cancellation-col--request-status" /><col className="cancellation-col--actions" /></colgroup><thead><tr><th>Ticket</th><th>Assigned Agent</th><th>Status</th><th>Requested</th><th>Request Status</th><th>Review</th></tr></thead><tbody>{pendingCancellationRequests.map((request) => <tr key={request.id}><td><span className="cancellation-ticket-identity"><strong>{request.ticketReferenceNumber}</strong><small>{request.ticketTitle}</small></span></td><td className="cancellation-request-agent">{request.requestedByAgentName}</td><td className="cancellation-request-ticket-status"><TicketStatusBadge value={request.currentTicketStatus} /></td><td>{formatLocalDateTime(request.requestedDate)}</td><td><span className={`badge assignment-request-status assignment-request-status--${request.status.toLowerCase()}`}>{request.status}</span></td><td><div className="cancellation-request-actions">{request.status === 'Pending' && <div className="cancellation-action-menu"><button className="button button--primary button--compact cancellation-action-menu__trigger" type="button" aria-haspopup="menu" aria-expanded={openCancellationMenu === request.id} onClick={(event) => toggleCancellationMenu(request.id, event)}>Review <span aria-hidden="true">▼</span></button>{openCancellationMenu === request.id && cancellationMenuPosition && createPortal(<div className="cancellation-action-menu__dropdown" style={cancellationMenuPosition} role="menu"><Link className="cancellation-action-menu__item" role="menuitem" to={`/manager/tickets/${request.ticketReferenceNumber}`} state={{ from: 'cancellation-requests', cancellationRequest: request }} onClick={() => setOpenCancellationMenu(null)}>View Ticket</Link><div className="cancellation-action-menu__divider" role="separator" /><button className="cancellation-action-menu__item cancellation-action-menu__item--danger" type="button" role="menuitem" onClick={() => { setOpenCancellationMenu(null); setCancellationReview({ request, decision: 'cancel' }) }}>Approve &amp; Cancel</button><button className="cancellation-action-menu__item" type="button" role="menuitem" onClick={() => { setOpenCancellationMenu(null); setCancellationReview({ request, decision: 'reassign' }) }}>Approve &amp; Reassign</button><div className="cancellation-action-menu__divider" role="separator" /><button className="cancellation-action-menu__item cancellation-action-menu__item--danger" type="button" role="menuitem" onClick={() => { setOpenCancellationMenu(null); setCancellationReview({ request, decision: 'reject' }) }}>Reject</button></div>, document.body)}</div>}</div></td></tr>)}</tbody></table></div>}
       </section>}
       <section id={roleArea === 'admin' ? 'assignment-approvals' : undefined} className="panel dashboard-section assignment-management-section">
         <div className="panel__heading assignment-section-heading"><div><h2>{roleArea === 'manager' ? 'My Assignment Requests' : 'Assignment Approvals'}</h2><p>{roleArea === 'manager' ? 'Track requests submitted for Administrator approval.' : 'Approve or reject assignment requests submitted by Managers.'}</p></div><span className="assignment-section-count">{visibleAssignmentRequests.length} {visibleAssignmentRequests.length === 1 ? 'request' : 'requests'}</span></div>
@@ -538,22 +494,7 @@ function AdminAssignmentsPage({ roleArea = 'admin' }) {
       </section>
       </>}
       {rejectingRequest && <><div className="dialog-backdrop" onClick={() => !reviewingRequest && setRejectingRequest(null)} aria-hidden="true" /><section className="dialog" role="dialog" aria-modal="true" aria-labelledby="reject-assignment-title"><h2 id="reject-assignment-title">{rejectingRequest.agentOrigin ? 'Decline Assignment Request' : 'Reject assignment request?'}</h2><p>{rejectingRequest.agentOrigin ? `Provide a reason for declining ${rejectingRequest.requestedByName}'s request for ${rejectingRequest.ticketReferenceNumber}.` : `Provide a short reason for rejecting assignment of ${rejectingRequest.ticketReferenceNumber} to ${rejectingRequest.requestedAgentName}.`}</p><label className="field"><span>Reason</span><textarea maxLength="500" rows="3" value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)} placeholder="Provide a reason for declining this request..." autoFocus /></label><div className="dialog__actions"><button className="button button--secondary" type="button" disabled={Boolean(reviewingRequest)} onClick={() => setRejectingRequest(null)}>Cancel</button><button className="button button--danger" type="button" disabled={!rejectionReason.trim() || Boolean(reviewingRequest)} onClick={() => rejectingRequest.agentOrigin ? reviewAgentRequest(rejectingRequest, 'decline', rejectionReason) : reviewRequest(rejectingRequest, 'reject', rejectionReason)}>{reviewingRequest ? 'Saving…' : rejectingRequest.agentOrigin ? 'Decline Request' : 'Reject Request'}</button></div></section></>}
-      <section id={roleArea === 'admin' ? 'it-agent-workload' : undefined} className="panel">
-        <div className="panel__heading"><div><h2>IT Agent Workload</h2><p>Review current capacity before assigning support requests.</p></div></div>
-        {roleArea === 'admin' && <div className="workload-filter-toolbar">
-          <label><span>Search</span><input value={workloadFilters.search} onChange={(event) => setWorkloadFilters({ ...workloadFilters, search: event.target.value })} placeholder="Search agent by name" /></label>
-          <label><span>Capacity status</span><select value={workloadFilters.capacityState} onChange={(event) => setWorkloadFilters({ ...workloadFilters, capacityState: event.target.value })}><option value="">All statuses</option><option>Available</option><option>Near Capacity</option><option>Full</option><option>Over Capacity</option></select></label>
-          <label><span>Workload</span><select value={workloadFilters.workload} onChange={(event) => setWorkloadFilters({ ...workloadFilters, workload: event.target.value })}><option value="">All workloads</option><option value="has-capacity">Has capacity</option><option value="no-capacity">No capacity</option></select></label>
-          <label><span>Sort by</span><select value={workloadFilters.sortBy} onChange={(event) => setWorkloadFilters({ ...workloadFilters, sortBy: event.target.value })}><option value="name-asc">Name A–Z</option><option value="name-desc">Name Z–A</option><option value="workload-asc">Lowest workload</option><option value="workload-desc">Highest workload</option><option value="remaining-desc">Most remaining capacity</option><option value="remaining-asc">Least remaining capacity</option></select></label>
-          <button className="button button--secondary button--compact" type="button" onClick={() => setWorkloadFilters(initialWorkloadFilters)}>Reset Filters</button>
-        </div>}
-        {agentWorkloads.length > 0 && roleArea === 'admin' && <p className="workload-result-count">Showing {filteredAgentWorkloads.length} of {agentWorkloads.length} agents</p>}
-        {agentWorkloads.length === 0
-          ? <EmptyState title="No active agents" message="Active IT Support Agents will appear here." />
-          : filteredAgentWorkloads.length === 0
-            ? <EmptyState title="No matching agents" message="No IT Agents match the selected filters." action={<button className="button button--secondary button--compact" type="button" onClick={() => setWorkloadFilters(initialWorkloadFilters)}>Reset Filters</button>} />
-            : <div className="workload-grid workload-grid--filterable">{filteredAgentWorkloads.map((agent) => <AgentWorkloadCard agent={agent} ticketPath={roleArea === 'admin' ? `/admin/workload/${agent.userId}` : undefined} navigationState={roleArea === 'admin' ? { from: 'admin-assignments-workload' } : undefined} key={agent.userId} />)}</div>}
-      </section>
+      <AgentWorkloadPreview agents={agentWorkloads} roleArea={roleArea} />
     </>
   )
 }

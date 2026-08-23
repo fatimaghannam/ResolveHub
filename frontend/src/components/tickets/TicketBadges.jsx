@@ -1,6 +1,6 @@
 export function TicketStatusBadge({ value }) {
   const key = value.toLowerCase().replaceAll(' ', '-')
-  return <span className={`badge status-${key}`}>{value}</span>
+  return <span className={`badge ticket-status-badge status-${key}`}>{value}</span>
 }
 
 export function TicketPriorityBadge({ value }) {

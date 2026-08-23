@@ -21,14 +21,25 @@ const tooltipStyle = {
   boxShadow: '0 8px 24px rgba(20, 39, 68, .1)',
 }
 
+const ticketStatusColors = {
+  Open: 'var(--ticket-status-open)',
+  Assigned: 'var(--ticket-status-assigned)',
+  'In Progress': 'var(--ticket-status-in-progress)',
+  Pending: 'var(--ticket-status-pending)',
+  Resolved: 'var(--ticket-status-resolved)',
+  Closed: 'var(--ticket-status-closed)',
+  Cancelled: 'var(--ticket-status-cancelled)',
+  Duplicate: 'var(--ticket-status-duplicate)',
+}
+
 function ChartHeading({ title, description }) {
   return <div className="chart-heading"><h2>{title}</h2><p>{description}</p></div>
 }
 
 export function TicketStatusChart({ data, totalTickets }) {
-  const ticketStatusChartData = data.map((item, index) => ({
+  const ticketStatusChartData = data.map((item) => ({
     name: item.name, value: item.value,
-    color: ['#1769c2', '#6f42a6', '#d17a00', '#087b8c', '#18794e', '#68778c'][index % 6],
+    color: ticketStatusColors[item.name] ?? 'var(--ticket-status-closed)',
   }))
   const summary = ticketStatusChartData
     .map((item) => `${item.name}: ${item.value}`)

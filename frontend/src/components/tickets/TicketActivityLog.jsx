@@ -29,11 +29,14 @@ const iconRules = [
   [/duplicate review approved/i, CheckCircle2, 'resolved'],
   [/duplicate review rejected/i, CircleX, 'danger'],
   [/duplicate review reported/i, Copy, 'status'],
+  [/ticket reassigned/i, ArrowRightLeft, 'ticket-assigned'],
+  [/ticket assigned/i, UserRoundCheck, 'ticket-assigned'],
   [/reassign/i, ArrowRightLeft, 'assignment'], [/assign/i, UserRoundCheck, 'assignment'],
   [/created/i, FilePlus2, 'created'],
   [/paused/i, CirclePause, 'paused'], [/resumed/i, RefreshCcw, 'work'],
-  [/work started/i, CirclePlay, 'work'], [/resolved/i, CheckCircle2, 'resolved'],
-  [/closed/i, Archive, 'closed'], [/duplicate/i, Copy, 'danger'], [/cancelled/i, CircleX, 'danger'],
+  [/work started/i, CirclePlay, 'work'], [/resolved/i, CheckCircle2, 'ticket-resolved'],
+  [/closed/i, Archive, 'ticket-closed'], [/duplicate/i, Copy, 'ticket-duplicate'],
+  [/cancelled/i, CircleX, 'ticket-cancelled'],
   [/comment|reply/i, MessageSquareText, 'comment'], [/attachment/i, Paperclip, 'attachment'],
   [/reopened|status/i, RefreshCcw, 'status'], [/priority|category/i, Tag, 'status'],
 ]
@@ -41,12 +44,14 @@ const iconRules = [
 function activityVisual(item) {
   const type = item.activityType
   if (/status changed/i.test(type)) {
-    if (/resolved/i.test(item.newValue)) return { Icon: CheckCircle2, tone: 'resolved' }
-    if (/closed/i.test(item.newValue)) return { Icon: Archive, tone: 'closed' }
-    if (/cancelled/i.test(item.newValue)) return { Icon: CircleX, tone: 'danger' }
-    if (/pending/i.test(item.newValue)) return { Icon: CirclePause, tone: 'paused' }
-    if (/in progress/i.test(item.newValue)) return { Icon: Clock3, tone: 'default' }
-    if (/reopened|open/i.test(item.newValue)) return { Icon: RefreshCcw, tone: 'status' }
+    if (/assigned/i.test(item.newValue)) return { Icon: UserRoundCheck, tone: 'ticket-assigned' }
+    if (/in progress/i.test(item.newValue)) return { Icon: Clock3, tone: 'ticket-in-progress' }
+    if (/pending/i.test(item.newValue)) return { Icon: CirclePause, tone: 'ticket-pending' }
+    if (/resolved/i.test(item.newValue)) return { Icon: CheckCircle2, tone: 'ticket-resolved' }
+    if (/closed/i.test(item.newValue)) return { Icon: Archive, tone: 'ticket-closed' }
+    if (/cancelled/i.test(item.newValue)) return { Icon: CircleX, tone: 'ticket-cancelled' }
+    if (/duplicate/i.test(item.newValue)) return { Icon: Copy, tone: 'ticket-duplicate' }
+    if (/reopened|open/i.test(item.newValue)) return { Icon: RefreshCcw, tone: 'ticket-open' }
   }
   const match = iconRules.find(([pattern]) => pattern.test(type))
   return match ? { Icon: match[1], tone: match[2] } : { Icon: History, tone: 'default' }

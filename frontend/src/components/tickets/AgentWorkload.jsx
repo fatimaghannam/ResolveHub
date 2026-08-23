@@ -1,4 +1,15 @@
 import { Link } from 'react-router-dom'
+import { EmptyState } from '../common/States.jsx'
+
+const workloadPreviewLimit = 6
+
+function rankAgentWorkloads(agents) {
+  return agents.toSorted((left, right) =>
+    right.remainingCapacity - left.remainingCapacity ||
+    left.activeTicketCount - right.activeTicketCount ||
+    left.name.localeCompare(right.name) ||
+    left.userId - right.userId)
+}
 
 function capacityModifier(value) {
   return value.toLowerCase().replaceAll(' ', '-')
@@ -58,5 +69,46 @@ export function AgentWorkloadCard({ agent, ticketPath, navigationState }) {
       </div>
       {ticketPath && <footer className="workload-card__footer"><Link className="table-action" to={ticketPath} state={navigationState}>View tickets</Link></footer>}
     </article>
+  )
+}
+
+export function AgentWorkloadPreview({ agents, roleArea }) {
+  const previewAgents = rankAgentWorkloads(agents).slice(0, workloadPreviewLimit)
+  const hasAvailableCapacity = agents.some((agent) =>
+    !agent.isAtCapacity && agent.remainingCapacity > 0)
+
+  return (
+    <section id={roleArea === 'admin' ? 'it-agent-workload' : undefined} className="panel">
+      <div className="panel__heading workload-preview__heading">
+        <div>
+          <h2>IT Agent Workload</h2>
+          <p>Review current capacity before assigning support requests.</p>
+        </div>
+        <Link className="table-action workload-preview__all-link" to={`/${roleArea}/workload`}>
+          View all agents <span aria-hidden="true">→</span>
+        </Link>
+      </div>
+      {agents.length === 0
+        ? <EmptyState title="No IT agents" message="No IT agents are currently available in the system." />
+        : <>
+          <div className="workload-grid workload-preview__grid">
+            {previewAgents.map((agent) => (
+              <AgentWorkloadCard
+                agent={agent}
+                ticketPath={`/${roleArea}/workload/${agent.userId}`}
+                navigationState={roleArea === 'admin'
+                  ? { from: 'admin-assignments-workload' }
+                  : undefined}
+                key={agent.userId}
+              />
+            ))}
+          </div>
+          <p className={`workload-preview__message${hasAvailableCapacity ? '' : ' workload-preview__message--full'}`}>
+            {hasAvailableCapacity
+              ? 'Showing agents with the most available capacity.'
+              : 'No IT agents currently have available capacity.'}
+          </p>
+        </>}
+    </section>
   )
 }
