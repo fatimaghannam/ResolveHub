@@ -13,6 +13,31 @@ import {
 import '../../styles/login.css'
 import { useTheme } from '../../theme/ThemeContext.jsx'
 
+const supportEmail = import.meta.env.VITE_SUPPORT_EMAIL?.trim()
+const validSupportEmail = supportEmail &&
+  /^[^\s@?&#]+@[^\s@?&#]+\.[^\s@?&#]+$/.test(supportEmail)
+
+function createSupportMailto(accountEmail) {
+  if (!validSupportEmail) return null
+
+  const subject = 'ResolveHub Support Request'
+  const enteredEmail = accountEmail.trim()
+  const body = `Hello ResolveHub Support Team,
+
+I'm reaching out for help with accessing my ResolveHub account.
+
+Account email:${enteredEmail ? ` ${enteredEmail}` : ''}
+
+Issue:
+
+Description:
+
+
+Thank you.`
+
+  return `mailto:${encodeURIComponent(supportEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+}
+
 function getLoginError(error) {
   if (error.status === 400) {
     return 'Please check your email address and password and try again.'
@@ -101,6 +126,14 @@ function LoginPage() {
   function handleForgotPassword() {
     navigate('/forgot-password')
   }
+
+  function handleSupportContact(event) {
+    if (validSupportEmail) return
+    event.preventDefault()
+    setMessage('IT support contact is currently unavailable.')
+  }
+
+  const supportMailto = createSupportMailto(email)
 
   return (
     <main className="login-page">
@@ -199,7 +232,13 @@ function LoginPage() {
           <div className="login-card__footer">
             <p>
               Need help accessing your account?{' '}
-              <span>Contact IT Support</span>
+              <a
+                href={supportMailto ?? '#'}
+                onClick={handleSupportContact}
+                aria-label="Contact IT Support by email"
+              >
+                Contact IT Support
+              </a>
             </p>
           </div>
         </section>
