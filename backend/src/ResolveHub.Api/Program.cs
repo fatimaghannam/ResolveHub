@@ -339,6 +339,7 @@ builder.Services.AddScoped<ITicketCommentService, TicketCommentService>();
 builder.Services.AddScoped<IAgentTicketService, AgentTicketService>();
 builder.Services.AddScoped<IAdminTicketService, AdminTicketService>();
 builder.Services.AddScoped<IAdminTicketReportService, AdminTicketReportService>();
+builder.Services.AddScoped<IDashboardReportService, DashboardReportService>();
 builder.Services.AddScoped<IAdminUserService, AdminUserService>();
 builder.Services.AddScoped<IAdminCategoryService, AdminCategoryService>();
 builder.Services.AddScoped<ISystemAuditLogService, SystemAuditLogService>();

@@ -14,6 +14,7 @@ import { TicketPriorityBadge } from '../../components/tickets/TicketBadges.jsx'
 import { AgentWorkloadSummary } from '../../components/tickets/AgentWorkload.jsx'
 import { getManagerDashboard } from '../../services/managerService.js'
 import { formatLocalDateTime } from '../../utils/dateTime.js'
+import { DashboardReportButton } from '../../components/reports/DashboardReportDialog.jsx'
 
 const statistics = [
   ['Total Tickets', 'totalTickets', Ticket, 'cyan'],
@@ -45,9 +46,10 @@ function ManagerDashboardPage() {
 
   return (
     <>
-      <section className="page-heading page-heading--compact">
-        <h2>Welcome back, {user?.firstName ?? 'Manager'}</h2>
-        <p>Track support operations, team capacity, and tickets requiring attention.</p>
+      <section className="page-heading page-heading--compact page-heading--action">
+        <div><h2>Welcome back, {user?.firstName ?? 'Manager'}</h2>
+        <p>Track support operations, team capacity, and tickets requiring attention.</p></div>
+        <DashboardReportButton />
       </section>
       {error && <ErrorState message={error} onRetry={() => setReload((value) => value + 1)} />}
       {!error && !data && <LoadingState message="Loading Manager dashboard…" />}

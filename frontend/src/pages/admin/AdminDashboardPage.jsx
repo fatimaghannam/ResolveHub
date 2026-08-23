@@ -22,6 +22,7 @@ import { AgentWorkloadSummary } from '../../components/tickets/AgentWorkload.jsx
 import { ErrorState, LoadingState } from '../../components/common/States.jsx'
 import { getAdminDashboard } from '../../services/adminService.js'
 import { formatLocalDateTime } from '../../utils/dateTime.js'
+import { DashboardReportButton } from '../../components/reports/DashboardReportDialog.jsx'
 
 const statistics = [
   ['Total Users', 'totalUsers', Users, 'blue'],
@@ -62,9 +63,10 @@ function AdminDashboardPage() {
 
   return (
     <>
-      <section className="page-heading page-heading--compact">
-        <h2>Welcome back, {user?.firstName ?? 'Administrator'}</h2>
-        <p>Monitor system performance and manage help desk operations from one place.</p>
+      <section className="page-heading page-heading--compact page-heading--action">
+        <div><h2>Welcome back, {user?.firstName ?? 'Administrator'}</h2>
+        <p>Monitor system performance and manage help desk operations from one place.</p></div>
+        <DashboardReportButton />
       </section>
 
       {error && <ErrorState message={error} onRetry={() => setReload((value) => value + 1)} />}
