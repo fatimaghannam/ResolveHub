@@ -71,8 +71,16 @@ html:has(.dashboard-shell) { scroll-padding-top: 98px; }
 .icon-button.sidebar__mobile-close { display: none; margin-left: auto; color: white; }
 .sidebar__desktop-toggle { flex:0 0 26px; width:26px; height:26px; padding:0; border:1px solid rgba(255,255,255,.18); border-radius:7px; color:white; background:transparent; box-shadow:none; }
 .dashboard-shell--collapsed .sidebar { width: 84px; padding-inline: 6px; }
-.dashboard-shell--collapsed .sidebar__brand { height:70px; justify-content:space-between; gap:0; padding:0 2px 28px; }
-.dashboard-shell--collapsed .sidebar__desktop-toggle { flex-basis:24px; width:24px; height:24px; }
+.dashboard-shell--collapsed .sidebar__brand {   height: 70px;
+  justify-content: center;
+  position: relative;
+  gap: 0;
+  padding: 0 2px 28px; }
+.dashboard-shell--collapsed .sidebar__desktop-toggle {   position: absolute;
+  right: -4px;
+  flex-basis: 24px;
+  width: 24px;
+  height: 24px; }
 .dashboard-shell--collapsed .sidebar-text { position:absolute; opacity:0; visibility:hidden; transform:translateX(-5px); pointer-events:none; transition:opacity 90ms ease, transform 120ms ease, visibility 0s linear 120ms; }
 .dashboard-shell--collapsed .sidebar-link { justify-content: center; padding-inline: 0; }
 .dashboard-shell--collapsed .sidebar-link--active { box-shadow: inset 3px 0 var(--blue); }
