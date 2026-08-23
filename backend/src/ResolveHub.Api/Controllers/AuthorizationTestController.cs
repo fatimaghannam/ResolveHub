@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
 using ResolveHub.Api.Constants;
 
 namespace ResolveHub.Api.Controllers;
@@ -7,8 +8,23 @@ namespace ResolveHub.Api.Controllers;
 [ApiController]
 [Route("api/authorization-test")]
 [Authorize]
-public sealed class AuthorizationTestController : ControllerBase
+public sealed class AuthorizationTestController(IWebHostEnvironment environment)
+    : ControllerBase, IAsyncActionFilter
 {
+    [NonAction]
+    public async Task OnActionExecutionAsync(
+        ActionExecutingContext context,
+        ActionExecutionDelegate next)
+    {
+        if (!environment.IsDevelopment() && !environment.IsEnvironment("Testing"))
+        {
+            context.Result = NotFound();
+            return;
+        }
+
+        await next();
+    }
+
     [HttpGet("authenticated")]
     public IActionResult GetAuthenticated()
     {

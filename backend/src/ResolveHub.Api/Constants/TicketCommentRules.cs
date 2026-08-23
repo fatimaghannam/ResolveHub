@@ -11,11 +11,11 @@ public static class TicketCommentRules //This class contains the rules related t
         Enum.TryParse(value, true, out visibility) &&
         Enum.IsDefined(visibility);
 
-    public static bool IsReadOnly(string statusName) => //checks whether comments should be read-only based on the ticket status , whether it is closed/cancelled or duplicate
+    public static bool IsReadOnly(string statusName) => //checks whether comments should be read only based on the ticket status , whether it is closed/cancelled or duplicate
         statusName is TicketStatusNames.Closed or TicketStatusNames.Cancelled or
             TicketStatusNames.Duplicate;
 
-    public static string HistoryDescription(CommentVisibility visibility) => //checks the description that will b saved in the ticket history .
+    public static string HistoryDescription(CommentVisibility visibility) => //checks the description that will be saved in the ticket history .
         visibility == CommentVisibility.Private
             ? "A Private comment was added."
             : "A Public comment was added.";
