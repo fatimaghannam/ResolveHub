@@ -9,6 +9,7 @@ using ResolveHub.Api.Constants;
 using ResolveHub.Api.Data;
 using ResolveHub.Api.DTOs.AI;
 using ResolveHub.Api.Entities;
+using ResolveHub.Api.Infrastructure;
 using ResolveHub.Api.Services.Interfaces;
 using ResolveHub.Api.Services.Models;
 using ResolveHub.Api.Settings;
@@ -91,6 +92,20 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
     public async Task<TicketServiceResult<AiChatResponse>> ChatAsync(int userId, string role, AiChatRequest request, CancellationToken token)
     {
         var latestUserMessage = request.Messages.LastOrDefault(message => message.Role == "user")?.Content;
+        if (TryParseTicketLookupIntent(request.Messages, latestUserMessage, out var lookupIntent))
+        {
+            try
+            {
+                return new(TicketOperationStatus.Success,
+                    await LookupTicketsAsync(userId, role, lookupIntent, token));
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogError(ex, "Authorized AI ticket lookup failed for user {UserId}.", userId);
+                return new(TicketOperationStatus.Success, new(
+                    "I couldn't retrieve ticket information right now. Please try again."));
+            }
+        }
         if (TryGetAssistantConversationAnswer(latestUserMessage, out var conversationAnswer))
             return new(TicketOperationStatus.Success, new(conversationAnswer));
         var contextualMessage = ResolveContextualFollowUp(request.Messages, latestUserMessage);
@@ -150,10 +165,169 @@ public sealed class OllamaAiAssistantService(HttpClient httpClient, ApplicationD
 
     private async Task<string?> GetTicketContextAsync(int userId, string role, int ticketId, CancellationToken token)
     {
-        var query = db.Tickets.AsNoTracking().Where(x => x.ID == ticketId && !x.IsDeleted);
-        query = role switch { RoleNames.Employee => query.Where(x => x.CreatedByUserAccountID == userId), RoleNames.ITSupportAgent => query.Where(x => x.AssignedToUserAccountID == userId || (x.AssignedToUserAccountID == null && x.TicketStatus.Name == TicketStatusNames.Open)), RoleNames.Admin or RoleNames.Manager => query, _ => query.Where(x => false) };
+        var query = db.Tickets.AsNoTracking().ReadableBy(userId, role)
+            .Where(x => x.ID == ticketId);
         return await query.Select(x => $"Reference: {x.TicketReferenceNumber}; Title: {x.Title}; Description: {x.Description}; Category: {x.TicketCategory.Name}; Priority: {x.TicketPriority.Name}; Status: {x.TicketStatus.Name}; Resolution: {x.ResolutionSummary}").SingleOrDefaultAsync(token);
     }
+
+    private async Task<AiChatResponse> LookupTicketsAsync(
+        int userId, string role, TicketLookupIntent intent, CancellationToken token)
+    {
+        const string notFound = "I couldn't find a ticket you have access to matching that request.";
+        var query = db.Tickets.AsNoTracking().ReadableBy(userId, role);
+        if (intent.TicketNumber is not null)
+            query = query.Where(ticket => ticket.TicketReferenceNumber == intent.TicketNumber);
+        if (intent.Status is not null)
+            query = query.Where(ticket => ticket.TicketStatus.Name == intent.Status);
+        if (intent.Unresolved)
+            query = query.Where(ticket =>
+                ticket.TicketStatus.Name != TicketStatusNames.Resolved &&
+                ticket.TicketStatus.Name != TicketStatusNames.Closed &&
+                ticket.TicketStatus.Name != TicketStatusNames.Cancelled &&
+                ticket.TicketStatus.Name != TicketStatusNames.Duplicate);
+        if (intent.Keyword is not null)
+        {
+            var keyword = intent.Keyword.ToLower();
+            query = query.Where(ticket =>
+                ticket.Title.ToLower().Contains(keyword) ||
+                ticket.TicketCategory.Name.ToLower().Contains(keyword));
+        }
+
+        var total = await query.CountAsync(token);
+        if (total == 0) return new(notFound);
+
+        var tickets = await query
+            .OrderByDescending(ticket => ticket.UpdatedDate)
+            .ThenByDescending(ticket => ticket.CreatedDate)
+            .Take(5)
+            .Select(ticket => new AiTicketLookupItem(
+                ticket.ID, ticket.TicketReferenceNumber, ticket.Title,
+                ticket.TicketCategory.Name, ticket.TicketPriority.Name,
+                ticket.TicketStatus.Name,
+                ticket.AssignedToUserAccount == null ? null :
+                    ticket.AssignedToUserAccount.FirstName + " " +
+                    ticket.AssignedToUserAccount.LastName,
+                ticket.CreatedDate, ticket.UpdatedDate,
+                db.TicketHistory.AsNoTracking()
+                    .Where(history => history.TicketID == ticket.ID &&
+                        history.ActionType != TicketHistoryActionNames.CommentAdded &&
+                        history.ActionType != TicketHistoryActionNames.AttachmentUploaded &&
+                        (role != RoleNames.Employee || !history.IsInternal))
+                    .OrderByDescending(history => history.CreatedDate)
+                    .Select(history => history.ActionType)
+                    .FirstOrDefault()))
+            .ToListAsync(token);
+
+        if (intent.Ordinal is > 0 && intent.Ordinal <= tickets.Count)
+        {
+            var selected = tickets[intent.Ordinal.Value - 1];
+            return TicketResponse(selected);
+        }
+        if (tickets.Count == 1) return TicketResponse(tickets[0]);
+
+        var introduction = total > 5
+            ? $"I found {total} matching tickets. Here are the 5 most recent:"
+            : $"I found {total} tickets that may match:";
+        var lines = tickets.Select(ticket =>
+            $"• {ticket.TicketNumber} — {ticket.Title} — {ticket.Status}");
+        var message = $"{introduction}\n\n{string.Join("\n", lines)}\n\nWhich ticket do you mean?";
+        return new(message, TicketLookup: new(tickets, total));
+    }
+
+    private static AiChatResponse TicketResponse(AiTicketLookupItem ticket)
+    {
+        var assigned = string.IsNullOrWhiteSpace(ticket.AssignedAgentName)
+            ? "Unassigned" : ticket.AssignedAgentName;
+        var update = WorkflowUpdate(ticket.LatestUpdate, ticket.Status);
+        var message = $"{ticket.TicketNumber} — {ticket.Title}\n\n" +
+            $"Status: {ticket.Status}\nPriority: {ticket.Priority}\n" +
+            $"Assigned to: {assigned}\nLatest update: {update}\n" +
+            $"Last updated: {ticket.UpdatedAt:MMM d, yyyy 'at' h:mm tt} UTC";
+        return new(message, new("view_ticket", ticket.TicketId, ticket.TicketNumber),
+            new([ticket], 1));
+    }
+
+    private static string WorkflowUpdate(string? action, string status) => action switch
+    {
+        TicketHistoryActionNames.TicketCreated => "The ticket was created.",
+        TicketHistoryActionNames.TicketAssigned => "The ticket was assigned.",
+        TicketHistoryActionNames.TicketReassigned => "The ticket was reassigned.",
+        TicketHistoryActionNames.TicketWorkStarted => "Work started on the ticket.",
+        TicketHistoryActionNames.WorkPaused => "Work was paused.",
+        TicketHistoryActionNames.WorkResumed => "Work resumed.",
+        TicketHistoryActionNames.TicketResolved => "The ticket was resolved.",
+        TicketHistoryActionNames.TicketClosed => "The ticket was closed.",
+        TicketHistoryActionNames.TicketCancelled => "The ticket was cancelled.",
+        TicketHistoryActionNames.DuplicateMarked => "The ticket was marked as a duplicate.",
+        TicketHistoryActionNames.StatusChanged => $"The ticket status changed to {status}.",
+        _ => $"The ticket is currently {status}."
+    };
+
+    private static bool TryParseTicketLookupIntent(
+        IReadOnlyCollection<AiChatMessage> messages, string? message,
+        out TicketLookupIntent intent)
+    {
+        intent = default!;
+        if (string.IsNullOrWhiteSpace(message)) return false;
+        var value = message.Trim();
+        var reference = Regex.Match(value, @"\bRH-\d{4}-\d{4,}\b",
+            RegexOptions.IgnoreCase);
+        var normalized = value.ToLowerInvariant();
+        int? ordinal = Regex.IsMatch(normalized, @"\b(first|1st)\b") ? 1 :
+            Regex.IsMatch(normalized, @"\b(second|2nd)\b") ? 2 :
+            Regex.IsMatch(normalized, @"\b(third|3rd)\b") ? 3 :
+            Regex.IsMatch(normalized, @"\b(fourth|4th)\b") ? 4 :
+            Regex.IsMatch(normalized, @"\b(fifth|5th)\b") ? 5 : null;
+        var referential = ordinal.HasValue && Regex.IsMatch(normalized,
+            @"\b(one|ticket|result)\b");
+        if (referential && !reference.Success)
+        {
+            var prior = messages.Reverse().Skip(1)
+                .FirstOrDefault(item => item.Role == "assistant")?.Content;
+            if (prior is not null)
+            {
+                var references = Regex.Matches(prior, @"\bRH-\d{4}-\d{4,}\b",
+                    RegexOptions.IgnoreCase).Select(match => match.Value).Distinct().ToArray();
+                if (ordinal <= references.Length)
+                    reference = Regex.Match(references[ordinal.Value - 1], @".+");
+            }
+        }
+        var guidanceQuestion = Regex.IsMatch(normalized,
+            @"^(how|where|can|may|do|what happens after|which roles)\b");
+        var isIntent = reference.Success || referential || (!guidanceQuestion &&
+            (Regex.IsMatch(normalized, @"^my tickets?[?.!]*$") ||
+             Regex.IsMatch(normalized,
+                @"\b(show|list|find|which|what happened to|what(?:'s| is) happening with|what is the status of|who is working on|when was .*last updated|last update (?:for|on))\b.*\btickets?\b")));
+        if (!isIntent) return false;
+
+        string? status = null;
+        foreach (var candidate in new[] { TicketStatusNames.InProgress,
+                     TicketStatusNames.Assigned, TicketStatusNames.Pending,
+                     TicketStatusNames.Resolved, TicketStatusNames.Closed,
+                     TicketStatusNames.Cancelled, TicketStatusNames.Duplicate,
+                     TicketStatusNames.Open })
+            if (Regex.IsMatch(normalized,
+                    $@"\b{Regex.Escape(candidate.ToLowerInvariant())}\b"))
+            { status = candidate; break; }
+
+        string? keyword = null;
+        var keywordMatch = Regex.Match(value,
+            @"(?:my|the)\s+(?<keyword>[\p{L}\p{N}-]+)\s+ticket\b",
+            RegexOptions.IgnoreCase);
+        if (keywordMatch.Success &&
+            !string.Equals(keywordMatch.Groups["keyword"].Value, "open", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(keywordMatch.Groups["keyword"].Value, "pending", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(keywordMatch.Groups["keyword"].Value, "resolved", StringComparison.OrdinalIgnoreCase))
+            keyword = keywordMatch.Groups["keyword"].Value;
+
+        intent = new(reference.Success ? reference.Value.ToUpperInvariant() : null,
+            status, normalized.Contains("unresolved"), keyword, ordinal);
+        return true;
+    }
+
+    private sealed record TicketLookupIntent(
+        string? TicketNumber, string? Status, bool Unresolved,
+        string? Keyword, int? Ordinal);
 
     private async Task<T> AskJsonAsync<T>(string system, string user, object schema,
         string operation, int numPredict, CancellationToken token)

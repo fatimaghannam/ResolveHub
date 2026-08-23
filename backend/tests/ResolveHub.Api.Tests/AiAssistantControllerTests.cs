@@ -1368,6 +1368,117 @@ public sealed class AiAssistantControllerTests
         Assert.DoesNotContain("Ticket creation is allowed only", handler.Body);
     }
 
+    [Fact]
+    public async Task LiveLookup_EmployeeCanReadOwnTicket_ButCannotEnumerateAnotherTicket()
+    {
+        await using var db = Context();
+        await SeedLookupTickets(db);
+        var service = Service(db, new CapturingHandler("{}"));
+
+        var own = await Chat(service, 1, RoleNames.Employee, "Find RH-2026-1001");
+        var denied = await Chat(service, 1, RoleNames.Employee, "Find RH-2026-1002");
+        var missing = await Chat(service, 1, RoleNames.Employee, "Find RH-2099-9999");
+
+        Assert.Equal("RH-2026-1001", own.Action?.TicketNumber);
+        Assert.Equal(denied.Message, missing.Message);
+        Assert.Null(denied.Action);
+        Assert.DoesNotContain("private diagnostic", own.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task LiveLookup_EmployeeListsOnlyOwnMatchingTickets()
+    {
+        await using var db = Context();
+        await SeedLookupTickets(db);
+        var result = await Chat(Service(db, new CapturingHandler("{}")),
+            1, RoleNames.Employee, "Show my open tickets");
+
+        Assert.Single(result.TicketLookup!.Tickets);
+        Assert.Equal("RH-2026-1001", result.TicketLookup.Tickets.Single().TicketNumber);
+    }
+
+    [Fact]
+    public async Task LiveLookup_AgentUsesExistingReadableTicketScope()
+    {
+        await using var db = Context();
+        await SeedLookupTickets(db);
+        var service = Service(db, new CapturingHandler("{}"));
+
+        var assigned = await Chat(service, 3, RoleNames.ITSupportAgent, "Find RH-2026-1002");
+        var open = await Chat(service, 3, RoleNames.ITSupportAgent, "Find RH-2026-1001");
+        var denied = await Chat(service, 3, RoleNames.ITSupportAgent, "Find RH-2026-1003");
+
+        Assert.NotNull(assigned.Action);
+        Assert.NotNull(open.Action);
+        Assert.Null(denied.Action);
+    }
+
+    [Theory]
+    [InlineData(RoleNames.Manager)]
+    [InlineData(RoleNames.Admin)]
+    public async Task LiveLookup_OrganizationalRolesCanReadExistingTicketScope(string role)
+    {
+        await using var db = Context();
+        await SeedLookupTickets(db);
+        var result = await Chat(Service(db, new CapturingHandler("{}")),
+            4, role, "Find RH-2026-1003");
+
+        Assert.Equal("RH-2026-1003", result.Action?.TicketNumber);
+    }
+
+    [Fact]
+    public async Task LiveLookup_TitleAndUnresolvedQueriesUseLiveAuthorizedData()
+    {
+        await using var db = Context();
+        await SeedLookupTickets(db);
+        var service = Service(db, new CapturingHandler("{}"));
+
+        var byTitle = await Chat(service, 1, RoleNames.Employee,
+            "What is happening with my Wi-Fi ticket?");
+        var unresolved = await Chat(service, 2, RoleNames.Employee,
+            "Show my unresolved tickets");
+
+        Assert.Equal("RH-2026-1001", byTitle.Action?.TicketNumber);
+        Assert.Equal(2, unresolved.TicketLookup?.TotalCount);
+        Assert.Contains("RH-2026-1002", unresolved.Message);
+    }
+
+    private static async Task<AiChatResponse> Chat(
+        OllamaAiAssistantService service, int userId, string role, string message)
+    {
+        var result = await service.ChatAsync(userId, role, new AiChatRequest
+        {
+            Messages = [new AiChatMessage { Role = "user", Content = message }]
+        }, default);
+        Assert.Equal(TicketOperationStatus.Success, result.Status);
+        return result.Value!;
+    }
+
+    private static async Task SeedLookupTickets(ApplicationDbContext db)
+    {
+        var owner = LookupUser(1, "owner@test", "Own", "Employee");
+        var other = LookupUser(2, "other@test", "Other", "Employee");
+        var agent = LookupUser(3, "agent@test", "Ari", "Agent");
+        var anotherAgent = LookupUser(5, "agent2@test", "Sam", "Agent");
+        var category = new TicketCategory { ID = 1, Name = "Network", SortOrder = 1 };
+        var priority = new TicketPriority { ID = 1, Name = "Medium", SortOrder = 1 };
+        var open = new TicketStatus { ID = 1, Name = TicketStatusNames.Open, SortOrder = 1 };
+        var assigned = new TicketStatus { ID = 2, Name = TicketStatusNames.Assigned, SortOrder = 2 };
+        var now = DateTime.UtcNow;
+        db.AddRange(owner, other, agent, anotherAgent, category, priority, open, assigned);
+        db.Tickets.AddRange(
+            new Ticket { ID = 1, TicketReferenceNumber = "RH-2026-1001", CreatedByUserAccountID = 1, TicketCategoryID = 1, TicketPriorityID = 1, TicketStatusID = 1, Title = "Laptop disconnects from Wi-Fi", Description = "Connection issue", CreatedDate = now.AddDays(-2), UpdatedDate = now.AddDays(-1) },
+            new Ticket { ID = 2, TicketReferenceNumber = "RH-2026-1002", CreatedByUserAccountID = 2, AssignedToUserAccountID = 3, TicketCategoryID = 1, TicketPriorityID = 1, TicketStatusID = 2, Title = "VPN access", Description = "VPN issue", CreatedDate = now.AddDays(-3), UpdatedDate = now.AddHours(-4) },
+            new Ticket { ID = 3, TicketReferenceNumber = "RH-2026-1003", CreatedByUserAccountID = 2, AssignedToUserAccountID = 5, TicketCategoryID = 1, TicketPriorityID = 1, TicketStatusID = 2, Title = "Router replacement", Description = "Router issue", CreatedDate = now.AddDays(-4), UpdatedDate = now.AddHours(-2) });
+        db.TicketHistory.Add(new TicketHistory { TicketID = 1, ActionType = TicketHistoryActionNames.CommentAdded, PerformedByUserAccountID = 3, Description = "private diagnostic secret", IsInternal = true, CreatedDate = now });
+        await db.SaveChangesAsync();
+    }
+
+    private static UserAccount LookupUser(int id, string email, string first, string last) =>
+        new() { Id = id, UserName = email, NormalizedUserName = email.ToUpperInvariant(),
+            Email = email, NormalizedEmail = email.ToUpperInvariant(),
+            FirstName = first, LastName = last };
+
     private static ApplicationDbContext Context() => new(new DbContextOptionsBuilder<ApplicationDbContext>()
         .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
 

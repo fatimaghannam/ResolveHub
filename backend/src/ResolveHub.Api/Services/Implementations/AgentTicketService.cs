@@ -746,11 +746,8 @@ public sealed class AgentTicketService(
             !ticket.IsDeleted);
 
     private IQueryable<Ticket> ReadableTickets(int agentId) =>
-        dbContext.Tickets.AsNoTracking().Where(ticket =>
-            !ticket.IsDeleted &&
-            (ticket.AssignedToUserAccountID == agentId ||
-             (ticket.AssignedToUserAccountID == null &&
-              ticket.TicketStatus.Name == TicketStatusNames.Open)));
+        dbContext.Tickets.AsNoTracking()
+            .ReadableBy(agentId, RoleNames.ITSupportAgent);
 
     private async Task<IReadOnlyCollection<AllowedStatusTransitionDto>>
         GetAllowedTransitionsAsync(string currentStatus, CancellationToken token)

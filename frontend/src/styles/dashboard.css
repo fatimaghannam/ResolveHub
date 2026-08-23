@@ -1116,6 +1116,7 @@ html:has(.dashboard-shell) { scroll-padding-top: 98px; }
 @media (prefers-reduced-motion:reduce) { .ai-assistant { transform:none; transition-duration:.01ms; } }
 @media (max-width:600px) { .ai-suggestion-grid { grid-template-columns:1fr; }.ai-launcher { right:16px; bottom:16px; }.ai-assistant { right:16px; bottom:74px; } }
 @media (max-width:600px) { .ai-ticket-tools__header { align-items:stretch; flex-direction:column; }.ai-ticket-tools__actions { justify-content:stretch; }.ai-ticket-tools__actions .button { width:100%; } }
+.ai-message__ticket-action { display:block; margin-top:9px; padding:0; border:0; color:var(--blue); background:transparent; font:inherit; font-weight:600; cursor:pointer; }.ai-message__ticket-action:hover { text-decoration:underline; }.ai-message__ticket-action:focus-visible { outline:2px solid var(--blue); outline-offset:3px; border-radius:2px; }
 [data-theme='dark'] .ai-card,[data-theme='dark'] .ai-assistant,[data-theme='dark'] .ai-assistant header,[data-theme='dark'] .ai-assistant form,[data-theme='dark'] .ai-message--assistant { background:var(--panel, #172536); }
 .profile-note { margin: 22px 0 0; color: var(--muted); }.admin-user-dialog { width: min(calc(100% - 32px), 620px); }.table-action--button { font: inherit; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }

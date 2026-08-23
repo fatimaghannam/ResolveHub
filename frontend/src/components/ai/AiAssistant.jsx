@@ -1,10 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Bot, RotateCcw, Send, X } from 'lucide-react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { sendAiChat } from '../../services/aiService.js'
+import { getStoredAuth, ADMIN_ROLE, EMPLOYEE_ROLE, IT_AGENT_ROLE, MANAGER_ROLE } from '../../services/authStorage.js'
 
 function AiAssistant() {
   const { pathname } = useLocation()
+  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [messages, setMessages] = useState([])
@@ -40,7 +42,9 @@ function AiAssistant() {
     try {
       const result = await sendAiChat(next, null, getPageContext(pathname))
       if (conversationVersion !== conversationVersionRef.current) return
-      setMessages([...next, { role: 'assistant', content: result.message }].slice(-10))
+      setMessages([...next, {
+        role: 'assistant', content: result.message, action: result.action,
+      }].slice(-10))
     } catch (err) {
       if (conversationVersion === conversationVersionRef.current) setError(err.message)
     } finally {
@@ -64,13 +68,29 @@ function AiAssistant() {
       <header><div className="ai-assistant__brand"><img src="/favicon.png" alt="ResolveHub" draggable="false" /><div><strong>ResolveHub AI Assistant</strong><small>Read-only help and guidance</small></div></div><div className="ai-assistant__header-actions"><button type="button" className="ai-assistant__header-button ai-assistant__new-chat" onClick={startNewChat} aria-label="Start new chat" title="Start new chat"><RotateCcw size={19} /></button><button type="button" className="ai-assistant__header-button" onClick={() => setOpen(false)} aria-label="Close assistant"><X size={19} /></button></div></header>
       <div className="ai-assistant__messages" ref={messagesRef}>
         {messages.length === 0 && <p className="ai-assistant__welcome">Ask about ticket statuses, writing a clear request, or safe basic troubleshooting.</p>}
-        {messages.map((message, index) => <div key={index} className={`ai-message ai-message--${message.role}`}>{message.content}</div>)}
+        {messages.map((message, index) => <div key={index} className={`ai-message ai-message--${message.role}`}>
+          <span>{message.content}</span>
+          {message.role === 'assistant' && message.action?.type === 'view_ticket' && <button type="button" className="ai-message__ticket-action" onClick={() => navigate(ticketRoute(message.action, pathname))}>View Ticket →</button>}
+        </div>)}
         {busy && <div className="ai-message ai-message--assistant">Generating response…</div>}
         {error && <div className="inline-alert inline-alert--error">{error}</div>}
       </div>
       <form onSubmit={send}><input ref={inputRef} maxLength="2000" value={input} onChange={(event) => setInput(event.target.value)} placeholder="Ask ResolveHub AI…" /><button disabled={busy || !input.trim()} aria-label="Send"><Send size={18} /></button></form>
     </aside>}
   </>
+}
+
+function ticketRoute(action, pathname) {
+  const roleArea = pathname.split('/')[1]
+  if (roleArea === 'admin' || roleArea === 'manager' || roleArea === 'agent')
+    return `/${roleArea}/tickets/${encodeURIComponent(action.ticketNumber)}`
+  if (roleArea === 'employee') return `/employee/tickets/${action.ticketId}`
+  const roles = getStoredAuth()?.user?.roles ?? []
+  if (roles.includes(ADMIN_ROLE)) return `/admin/tickets/${encodeURIComponent(action.ticketNumber)}`
+  if (roles.includes(MANAGER_ROLE)) return `/manager/tickets/${encodeURIComponent(action.ticketNumber)}`
+  if (roles.includes(IT_AGENT_ROLE)) return `/agent/tickets/${encodeURIComponent(action.ticketNumber)}`
+  if (roles.includes(EMPLOYEE_ROLE)) return `/employee/tickets/${action.ticketId}`
+  return '/login'
 }
 
 const pageContexts = {
