@@ -3,6 +3,8 @@ import {
   Bell,
   ClipboardCheck,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   CircleUserRound,
   FileClock,
   FilePlus2,
@@ -11,8 +13,6 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
-  PanelLeftClose,
-  PanelLeftOpen,
   Moon,
   Sun,
   Tags,
@@ -299,11 +299,14 @@ function DashboardLayout() {
             type="button"
             className="icon-button sidebar__desktop-toggle"
             onClick={toggleDesktopSidebar}
-            aria-label={isDesktopCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+            aria-label={isDesktopCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={isDesktopCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             aria-expanded={!isDesktopCollapsed}
             aria-controls={sidebarId}
           >
-            {isDesktopCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+            {isDesktopCollapsed
+              ? <ChevronRight size={17} aria-hidden="true" />
+              : <ChevronLeft size={17} aria-hidden="true" />}
           </button>
           <button
             type="button"

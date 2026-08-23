@@ -34,7 +34,7 @@
   --scrollbar-thumb: #426d9d;
 }
 
-.dashboard-shell { width: 100%; height: 100%; min-height: 0; display: grid; grid-template-columns: 250px minmax(0, 1fr); overflow: hidden; background: var(--canvas); color: var(--ink); }
+.dashboard-shell { width: 100%; height: 100%; min-height: 0; display: grid; grid-template-columns: 250px minmax(0, 1fr); overflow: hidden; background: var(--canvas); color: var(--ink); transition: grid-template-columns 180ms cubic-bezier(.2, .8, .2, 1); }
 html:has(.dashboard-shell) { scroll-padding-top: 98px; }
 .dashboard-shell--collapsed { grid-template-columns: 76px minmax(0, 1fr); }
 .sidebar {
@@ -71,7 +71,7 @@ html:has(.dashboard-shell) { scroll-padding-top: 98px; }
 .icon-button.sidebar__mobile-close { display: none; margin-left: auto; color: white; }
 .sidebar__desktop-toggle { flex:0 0 26px; width:26px; height:26px; padding:0; border:1px solid rgba(255,255,255,.18); border-radius:7px; color:white; background:transparent; box-shadow:none; }
 .dashboard-shell--collapsed .sidebar { width: 76px; padding-inline: 6px; }
-.dashboard-shell--collapsed .sidebar__brand { height:100px; flex-direction:column; justify-content:flex-start; align-items:center; gap:10px; padding:0 0 18px; }
+.dashboard-shell--collapsed .sidebar__brand { height:70px; justify-content:center; gap:4px; padding:0 0 28px; }
 .dashboard-shell--collapsed .sidebar__desktop-toggle { flex-basis:24px; width:24px; height:24px; }
 .dashboard-shell--collapsed .sidebar-text { position:absolute; opacity:0; visibility:hidden; transform:translateX(-5px); pointer-events:none; transition:opacity 90ms ease, transform 120ms ease, visibility 0s linear 120ms; }
 .dashboard-shell--collapsed .sidebar-link { justify-content: center; padding-inline: 0; }
@@ -1206,7 +1206,7 @@ html:has(.dashboard-shell) { scroll-padding-top: 98px; }
   .topbar__identity { display: none; }.dialog__actions { flex-direction: column-reverse; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .sidebar, .quick-action-card { transition: none; }
+  .dashboard-shell, .sidebar, .quick-action-card { transition: none; }
   .quick-action-card:hover { transform: none; }
   .app-toast { animation: none; transition: none; }
   .dialog--duplicate { animation: none; }
