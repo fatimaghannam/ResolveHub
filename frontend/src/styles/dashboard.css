@@ -147,7 +147,13 @@ html:has(.dashboard-shell) { scroll-padding-top: 98px; }
 .notifications-panel .notification-item__icon { margin:0; }
 @media (max-width:700px) { .notifications-panel .notification-item--button { grid-template-columns:38px minmax(0,1fr); gap:12px; padding:16px 2px; }.notifications-panel .notification-item__time { grid-column:2; padding-top:0; text-align:left; white-space:normal; } }
 .dashboard-scroll { min-width: 0; min-height: 0; flex: 1 1 auto; overflow-x: hidden; overflow-y: auto; }
-.dashboard-content { width: min(100%, 1500px); min-width: 0; box-sizing: border-box; margin-inline: auto; padding: clamp(22px, 3vw, 42px); padding-bottom: 32px; }
+.dashboard-content {
+  width: min(100%, 1500px);
+  min-width: 0;
+  box-sizing: border-box;
+  margin-inline: auto;
+  padding: 26px clamp(22px, 3vw, 42px) 32px;
+}
 .page-heading { margin-bottom: 26px; }
 .page-heading--compact { margin-bottom: 18px; }
 .page-heading--compact h2 { margin-bottom: 0; }
