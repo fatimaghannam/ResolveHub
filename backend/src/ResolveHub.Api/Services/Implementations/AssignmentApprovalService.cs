@@ -99,6 +99,39 @@ public sealed class AssignmentApprovalService(
         if (!approve && string.IsNullOrWhiteSpace(rejectionReason))
             return new(TicketOperationStatus.Invalid,
                 Message: "A rejection reason is required.");
+        if (!dbContext.Database.IsRelational() ||
+            dbContext.Database.CurrentTransaction is not null)
+            return await ReviewCoreAsync(administratorId, requestId, approve,
+                rejectionReason, token);
+
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async strategyToken =>
+        {
+            dbContext.ChangeTracker.Clear();
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable, strategyToken);
+            try
+            {
+                var result = await ReviewCoreAsync(administratorId, requestId,
+                    approve, rejectionReason, strategyToken);
+                if (result.Status == TicketOperationStatus.Success)
+                    await transaction.CommitAsync(strategyToken);
+                else
+                    await transaction.RollbackAsync(CancellationToken.None);
+                return result;
+            }
+            catch
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+                throw;
+            }
+        }, token);
+    }
+
+    private async Task<TicketServiceResult<bool>> ReviewCoreAsync(
+        int administratorId, int requestId, bool approve, string? rejectionReason,
+        CancellationToken token)
+    {
         var request = await dbContext.TicketAssignmentRequests
             .Include(item => item.Ticket)
             .Include(item => item.RequestedByUserAccount)
@@ -112,57 +145,39 @@ public sealed class AssignmentApprovalService(
             return new(TicketOperationStatus.Conflict,
                 Message: "This legacy request does not contain a requested agent.");
 
-        IDbContextTransaction? transaction = null;
-        try
+        if (approve)
         {
-            if (dbContext.Database.IsRelational())
-                transaction = await dbContext.Database.BeginTransactionAsync(
-                    IsolationLevel.Serializable, token);
-            if (approve)
+            var assignment = await adminTicketService.AssignAsync(
+                administratorId, request.Ticket.TicketReferenceNumber,
+                request.RequestedAgentUserAccountID.Value, token);
+            if (assignment.Status != TicketOperationStatus.Success)
             {
-                var assignment = await adminTicketService.AssignAsync(
-                    administratorId, request.Ticket.TicketReferenceNumber,
-                    request.RequestedAgentUserAccountID.Value, token);
-                if (assignment.Status != TicketOperationStatus.Success)
-                {
-                    if (transaction is not null) await transaction.RollbackAsync(token);
-                    return assignment;
-                }
+                return assignment;
             }
-            var now = DateTime.UtcNow;
-            request.Status = approve ? AssignmentRequestStatusNames.Approved :
-                AssignmentRequestStatusNames.Rejected;
-            request.ReviewedByUserAccountID = administratorId;
-            request.ReviewedDate = now;
-            request.ReviewReason = approve ? null : rejectionReason;
-            var agentName = request.RequestedAgentUserAccount!.FirstName + " " +
-                request.RequestedAgentUserAccount.LastName;
-            var action = approve ? TicketHistoryActionNames.AssignmentRequestApproved :
-                TicketHistoryActionNames.AssignmentRequestRejected;
-            var description = approve
-                ? $"Administrator approved assignment to {agentName}."
-                : $"Administrator rejected assignment to {agentName}. Reason: {rejectionReason}";
-            AddAudit(request.Ticket, administratorId, action,
-                AssignmentRequestStatusNames.Pending, request.Status, description, now);
-            Notify(request.RequestedByUserAccountID, request.Ticket,
-                approve ? NotificationTypeNames.AssignmentRequestApproved : NotificationTypeNames.AssignmentRequestRejected,
-                approve ? "Assignment Request Approved" : "Assignment Request Rejected",
-                approve
-                    ? $"Your assignment request for {request.Ticket.TicketReferenceNumber} was approved."
-                    : $"Your assignment request for {request.Ticket.TicketReferenceNumber} was rejected. Reason: {rejectionReason}", now);
-            await dbContext.SaveChangesAsync(token);
-            if (transaction is not null) await transaction.CommitAsync(token);
-            return new(TicketOperationStatus.Success, true);
         }
-        catch
-        {
-            if (transaction is not null) await transaction.RollbackAsync(token);
-            throw;
-        }
-        finally
-        {
-            if (transaction is not null) await transaction.DisposeAsync();
-        }
+        var now = DateTime.UtcNow;
+        request.Status = approve ? AssignmentRequestStatusNames.Approved :
+            AssignmentRequestStatusNames.Rejected;
+        request.ReviewedByUserAccountID = administratorId;
+        request.ReviewedDate = now;
+        request.ReviewReason = approve ? null : rejectionReason;
+        var agentName = request.RequestedAgentUserAccount!.FirstName + " " +
+            request.RequestedAgentUserAccount.LastName;
+        var action = approve ? TicketHistoryActionNames.AssignmentRequestApproved :
+            TicketHistoryActionNames.AssignmentRequestRejected;
+        var description = approve
+            ? $"Administrator approved assignment to {agentName}."
+            : $"Administrator rejected assignment to {agentName}. Reason: {rejectionReason}";
+        AddAudit(request.Ticket, administratorId, action,
+            AssignmentRequestStatusNames.Pending, request.Status, description, now);
+        Notify(request.RequestedByUserAccountID, request.Ticket,
+            approve ? NotificationTypeNames.AssignmentRequestApproved : NotificationTypeNames.AssignmentRequestRejected,
+            approve ? "Assignment Request Approved" : "Assignment Request Rejected",
+            approve
+                ? $"Your assignment request for {request.Ticket.TicketReferenceNumber} was approved."
+                : $"Your assignment request for {request.Ticket.TicketReferenceNumber} was rejected. Reason: {rejectionReason}", now);
+        await dbContext.SaveChangesAsync(token);
+        return new(TicketOperationStatus.Success, true);
     }
 
     private Task<int> ActiveCountAsync(int agentId, CancellationToken token) =>

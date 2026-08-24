@@ -333,26 +333,39 @@ public sealed class AdminTicketService(
         CancellationToken token,
         int? preservedAgentRequestId = null)
     {
-        IDbContextTransaction? transaction = null;
-        if (dbContext.Database.IsRelational() &&
-            dbContext.Database.CurrentTransaction is null)
-        {
-            transaction = await dbContext.Database.BeginTransactionAsync(
-                IsolationLevel.Serializable,
-                token);
-        }
+        if (!dbContext.Database.IsRelational() ||
+            dbContext.Database.CurrentTransaction is not null)
+            return await AssignCoreAsync(administratorId, ticketReference,
+                agentUserId, token, preservedAgentRequestId);
 
-        async Task<TicketServiceResult<bool>> FailureAsync(
-            TicketOperationStatus status,
-            string? message = null)
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async strategyToken =>
         {
-            if (transaction is not null)
-                await transaction.RollbackAsync(token);
-            return new(status, Message: message);
-        }
+            dbContext.ChangeTracker.Clear();
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable, strategyToken);
+            try
+            {
+                var result = await AssignCoreAsync(administratorId, ticketReference,
+                    agentUserId, strategyToken, preservedAgentRequestId);
+                if (result.Status == TicketOperationStatus.Success)
+                    await transaction.CommitAsync(strategyToken);
+                else
+                    await transaction.RollbackAsync(CancellationToken.None);
+                return result;
+            }
+            catch
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+                throw;
+            }
+        }, token);
+    }
 
-        try
-        {
+    private async Task<TicketServiceResult<bool>> AssignCoreAsync(
+        int administratorId, string ticketReference, int? agentUserId,
+        CancellationToken token, int? preservedAgentRequestId)
+    {
             var ticket = await dbContext.Tickets
                 .Include(item => item.TicketStatus)
                 .SingleOrDefaultAsync(item =>
@@ -360,19 +373,19 @@ public sealed class AdminTicketService(
                     !item.IsDeleted,
                     token);
             if (ticket is null)
-                return await FailureAsync(TicketOperationStatus.NotFound);
+                return new(TicketOperationStatus.NotFound);
             if (DuplicateTicketRules.IsDuplicate(ticket.TicketStatus.Name))
-                return await FailureAsync(TicketOperationStatus.Conflict,
-                    DuplicateTicketRules.ReadOnlyMessage);
+                return new(TicketOperationStatus.Conflict,
+                    Message: DuplicateTicketRules.ReadOnlyMessage);
             if (ticket.TicketStatus.IsFinalStatus)
-                return await FailureAsync(
+                return new(
                     TicketOperationStatus.Conflict,
-                    "Completed tickets cannot be assigned or reassigned.");
+                    Message: "Completed tickets cannot be assigned or reassigned.");
             if (ticket.AssignedToUserAccountID == agentUserId)
             {
-                return await FailureAsync(
+                return new(
                     TicketOperationStatus.Conflict,
-                    agentUserId.HasValue
+                    Message: agentUserId.HasValue
                         ? "This ticket is already assigned to that agent."
                         : "This ticket is already unassigned.");
             }
@@ -389,9 +402,9 @@ public sealed class AdminTicketService(
                     select user.Id).AnyAsync(token);
                 if (!agentIsEligible)
                 {
-                    return await FailureAsync(
+                    return new(
                         TicketOperationStatus.Invalid,
-                        "Select an active IT Support Agent.");
+                        Message: "Select an active IT Support Agent.");
                 }
 
                 var activeTickets = await dbContext.Tickets.CountAsync(
@@ -404,9 +417,9 @@ public sealed class AdminTicketService(
                 if (activeTickets >=
                     TicketWorkloadRules.MaxActiveTicketsPerAgent)
                 {
-                    return await FailureAsync(
+                    return new(
                         TicketOperationStatus.Conflict,
-                        $"This IT Agent has reached the maximum workload of {TicketWorkloadRules.MaxActiveTicketsPerAgent} active tickets.");
+                        Message: $"This IT Agent has reached the maximum workload of {TicketWorkloadRules.MaxActiveTicketsPerAgent} active tickets.");
                 }
             }
 
@@ -517,20 +530,6 @@ public sealed class AdminTicketService(
             }
 
             await dbContext.SaveChangesAsync(token);
-            if (transaction is not null)
-                await transaction.CommitAsync(token);
-        }
-        catch
-        {
-            if (transaction is not null)
-                await transaction.RollbackAsync(token);
-            throw;
-        }
-        finally
-        {
-            if (transaction is not null)
-                await transaction.DisposeAsync();
-        }
         return new(TicketOperationStatus.Success, true);
     }
 
