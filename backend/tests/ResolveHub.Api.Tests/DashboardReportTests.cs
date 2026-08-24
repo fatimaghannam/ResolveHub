@@ -274,9 +274,43 @@ public sealed class DashboardReportTests
         Assert.Equal(2, Occurrences(svg, "data-series='created-value'"));
         Assert.Equal(2, Occurrences(svg, "data-series='resolved-value'"));
         Assert.Contains(">2</text>", svg);
-        Assert.DoesNotContain(">0</text>", svg);
         Assert.Contains("data-region='legend'", svg);
         Assert.Contains("paint-order='stroke'", svg);
+        Assert.Contains("data-label-position='above'", svg);
+        Assert.Contains("data-label-position='below'", svg);
+    }
+
+    [Fact]
+    public void Trend_UsesDynamicIntegerYAxisAndHorizontalGridLines()
+    {
+        DashboardReportTrendItem[] trend =
+            [new("Aug 1", 1, 1), new("Aug 2", 3, 2), new("Aug 3", 0, 1)];
+
+        var svg = InvokePrivate<string>("LineSvg", (object)trend);
+
+        Assert.Equal(5, Occurrences(svg, "data-axis='count'"));
+        Assert.Equal(5, Occurrences(svg, "data-grid='horizontal'"));
+        foreach (var value in Enumerable.Range(0, 5))
+            Assert.Contains($">{value}</text>", svg);
+        Assert.DoesNotContain(">0.5</text>", svg);
+        Assert.DoesNotContain(">1.5</text>", svg);
+        Assert.Contains("data-axis-line='x'", svg);
+        Assert.Contains("data-axis-line='y'", svg);
+        Assert.Contains("data-series='created-line'", svg);
+        Assert.Contains("data-series='resolved-line'", svg);
+    }
+
+    [Fact]
+    public void Trend_WithNoActivity_UsesEmptyState()
+    {
+        DashboardReportTrendItem[] trend =
+            [new("Aug 1", 0, 0), new("Aug 2", 0, 0)];
+
+        var svg = InvokePrivate<string>("LineSvg", (object)trend);
+
+        Assert.Contains("No ticket activity in this period.", svg);
+        Assert.DoesNotContain("data-series='created-line'", svg);
+        Assert.DoesNotContain("data-grid='horizontal'", svg);
     }
 
     [Fact]

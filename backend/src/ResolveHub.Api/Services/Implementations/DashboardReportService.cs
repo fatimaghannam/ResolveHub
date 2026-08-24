@@ -346,24 +346,33 @@ public sealed class DashboardReportService(ApplicationDbContext db) : IDashboard
     private static string LineSvg(IReadOnlyCollection<DashboardReportTrendItem> source)
     {
         var data = source.ToList();
-        if (data.Count == 0) return EmptySvg("No ticket activity in this period.");
-        const double left = 48, top = 44, width = 642, height = 106;
+        if (data.Count == 0 || data.All(item => item.Created == 0 && item.Resolved == 0))
+            return EmptyLineSvg("No ticket activity in this period.");
+        const double left = 54, top = 46, width = 646, height = 108;
         var max = Math.Max(1, data.Max(item => Math.Max(item.Created, item.Resolved)));
-        var displayMaximum = max + 1;
+        var tickStep = max <= 4 ? 1 : (int)Math.Ceiling(max / 5d);
+        var displayMaximum = (int)Math.Ceiling((max + 1d) / tickStep) * tickStep;
         double X(int index) => left + index * width / Math.Max(1, data.Count - 1);
         double Y(int value) => top + height - value * height / displayMaximum;
         string Points(Func<DashboardReportTrendItem, int> selector) => string.Join(" ", data.Select((item, index) =>
             $"{X(index):0.##},{Y(selector(item)):0.##}"));
+        var yTicks = string.Join("", Enumerable.Range(0, displayMaximum / tickStep + 1)
+            .Select(index => index * tickStep)
+            .Select(value =>
+            {
+                var y = Y(value);
+                return $"<line data-grid='horizontal' x1='{left}' y1='{y:0.##}' x2='{left + width}' y2='{y:0.##}' stroke='#E2E8F0' stroke-width='1'/><text data-axis='count' x='{left - 10}' y='{y + 3:0.##}' text-anchor='end' font-family='Arial' font-size='9' font-weight='600' fill='#475569'>{value}</text>";
+            }));
         var labelStep = Math.Max(1, (int)Math.Ceiling(data.Count / 8d));
         var labels = string.Join("", data.Select((item, index) => (item, index))
             .Where(value => value.index % labelStep == 0)
             .Select(value =>
             $"<text data-axis='date' x='{X(value.index):0.##}' y='181' text-anchor='middle' font-size='8.5' fill='#64748B'>{WebUtility.HtmlEncode(value.item.Label)}</text>"));
         var createdPoints = string.Join("", data.Select((item, index) => item.Created == 0 ? "" :
-            $"<circle data-series='created-point' cx='{X(index):0.##}' cy='{Y(item.Created):0.##}' r='3.5' fill='#2563EB'/><text data-series='created-value' x='{X(index):0.##}' y='{Math.Max(36, Y(item.Created) - 8):0.##}' text-anchor='middle' font-size='8' font-weight='700' fill='#1E40AF' stroke='#FFFFFF' stroke-width='2.5' paint-order='stroke'>{item.Created}</text>"));
+            $"<circle data-series='created-point' cx='{X(index):0.##}' cy='{Y(item.Created):0.##}' r='3.7' fill='#2563EB' stroke='#FFFFFF' stroke-width='1.5'/><text data-series='created-value' data-label-position='above' x='{X(index):0.##}' y='{Math.Max(37, Y(item.Created) - 9):0.##}' text-anchor='middle' font-family='Arial' font-size='9.5' font-weight='700' fill='#1E3A8A' stroke='#FFFFFF' stroke-width='3' paint-order='stroke'>{item.Created}</text>"));
         var resolvedPoints = string.Join("", data.Select((item, index) => item.Resolved == 0 ? "" :
-            $"<circle data-series='resolved-point' cx='{X(index):0.##}' cy='{Y(item.Resolved):0.##}' r='3.5' fill='#15803D'/><text data-series='resolved-value' x='{X(index):0.##}' y='{Math.Min(166, Y(item.Resolved) + 13):0.##}' text-anchor='middle' font-size='8' font-weight='700' fill='#166534' stroke='#FFFFFF' stroke-width='2.5' paint-order='stroke'>{item.Resolved}</text>"));
-        return $"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 740 210'><g data-region='legend'><circle cx='514' cy='17' r='4' fill='#2563EB'/><text x='524' y='20' font-size='9' fill='#334155'>Created Tickets</text><circle cx='625' cy='17' r='4' fill='#15803D'/><text x='635' y='20' font-size='9' fill='#334155'>Resolved Tickets</text></g><line x1='{left}' y1='{top + height}' x2='{left + width}' y2='{top + height}' stroke='#CBD5E1'/><line x1='{left}' y1='{top}' x2='{left}' y2='{top + height}' stroke='#CBD5E1'/><polyline points='{Points(item => item.Created)}' fill='none' stroke='#2563EB' stroke-width='3'/><polyline points='{Points(item => item.Resolved)}' fill='none' stroke='#15803D' stroke-width='3'/>{createdPoints}{resolvedPoints}{labels}</svg>";
+            $"<circle data-series='resolved-point' cx='{X(index):0.##}' cy='{Y(item.Resolved):0.##}' r='3.7' fill='#15803D' stroke='#FFFFFF' stroke-width='1.5'/><text data-series='resolved-value' data-label-position='below' x='{X(index):0.##}' y='{Math.Min(169, Y(item.Resolved) + 15):0.##}' text-anchor='middle' font-family='Arial' font-size='9.5' font-weight='700' fill='#14532D' stroke='#FFFFFF' stroke-width='3' paint-order='stroke'>{item.Resolved}</text>"));
+        return $"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 740 210'><g data-region='legend'><circle cx='514' cy='17' r='4' fill='#2563EB'/><text x='524' y='20' font-family='Arial' font-size='9' fill='#334155'>Created Tickets</text><circle cx='625' cy='17' r='4' fill='#15803D'/><text x='635' y='20' font-family='Arial' font-size='9' fill='#334155'>Resolved Tickets</text></g>{yTicks}<line data-axis-line='x' x1='{left}' y1='{top + height}' x2='{left + width}' y2='{top + height}' stroke='#94A3B8' stroke-width='1.4'/><line data-axis-line='y' x1='{left}' y1='{top}' x2='{left}' y2='{top + height}' stroke='#94A3B8' stroke-width='1.4'/><polyline data-series='created-line' points='{Points(item => item.Created)}' fill='none' stroke='#2563EB' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/><polyline data-series='resolved-line' points='{Points(item => item.Resolved)}' fill='none' stroke='#15803D' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/>{createdPoints}{resolvedPoints}{labels}</svg>";
     }
 
     private static string CategorySvg(IReadOnlyCollection<DashboardReportChartItem> source)
@@ -383,6 +392,9 @@ public sealed class DashboardReportService(ApplicationDbContext db) : IDashboard
 
     private static string EmptySvg(string message) =>
         $"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 700 150'><rect width='700' height='150' fill='#F8FAFC'/><text x='350' y='78' text-anchor='middle' font-family='Arial' font-size='12' fill='#64748B'>{WebUtility.HtmlEncode(message)}</text></svg>";
+
+    private static string EmptyLineSvg(string message) =>
+        $"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 740 210'><rect width='740' height='210' fill='#F8FAFC'/><text x='370' y='108' text-anchor='middle' font-family='Arial' font-size='12' fill='#64748B'>{WebUtility.HtmlEncode(message)}</text></svg>";
 
     private static float CategoryPdfHeight(
         IReadOnlyCollection<DashboardReportChartItem> categories) =>
