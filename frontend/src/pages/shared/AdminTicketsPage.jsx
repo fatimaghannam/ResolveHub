@@ -15,6 +15,8 @@ import {
 } from '../../utils/dateRange.js'
 import { formatLocalDateTime } from '../../utils/dateTime.js'
 
+const nonAssignableStatuses = new Set(['Closed', 'Cancelled', 'Duplicate'])
+
 const pageSize = 8
 const blankFilters = {
   search: '',
@@ -209,7 +211,7 @@ function AdminTicketsPage({ roleArea = 'admin' }) {
             <col className="admin-ticket-col--action" />
           </colgroup>
           <thead><tr><th>Ticket Number</th><th>Title</th><th>Requester</th><th>Category</th><th>Priority</th><th>Status</th><th>Assigned Agent</th><th>Created</th><th>Action</th></tr></thead>
-          <tbody>{rows.map((ticket) => <tr key={ticket.id}><td><strong>{ticket.ticketReferenceNumber}</strong></td><td><span className="admin-ticket-title" title={ticket.title}>{ticket.title}</span></td><td><span className="admin-ticket-cell-ellipsis" title={ticket.requesterName}>{ticket.requesterName}</span></td><td><span className="admin-ticket-cell-ellipsis" title={ticket.categoryName}>{ticket.categoryName}</span></td><td><TicketPriorityBadge value={ticket.priorityName} /></td><td><TicketStatusBadge value={ticket.statusName} /></td><td><span className="admin-ticket-cell-ellipsis" title={ticket.assignedAgentName ?? 'Unassigned'}>{ticket.assignedAgentName ?? 'Unassigned'}</span></td><td><span className="admin-ticket-cell-ellipsis" title={formatLocalDateTime(ticket.createdDate)}>{formatLocalDateTime(ticket.createdDate)}</span></td><td><div className="row-actions"><Link className="table-action" to={`/${roleArea}/tickets/${ticket.ticketReferenceNumber}`}>View</Link>{!ticket.assignedAgentId && ticket.statusName !== 'Duplicate' && <Link className="table-action" to={`/${roleArea}/assignments?ticket=${encodeURIComponent(ticket.ticketReferenceNumber)}`}>Assign</Link>}</div></td></tr>)}</tbody>
+          <tbody>{rows.map((ticket) => <tr key={ticket.id}><td><strong>{ticket.ticketReferenceNumber}</strong></td><td><span className="admin-ticket-title" title={ticket.title}>{ticket.title}</span></td><td><span className="admin-ticket-cell-ellipsis" title={ticket.requesterName}>{ticket.requesterName}</span></td><td><span className="admin-ticket-cell-ellipsis" title={ticket.categoryName}>{ticket.categoryName}</span></td><td><TicketPriorityBadge value={ticket.priorityName} /></td><td><TicketStatusBadge value={ticket.statusName} /></td><td><span className="admin-ticket-cell-ellipsis" title={ticket.assignedAgentName ?? 'Unassigned'}>{ticket.assignedAgentName ?? 'Unassigned'}</span></td><td><span className="admin-ticket-cell-ellipsis" title={formatLocalDateTime(ticket.createdDate)}>{formatLocalDateTime(ticket.createdDate)}</span></td><td><div className="row-actions"><Link className="table-action" to={`/${roleArea}/tickets/${ticket.ticketReferenceNumber}`}>View</Link>{!ticket.assignedAgentId && !nonAssignableStatuses.has(ticket.statusName) && <Link className="table-action" to={`/${roleArea}/assignments?ticket=${encodeURIComponent(ticket.ticketReferenceNumber)}`}>Assign</Link>}</div></td></tr>)}</tbody>
         </table></div>}
         <Pagination page={page} totalPages={data.totalPages} onChange={(nextPage) => { setPage(nextPage); setSearchParams(urlValues(filters, nextPage)) }} />
       </section>}

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using ResolveHub.Api.Constants;
 using ResolveHub.Api.Data;
 using ResolveHub.Api.DTOs.Tickets;
+using ResolveHub.Api.Entities;
 using ResolveHub.Api.Services.Interfaces;
 using ResolveHub.Api.Services.Models;
 
@@ -133,6 +134,9 @@ public sealed class TicketActivityService(ApplicationDbContext dbContext)
             .Where(item => item.TicketReferenceNumber == normalizedReference)
             .Select(item => new { item.ID, item.CreatedByUserAccountID, item.AssignedToUserAccountID,
                 Status = item.TicketStatus.Name, item.IsDeleted,
+                WasCancellationAgent = item.CancellationRequests.Any(request =>
+                    request.RequestedByAgentUserAccountID == userId &&
+                    request.Status == CancellationRequestStatusNames.Approved),
                 CreatorDepartmentId = item.CreatedByUserAccount.DepartmentID })
             .SingleOrDefaultAsync(token);
         if (ticket is null) return new(ActivityAccess.NotFound, 0);
@@ -142,6 +146,8 @@ public sealed class TicketActivityService(ApplicationDbContext dbContext)
             : null;
         var visible = ticket.CreatedByUserAccountID == userId ||
             ticket.AssignedToUserAccountID == userId || isAdministrator ||
+            (isAgent && ticket.Status == TicketStatusNames.Cancelled &&
+                ticket.WasCancellationAgent) ||
             (isAgent && !ticket.IsDeleted &&
                 ticket.AssignedToUserAccountID == null && ticket.Status == TicketStatusNames.Open) ||
             (isManager && ticket.CreatorDepartmentId == userDepartmentId);

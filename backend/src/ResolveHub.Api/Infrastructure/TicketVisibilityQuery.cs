@@ -14,6 +14,10 @@ public static class TicketVisibilityQuery
         RoleNames.ITSupportAgent => query.Where(ticket =>
             !ticket.IsDeleted &&
             (ticket.AssignedToUserAccountID == userId ||
+             (ticket.TicketStatus.Name == TicketStatusNames.Cancelled &&
+              ticket.CancellationRequests.Any(request =>
+                  request.RequestedByAgentUserAccountID == userId &&
+                  request.Status == CancellationRequestStatusNames.Approved)) ||
              (ticket.AssignedToUserAccountID == null &&
               ticket.TicketStatus.Name == TicketStatusNames.Open))),
         RoleNames.Manager or RoleNames.Admin => query.Where(ticket => !ticket.IsDeleted),

@@ -21,6 +21,9 @@ public sealed class AssignmentApprovalService(
             .SingleOrDefaultAsync(item => item.TicketReferenceNumber == ticketReference &&
                 !item.IsDeleted, token);
         if (ticket is null) return new(TicketOperationStatus.NotFound);
+        if (ticket.TicketStatus.Name == TicketStatusNames.Cancelled)
+            return new(TicketOperationStatus.Conflict,
+                Message: "Cancelled tickets cannot be assigned.");
         if (ticket.AssignedToUserAccountID.HasValue ||
             ticket.TicketStatus.Name != TicketStatusNames.Open)
             return new(TicketOperationStatus.Conflict,

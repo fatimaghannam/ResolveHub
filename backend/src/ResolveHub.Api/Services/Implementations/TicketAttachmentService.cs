@@ -147,7 +147,11 @@ public sealed class TicketAttachmentService(
                 !attachment.IsDeleted &&
                 !attachment.Ticket.IsDeleted &&
                 attachment.Ticket.TicketReferenceNumber == ticketReference &&
-                attachment.Ticket.AssignedToUserAccountID == agentId)
+                (attachment.Ticket.AssignedToUserAccountID == agentId ||
+                 (attachment.Ticket.TicketStatus.Name == TicketStatusNames.Cancelled &&
+                  attachment.Ticket.CancellationRequests.Any(request =>
+                      request.RequestedByAgentUserAccountID == agentId &&
+                      request.Status == CancellationRequestStatusNames.Approved))))
             .Select(attachment => new
             {
                 attachment.FilePath,

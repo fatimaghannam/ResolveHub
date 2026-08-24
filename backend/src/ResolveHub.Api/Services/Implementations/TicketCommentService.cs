@@ -51,7 +51,7 @@ public sealed class TicketCommentService(
         }
 
         var strategy = dbContext.Database.CreateExecutionStrategy();
-        return await strategy.ExecuteAsync<TicketServiceResult<TicketCommentDto>>(async () =>
+        return await strategy.ExecuteAsync(async strategyToken =>
         {
         dbContext.ChangeTracker.Clear();
         Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction = null;
@@ -60,13 +60,13 @@ public sealed class TicketCommentService(
         {
             if (dbContext.Database.IsRelational() &&
                 dbContext.Database.CurrentTransaction is null)
-                transaction = await dbContext.Database.BeginTransactionAsync(token);
+                transaction = await dbContext.Database.BeginTransactionAsync(strategyToken);
             var result = await AddAsync(userId, audience, ticketId, ticketReference,
                 new AddTicketCommentRequestDto
                 {
                     Message = request.Content,
                     Visibility = request.Visibility
-                }, request.ParentCommentId, token);
+                }, request.ParentCommentId, strategyToken);
             if (result.Status != TicketOperationStatus.Success)
             {
                 if (transaction is not null)
@@ -77,7 +77,7 @@ public sealed class TicketCommentService(
             foreach (var file in request.Attachments)
             {
                 var upload = await UploadAttachmentAsync(userId, audience, ticketId,
-                    ticketReference, result.Value!.Id, file, token);
+                    ticketReference, result.Value!.Id, file, strategyToken);
                 if (upload.Status != TicketOperationStatus.Success)
                 {
                     if (transaction is not null)
@@ -91,16 +91,18 @@ public sealed class TicketCommentService(
                 storedPaths.Add(path);
             }
 
-            if (transaction is not null) await transaction.CommitAsync(token);
             var ticket = await FindReadableTicketAsync(userId, audience, ticketId,
-                ticketReference, token);
-            return new(TicketOperationStatus.Success,
-                (await ProjectAsync(ticket!, userId, token))
-                    .Single(comment => comment.Id == result.Value!.Id));
+                ticketReference, strategyToken);
+            var createdComment = (await ProjectAsync(ticket!, userId, strategyToken))
+                .Single(comment => comment.Id == result.Value!.Id);
+            if (transaction is not null)
+                await transaction.CommitAsync(strategyToken);
+            return new(TicketOperationStatus.Success, createdComment);
         }
         catch
         {
-            if (transaction is not null) await transaction.RollbackAsync(token);
+            if (transaction is not null)
+                await transaction.RollbackAsync(CancellationToken.None);
             DeleteStoredFiles(storedPaths, settings);
             throw;
         }
@@ -108,7 +110,7 @@ public sealed class TicketCommentService(
         {
             if (transaction is not null) await transaction.DisposeAsync();
         }
-        });
+        }, token);
     }
     public async Task<TicketCommentPageDto?> GetAsync(
         int userId, TicketCommentAudience audience, int? ticketId,
@@ -473,6 +475,10 @@ public sealed class TicketCommentService(
                 ticket.CreatedByUserAccountID == userId),
             TicketCommentAudience.Agent => query.Where(ticket =>
                 ticket.AssignedToUserAccountID == userId ||
+                (ticket.TicketStatus.Name == TicketStatusNames.Cancelled &&
+                 ticket.CancellationRequests.Any(request =>
+                     request.RequestedByAgentUserAccountID == userId &&
+                     request.Status == CancellationRequestStatusNames.Approved)) ||
                 (ticket.AssignedToUserAccountID == null &&
                  ticket.TicketStatus.Name == TicketStatusNames.Open)),
             _ => query

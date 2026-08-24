@@ -21,6 +21,8 @@ public sealed class AgentTicketService(
     private static readonly string[] FinishedStatuses =
         [TicketStatusNames.Resolved, TicketStatusNames.Closed,
             TicketStatusNames.Cancelled, TicketStatusNames.Duplicate];
+    private static readonly string[] AssignedTicketStatuses =
+        [.. ActiveStatuses, .. FinishedStatuses];
 
     public async Task<AgentDashboardDto> GetDashboardAsync(
         int agentId, CancellationToken token)
@@ -77,13 +79,16 @@ public sealed class AgentTicketService(
     private async Task<PagedResultDto<AgentTicketListItemDto>> GetTicketsAsync(
         int agentId, AgentTicketFilterDto filter, string scope, CancellationToken token)
     {
+        var requestedScope = filter.Scope?.Trim().ToLowerInvariant();
         var query = scope switch
         {
             "open" => OpenTickets(),
-            "history" => OwnedTickets(agentId).Where(ticket =>
+            "history" => AssociatedTickets(agentId).Where(ticket =>
                 FinishedStatuses.Contains(ticket.TicketStatus.Name)),
+            _ when requestedScope == "all" => AssociatedTickets(agentId).Where(ticket =>
+                AssignedTicketStatuses.Contains(ticket.TicketStatus.Name)),
             _ => OwnedTickets(agentId).Where(ticket =>
-                ActiveStatuses.Contains(ticket.TicketStatus.Name))
+                ActiveStatuses.Contains(ticket.TicketStatus.Name)),
         };
         var search = filter.Search?.Trim();
         if (!string.IsNullOrWhiteSpace(search))
@@ -196,6 +201,9 @@ public sealed class AgentTicketService(
         if (DuplicateTicketRules.IsDuplicate(ticket.TicketStatus.Name))
             return new(TicketOperationStatus.Conflict,
                 Message: DuplicateTicketRules.ReadOnlyMessage);
+        if (ticket.TicketStatus.Name == TicketStatusNames.Cancelled)
+            return new(TicketOperationStatus.Conflict,
+                Message: "Cancelled tickets cannot be assigned.");
         if (ticket.AssignedToUserAccountID.HasValue ||
             ticket.TicketStatus.Name != TicketStatusNames.Open)
             return new(TicketOperationStatus.Conflict,
@@ -752,6 +760,14 @@ public sealed class AgentTicketService(
     private IQueryable<Ticket> OwnedTickets(int agentId) =>
         dbContext.Tickets.AsNoTracking().Where(ticket =>
             ticket.AssignedToUserAccountID == agentId && !ticket.IsDeleted);
+
+    private IQueryable<Ticket> AssociatedTickets(int agentId) =>
+        dbContext.Tickets.AsNoTracking().Where(ticket => !ticket.IsDeleted &&
+            (ticket.AssignedToUserAccountID == agentId ||
+             (ticket.TicketStatus.Name == TicketStatusNames.Cancelled &&
+              ticket.CancellationRequests.Any(request =>
+                  request.RequestedByAgentUserAccountID == agentId &&
+                  request.Status == CancellationRequestStatusNames.Approved))));
 
     private IQueryable<Ticket> OpenTickets() =>
         dbContext.Tickets.AsNoTracking().Where(ticket =>

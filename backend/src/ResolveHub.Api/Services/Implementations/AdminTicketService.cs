@@ -380,7 +380,11 @@ public sealed class AdminTicketService(
             if (DuplicateTicketRules.IsDuplicate(ticket.TicketStatus.Name))
                 return new(TicketOperationStatus.Conflict,
                     Message: DuplicateTicketRules.ReadOnlyMessage);
-            if (ticket.TicketStatus.IsFinalStatus)
+            if (ticket.TicketStatus.Name == TicketStatusNames.Cancelled)
+                return new(TicketOperationStatus.Conflict,
+                    Message: "Cancelled tickets cannot be assigned.");
+            if (ticket.TicketStatus.Name == TicketStatusNames.Closed ||
+                ticket.TicketStatus.IsFinalStatus)
                 return new(
                     TicketOperationStatus.Conflict,
                     Message: "Completed tickets cannot be assigned or reassigned.");
@@ -567,9 +571,43 @@ public sealed class AdminTicketService(
         int administratorId, int reviewId, bool approve,
         string? internalNote, CancellationToken token)
     {
+        if (!dbContext.Database.IsRelational() ||
+            dbContext.Database.CurrentTransaction is not null)
+            return await ReviewDuplicateCoreAsync(
+                administratorId, reviewId, approve, internalNote, token);
+
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async strategyToken =>
+        {
+            dbContext.ChangeTracker.Clear();
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable, strategyToken);
+            try
+            {
+                var result = await ReviewDuplicateCoreAsync(
+                    administratorId, reviewId, approve, internalNote, strategyToken);
+                if (result.Status == TicketOperationStatus.Success)
+                    await transaction.CommitAsync(strategyToken);
+                else
+                    await transaction.RollbackAsync(CancellationToken.None);
+                return result;
+            }
+            catch
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+                throw;
+            }
+        }, token);
+    }
+
+    private async Task<TicketServiceResult<bool>> ReviewDuplicateCoreAsync(
+        int administratorId, int reviewId, bool approve,
+        string? internalNote, CancellationToken token)
+    {
         var review = await dbContext.DuplicateReviews
             .Include(item => item.Ticket).ThenInclude(ticket => ticket.TicketStatus)
             .Include(item => item.SuggestedOriginalTicket)
+                .ThenInclude(ticket => ticket.TicketStatus)
             .SingleOrDefaultAsync(item => item.ID == reviewId, token);
         if (review is null) return new(TicketOperationStatus.NotFound);
         if (review.Status != DuplicateReviewStatusNames.Pending)
@@ -579,6 +617,14 @@ public sealed class AdminTicketService(
         if (DuplicateTicketRules.IsDuplicate(review.Ticket.TicketStatus.Name))
             return new(TicketOperationStatus.Conflict,
                 Message: "This ticket has already been marked as Duplicate.");
+        if (approve && DuplicateTicketRules.IsDuplicate(
+                review.SuggestedOriginalTicket.TicketStatus.Name))
+            return new(TicketOperationStatus.Invalid,
+                Message: "A duplicate ticket cannot be selected as the original ticket.");
+        if (approve && review.SuggestedOriginalTicket.TicketStatus.Name ==
+                TicketStatusNames.Cancelled)
+            return new(TicketOperationStatus.Invalid,
+                Message: "A cancelled ticket cannot be selected as the original ticket.");
 
         var now = DateTime.UtcNow;
         var administratorName = await dbContext.Users.AsNoTracking()
@@ -604,7 +650,7 @@ public sealed class AdminTicketService(
                 CreatedDate = now
             });
         }
-        else if (!approve)
+        if (!approve)
         {
             review.Status = DuplicateReviewStatusNames.Rejected;
             review.ReviewedByUserAccountID = administratorId;
@@ -650,6 +696,39 @@ public sealed class AdminTicketService(
         int administratorId, string ticketReference,
         MarkDuplicateRequestDto request, CancellationToken token)
     {
+        if (!dbContext.Database.IsRelational() ||
+            dbContext.Database.CurrentTransaction is not null)
+            return await MarkDuplicateCoreAsync(
+                administratorId, ticketReference, request, token);
+
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async strategyToken =>
+        {
+            dbContext.ChangeTracker.Clear();
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable, strategyToken);
+            try
+            {
+                var result = await MarkDuplicateCoreAsync(
+                    administratorId, ticketReference, request, strategyToken);
+                if (result.Status == TicketOperationStatus.Success)
+                    await transaction.CommitAsync(strategyToken);
+                else
+                    await transaction.RollbackAsync(CancellationToken.None);
+                return result;
+            }
+            catch
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+                throw;
+            }
+        }, token);
+    }
+
+    private async Task<TicketServiceResult<bool>> MarkDuplicateCoreAsync(
+        int administratorId, string ticketReference,
+        MarkDuplicateRequestDto request, CancellationToken token)
+    {
         if (!request.Confirmed)
             return new(TicketOperationStatus.Invalid,
                 Message: "Confirm that this ticket should be marked as Duplicate.");
@@ -679,9 +758,11 @@ public sealed class AdminTicketService(
         }
 
         var normalizedOriginalReference = originalReference.ToUpperInvariant();
-        var original = await dbContext.Tickets.SingleOrDefaultAsync(ticket =>
-            !ticket.IsDeleted && ticket.TicketReferenceNumber.ToUpper() ==
-                normalizedOriginalReference, token);
+        var original = await dbContext.Tickets
+            .Include(ticket => ticket.TicketStatus)
+            .SingleOrDefaultAsync(ticket => !ticket.IsDeleted &&
+                ticket.TicketReferenceNumber.ToUpper() ==
+                    normalizedOriginalReference, token);
         if (original is null)
         {
             logger.LogWarning(
@@ -697,6 +778,12 @@ public sealed class AdminTicketService(
         if (DuplicateTicketRules.IsDuplicate(duplicate.TicketStatus.Name))
             return new(TicketOperationStatus.Conflict,
                 Message: "This ticket has already been marked as Duplicate.");
+        if (DuplicateTicketRules.IsDuplicate(original.TicketStatus.Name))
+            return new(TicketOperationStatus.Invalid,
+                Message: "A duplicate ticket cannot be selected as the original ticket.");
+        if (original.TicketStatus.Name == TicketStatusNames.Cancelled)
+            return new(TicketOperationStatus.Invalid,
+                Message: "A cancelled ticket cannot be selected as the original ticket.");
 
         var pendingReviews = await dbContext.DuplicateReviews
             .Include(review => review.ReportedByUserAccount)
@@ -799,6 +886,15 @@ public sealed class AdminTicketService(
             .Select(status => status.ID).SingleAsync(token);
         ticket.OriginalTicketID = originalTicketId;
         ticket.UpdatedDate = now;
+        var activeSession = await dbContext.TicketWorkSessions.SingleOrDefaultAsync(
+            session => session.TicketID == ticket.ID && session.EndedAt == null, token);
+        if (activeSession is not null)
+        {
+            activeSession.EndedAt = now;
+            activeSession.DurationMinutes = Math.Max(0,
+                (int)Math.Floor((now - activeSession.StartedAt).TotalMinutes));
+            activeSession.EndedReason = TicketStatusNames.Duplicate;
+        }
     }
 
     public async Task<IReadOnlyCollection<UserNotificationDto>> GetNotificationsAsync(
@@ -842,6 +938,9 @@ public sealed class AdminTicketService(
             .Where(ticket =>
                 !ticket.IsDeleted &&
                 ticket.AssignedToUserAccountID == null &&
+                ticket.TicketStatus.Name != TicketStatusNames.Closed &&
+                ticket.TicketStatus.Name != TicketStatusNames.Cancelled &&
+                ticket.TicketStatus.Name != TicketStatusNames.Duplicate &&
                 !ticket.TicketStatus.IsFinalStatus);
         var search = filter.Search?.Trim();
         if (!string.IsNullOrWhiteSpace(search))

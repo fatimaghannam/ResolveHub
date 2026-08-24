@@ -51,6 +51,39 @@ public sealed class ManagerTicketService(
         int managerId, string ticketReference,
         CreateDuplicateReviewRequestDto request, CancellationToken token)
     {
+        if (!dbContext.Database.IsRelational() ||
+            dbContext.Database.CurrentTransaction is not null)
+            return await ReportDuplicateCoreAsync(
+                managerId, ticketReference, request, token);
+
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async strategyToken =>
+        {
+            dbContext.ChangeTracker.Clear();
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable, strategyToken);
+            try
+            {
+                var result = await ReportDuplicateCoreAsync(
+                    managerId, ticketReference, request, strategyToken);
+                if (result.Status == TicketOperationStatus.Success)
+                    await transaction.CommitAsync(strategyToken);
+                else
+                    await transaction.RollbackAsync(CancellationToken.None);
+                return result;
+            }
+            catch
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+                throw;
+            }
+        }, token);
+    }
+
+    private async Task<TicketServiceResult<DuplicateReviewDto>> ReportDuplicateCoreAsync(
+        int managerId, string ticketReference,
+        CreateDuplicateReviewRequestDto request, CancellationToken token)
+    {
         var originalReference = request.SuggestedOriginalTicketReference.Trim();
         if (string.Equals(ticketReference, originalReference,
                 StringComparison.OrdinalIgnoreCase))
@@ -75,6 +108,12 @@ public sealed class ManagerTicketService(
         if (DuplicateTicketRules.IsDuplicate(reported.TicketStatus.Name))
             return new(TicketOperationStatus.Conflict,
                 Message: "This ticket has already been marked as Duplicate.");
+        if (DuplicateTicketRules.IsDuplicate(original.TicketStatus.Name))
+            return new(TicketOperationStatus.Invalid,
+                Message: "A duplicate ticket cannot be selected as the original ticket.");
+        if (original.TicketStatus.Name == TicketStatusNames.Cancelled)
+            return new(TicketOperationStatus.Invalid,
+                Message: "A cancelled ticket cannot be selected as the original ticket.");
         if (await dbContext.DuplicateReviews.AnyAsync(review =>
                 review.TicketID == reported.ID &&
                 review.Status == DuplicateReviewStatusNames.Pending, token))

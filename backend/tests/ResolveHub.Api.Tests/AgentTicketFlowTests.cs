@@ -9,6 +9,7 @@ using ResolveHub.Api.Data;
 using ResolveHub.Api.DTOs.Auth;
 using ResolveHub.Api.DTOs.Common;
 using ResolveHub.Api.DTOs.Tickets;
+using ResolveHub.Api.Entities;
 using Xunit;
 
 namespace ResolveHub.Api.Tests;
@@ -116,12 +117,35 @@ public sealed class AgentTicketFlowTests
         var employee = await factory.CreateUserAsync("agent-filter-owner@test.local", Password);
         var agent = await factory.CreateUserAsync(
             "agent-filter-agent@test.local", Password, RoleNames.ITSupportAgent);
+        var otherAgent = await factory.CreateUserAsync(
+            "agent-filter-other@test.local", Password, RoleNames.ITSupportAgent);
         using var employeeClient = await LoginAsync(factory, employee.Email!);
         using var agentClient = await LoginAsync(factory, agent.Email!);
+        using var otherAgentClient = await LoginAsync(factory, otherAgent.Email!);
         var first = await CreateTicketAsync(factory, employeeClient, "Network adapter failure");
         var second = await CreateTicketAsync(factory, employeeClient, "Printer toner warning");
+        var resolved = await CreateTicketAsync(factory, employeeClient, "Historical VPN repair");
+        var cancelled = await CreateTicketAsync(factory, employeeClient, "Approved cancellation history");
+        var unassignedOpen = await CreateTicketAsync(factory, employeeClient, "Unassigned open ticket");
         await SetAgentStateAsync(factory, first.Id, agent.Id, TicketStatusNames.InProgress, "High");
         await SetAgentStateAsync(factory, second.Id, agent.Id, TicketStatusNames.Assigned, "Low");
+        await SetAgentStateAsync(factory, resolved.Id, agent.Id, TicketStatusNames.Resolved, "Low");
+        await factory.SetTicketStateAsync(cancelled.Id, TicketStatusNames.Cancelled);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            db.TicketCancellationRequests.Add(new TicketCancellationRequest
+            {
+                TicketID = cancelled.Id,
+                RequestedByAgentUserAccountID = agent.Id,
+                Reason = "Cancellation approved during testing.",
+                Status = CancellationRequestStatusNames.Approved,
+                Outcome = CancellationRequestOutcomeNames.Cancelled,
+                RequestedDate = DateTime.UtcNow.AddMinutes(-2),
+                ReviewedDate = DateTime.UtcNow.AddMinutes(-1)
+            });
+            await db.SaveChangesAsync();
+        }
         await factory.SetTicketCreatedDateAsync(first.Id, DateTime.UtcNow.Date.AddDays(-2));
 
         var search = await agentClient.GetFromJsonAsync<
@@ -133,11 +157,40 @@ public sealed class AgentTicketFlowTests
             $"&toDate={DateTime.UtcNow.Date.AddDays(-2):yyyy-MM-dd}");
         var page = await agentClient.GetFromJsonAsync<
             PagedResultDto<AgentTicketListItemDto>>("/api/agent/tickets?page=1&pageSize=1");
+        var all = await agentClient.GetFromJsonAsync<
+            PagedResultDto<AgentTicketListItemDto>>("/api/agent/tickets?scope=all&pageSize=20");
+        var resolvedStatusId = await LookupIdAsync(factory, "status", TicketStatusNames.Resolved);
+        var resolvedOnly = await agentClient.GetFromJsonAsync<
+            PagedResultDto<AgentTicketListItemDto>>(
+            $"/api/agent/tickets?scope=all&statusId={resolvedStatusId}");
+        var otherAgentAll = await otherAgentClient.GetFromJsonAsync<
+            PagedResultDto<AgentTicketListItemDto>>("/api/agent/tickets?scope=all&pageSize=20");
+        var cancelledStatusId = await LookupIdAsync(factory, "status", TicketStatusNames.Cancelled);
+        var cancelledOnly = await agentClient.GetFromJsonAsync<
+            PagedResultDto<AgentTicketListItemDto>>(
+            $"/api/agent/tickets?scope=all&statusId={cancelledStatusId}");
+        var cancelledDetails = await agentClient.GetAsync(
+            $"/api/agent/tickets/{cancelled.TicketReferenceNumber}");
+        var otherAgentCancelledDetails = await otherAgentClient.GetAsync(
+            $"/api/agent/tickets/{cancelled.TicketReferenceNumber}");
+        var cancelledComments = await agentClient.GetAsync(
+            $"/api/agent/tickets/{cancelled.TicketReferenceNumber}/comments");
+        var cancelledActivity = await agentClient.GetAsync(
+            $"/api/tickets/{cancelled.TicketReferenceNumber}/activity");
 
         Assert.Equal(first.Id, Assert.Single(search!.Items).Id);
         Assert.Equal(first.Id, Assert.Single(dates!.Items).Id);
         Assert.Equal(2, page!.TotalItems);
         Assert.Equal(2, page.TotalPages);
+        Assert.Equal(4, all!.TotalItems);
+        Assert.DoesNotContain(all.Items, item => item.Id == unassignedOpen.Id);
+        Assert.Equal(resolved.Id, Assert.Single(resolvedOnly!.Items).Id);
+        Assert.Equal(cancelled.Id, Assert.Single(cancelledOnly!.Items).Id);
+        Assert.Equal(HttpStatusCode.OK, cancelledDetails.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, cancelledComments.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, cancelledActivity.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, otherAgentCancelledDetails.StatusCode);
+        Assert.Empty(otherAgentAll!.Items);
     }
 
     [Fact]

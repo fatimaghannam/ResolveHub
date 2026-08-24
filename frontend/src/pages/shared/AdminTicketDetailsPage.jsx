@@ -203,7 +203,20 @@ function AdminTicketDetailsPage({ roleArea = 'admin' }) {
       setLoadingOriginal(true)
       setDuplicateError('')
       const loadTicket = roleArea === 'manager' ? getManagerTicket : getAdminTicket
-      setOriginalTicketPreview(await loadTicket(reference))
+      const original = await loadTicket(reference)
+      if (original.statusName === 'Duplicate') {
+        setOriginalTicketPreview(null)
+        setDuplicateConfirmed(false)
+        setDuplicateError('A duplicate ticket cannot be selected as the original ticket.')
+        return
+      }
+      if (original.statusName === 'Cancelled') {
+        setOriginalTicketPreview(null)
+        setDuplicateConfirmed(false)
+        setDuplicateError('A cancelled ticket cannot be selected as the original ticket.')
+        return
+      }
+      setOriginalTicketPreview(original)
       setDuplicateConfirmed(false)
     } catch (requestError) {
       setOriginalTicketPreview(null)

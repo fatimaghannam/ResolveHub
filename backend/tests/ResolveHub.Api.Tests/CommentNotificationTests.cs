@@ -51,7 +51,7 @@ public sealed class CommentNotificationTests
             [agent.Id, adminOne.Id, adminTwo.Id]);
         await PostAndAssertAsync(agentClient,
             $"/api/agent/tickets/{ticket.TicketReferenceNumber}/comments", "Public",
-            [requester.Id, adminOne.Id, adminTwo.Id]);
+            [requester.Id, adminOne.Id, adminTwo.Id], useMultipart: true);
         await PostAndAssertAsync(adminClient,
             $"/api/admin/tickets/{ticket.TicketReferenceNumber}/comments", "Public",
             [requester.Id, agent.Id, adminTwo.Id]);
@@ -59,17 +59,31 @@ public sealed class CommentNotificationTests
             $"/api/tickets/{ticket.Id}/comments", "Private", [agent.Id]);
         await PostAndAssertAsync(agentClient,
             $"/api/agent/tickets/{ticket.TicketReferenceNumber}/comments", "Private",
-            [requester.Id]);
+            [requester.Id], useMultipart: true);
 
         async Task PostAndAssertAsync(HttpClient client, string path,
-            string visibility, int[] expectedRecipientIds)
+            string visibility, int[] expectedRecipientIds, bool useMultipart = false)
         {
-            var response = await client.PostAsJsonAsync(path, new
+            HttpResponseMessage response;
+            if (useMultipart)
             {
-                message = $"{visibility} notification test.",
-                visibility
-            });
-            response.EnsureSuccessStatusCode();
+                using var form = new MultipartFormDataContent();
+                form.Add(new StringContent($"{visibility} notification test."), "Content");
+                form.Add(new StringContent(visibility), "Visibility");
+                response = await client.PostAsync(path, form);
+            }
+            else
+            {
+                response = await client.PostAsJsonAsync(path, new
+                {
+                    message = $"{visibility} notification test.",
+                    visibility
+                });
+            }
+            using (response)
+            {
+                response.EnsureSuccessStatusCode();
+            }
 
             using var scope = factory.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();

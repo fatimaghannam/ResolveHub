@@ -14,11 +14,14 @@ import {
 import { formatTicketReference } from '../../utils/ticketReference.js'
 
 const pageSize = 8
+const assignedStatusNames = [
+  'Assigned', 'In Progress', 'Pending', 'Resolved', 'Closed', 'Cancelled', 'Duplicate',
+]
 const dateRangeOptions = STANDARD_DATE_RANGE_OPTIONS
 const supportedDateRanges = new Set(dateRangeOptions.map(([value]) => value))
 const emptyDraft = {
   search: '',
-  statusId: '',
+  statusId: 'active',
   categoryId: '',
   priorityId: '',
   dateRange: 'all',
@@ -27,13 +30,14 @@ const emptyDraft = {
 }
 const emptyFilters = { ...emptyDraft, page: 1, pageSize }
 
-function initialFilters(searchParams) {
+function initialFilters(searchParams, view) {
   const query = Object.fromEntries(searchParams)
   const dateRange = supportedDateRanges.has(query.dateRange)
     ? query.dateRange
     : query.fromDate || query.toDate ? 'custom' : 'all'
   return {
     ...emptyFilters,
+    statusId: view === 'open' ? '' : 'active',
     ...query,
     dateRange,
     page: Math.max(1, Number(query.page) || 1),
@@ -41,17 +45,19 @@ function initialFilters(searchParams) {
   }
 }
 
-function urlFilters(filters) {
+function urlFilters(filters, view) {
   return Object.fromEntries(Object.entries(filters).filter(([, value]) =>
-    value !== '' && value !== 'all' && value !== 1 && value !== pageSize))
+    value !== '' && value !== 'all' && value !== 1 && value !== pageSize &&
+    !(view === 'assigned' && value === 'active')))
 }
 
-function getApiFilters(filters) {
+function getApiFilters(filters, view) {
   const { fromUtc, toUtcExclusive } =
     getUtcDateRange(filters.fromDate, filters.toDate)
   return {
     search: filters.search,
-    statusId: filters.statusId,
+    statusId: /^\d+$/.test(filters.statusId) ? filters.statusId : '',
+    scope: view === 'assigned' && filters.statusId !== 'active' ? 'all' : 'active',
     categoryId: filters.categoryId,
     priorityId: filters.priorityId,
     fromUtc,
@@ -64,14 +70,14 @@ function getApiFilters(filters) {
 }
 
 const viewContent = {
-  assigned: ['Assigned Tickets', 'Review and manage the support requests assigned to you.', 'assigned'],
+  assigned: ['Assigned Tickets', 'Review active and historical support requests assigned to you.', 'assigned'],
   open: ['Open Tickets', 'Review unassigned tickets and request assignment from a Manager.', 'open'],
 }
 
 function AgentTicketsPage({ view = 'assigned' }) {
   const [title, subtitle, noun] = viewContent[view] ?? viewContent.assigned
   const [searchParams, setSearchParams] = useSearchParams()
-  const initial = initialFilters(searchParams)
+  const initial = initialFilters(searchParams, view)
   const [draft, setDraft] = useState({
     ...emptyDraft,
     ...initial,
@@ -88,7 +94,7 @@ function AgentTicketsPage({ view = 'assigned' }) {
   })
 
   useEffect(() => {
-    const next = initialFilters(searchParams)
+    const next = initialFilters(searchParams, view)
     setDraft((current) => {
       const nextDraft = { ...emptyDraft, ...next }
       return JSON.stringify(current) === JSON.stringify(nextDraft)
@@ -97,7 +103,7 @@ function AgentTicketsPage({ view = 'assigned' }) {
     })
     setFilters((current) =>
       JSON.stringify(current) === JSON.stringify(next) ? current : next)
-  }, [searchParams])
+  }, [searchParams, view])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -123,7 +129,7 @@ function AgentTicketsPage({ view = 'assigned' }) {
     setData(null)
     setError('')
     const loadTickets = view === 'open' ? getOpenTickets : getAssignedTickets
-    loadTickets(getApiFilters(filters), controller.signal)
+    loadTickets(getApiFilters(filters, view), controller.signal)
       .then((result) => {
         if (!controller.signal.aborted) setData(result)
       })
@@ -154,12 +160,13 @@ function AgentTicketsPage({ view = 'assigned' }) {
     setDraft(nextDraft)
     const next = { ...nextDraft, page: 1, pageSize }
     setFilters(next)
-    setSearchParams(urlFilters(next))
+    setSearchParams(urlFilters(next, view))
   }
 
   function clearFilters() {
-    setDraft(emptyDraft)
-    setFilters(emptyFilters)
+    const cleared = { ...emptyFilters, statusId: view === 'open' ? '' : 'active' }
+    setDraft(cleared)
+    setFilters(cleared)
     setSearchParams({})
     setDateError('')
   }
@@ -191,7 +198,7 @@ function AgentTicketsPage({ view = 'assigned' }) {
   }
 
   const hasActiveFilters = Boolean(
-    filters.search || filters.statusId || filters.categoryId ||
+    filters.search || (view === 'assigned' ? filters.statusId !== 'active' : filters.statusId) || filters.categoryId ||
     filters.priorityId || filters.dateRange !== 'all',
   )
 
@@ -203,10 +210,17 @@ function AgentTicketsPage({ view = 'assigned' }) {
       </section>
 
       <form className="filter-panel ticket-filters" onSubmit={applyFilters}>
-        <div className="ticket-filters__grid">
+        <div className={`ticket-filters__grid ${view === 'open' ? 'ticket-filters__grid--open' : ''}`}>
           <label className="filter-search"><span>Search</span><input value={draft.search} onChange={(event) => setDraft({ ...draft, search: event.target.value })} placeholder="Ticket number or title" /></label>
+          {view === 'assigned' && <label>
+            <span>Status</span>
+            <select value={draft.statusId} onChange={(event) => setDraft({ ...draft, statusId: event.target.value })}>
+              <option value="active">Active</option><option value="all">All</option>
+              {assignedStatusNames.map((name) => lookups.statuses.find((status) => status.name === name)).filter(Boolean)
+                .map((option) => <option value={option.id} key={option.id}>{option.name}</option>)}
+            </select>
+          </label>}
           {[
-            ['statusId', 'Status', lookups.statuses],
             ['categoryId', 'Category', lookups.categories],
             ['priorityId', 'Priority', lookups.priorities],
           ].map(([key, label, options]) => (
@@ -245,7 +259,7 @@ function AgentTicketsPage({ view = 'assigned' }) {
         {!error && !data && <LoadingState message="Loading assigned tickets…" />}
         {data && (
           <>
-            <div className="results-count">{data.totalItems} {noun} ticket{data.totalItems === 1 ? '' : 's'}</div>
+            <div className="results-count">{data.totalItems} {view === 'assigned' ? (filters.statusId === 'all' ? 'assigned' : filters.statusId === 'active' ? 'active' : (lookups.statuses.find((status) => String(status.id) === String(filters.statusId))?.name ?? 'assigned').toLowerCase()) : noun} ticket{data.totalItems === 1 ? '' : 's'}</div>
             {data.items.length === 0 ? (
               <EmptyState
                 title={hasActiveFilters ? 'No tickets match the selected filters' : view === 'open' ? 'No open tickets are currently available.' : 'No tickets found.'}
@@ -288,7 +302,7 @@ function AgentTicketsPage({ view = 'assigned' }) {
               onChange={(page) => {
                 const next = { ...filters, page }
                 setFilters(next)
-                setSearchParams(urlFilters(next))
+                setSearchParams(urlFilters(next, view))
               }}
             />
           </>

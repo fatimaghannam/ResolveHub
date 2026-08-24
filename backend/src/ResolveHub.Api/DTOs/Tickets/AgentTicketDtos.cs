@@ -8,6 +8,8 @@ public sealed class AgentTicketFilterDto : IValidatableObject
     [StringLength(200)]
     public string? Search { get; init; }
     public int? StatusId { get; init; }
+    [StringLength(20)]
+    public string? Scope { get; init; }
     public int? CategoryId { get; init; }
     public int? PriorityId { get; init; }
     public DateTime? FromDate { get; init; }

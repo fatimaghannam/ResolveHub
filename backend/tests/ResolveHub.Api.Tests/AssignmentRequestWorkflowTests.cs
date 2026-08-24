@@ -794,6 +794,61 @@ public sealed class AssignmentRequestWorkflowTests
             .Intersect(pageTwo.Items.Select(item => item.Id)));
     }
 
+    [Fact]
+    public async Task CancelledTicket_RejectsEveryAssignmentEntryPointWithoutSideEffects()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        await factory.SeedTicketLookupsAsync();
+        var admin = await factory.CreateUserAsync(
+            "cancelled-assign-admin@resolvehub.test", Password, RoleNames.Admin);
+        var manager = await factory.CreateUserAsync(
+            "cancelled-assign-manager@resolvehub.test", Password, RoleNames.Manager);
+        var employee = await factory.CreateUserAsync(
+            "cancelled-assign-owner@resolvehub.test", Password, RoleNames.Employee);
+        var agent = await factory.CreateUserAsync(
+            "cancelled-assign-agent@resolvehub.test", Password, RoleNames.ITSupportAgent);
+        using var adminClient = await LoginAsync(factory, admin.Email!);
+        using var managerClient = await LoginAsync(factory, manager.Email!);
+        using var employeeClient = await LoginAsync(factory, employee.Email!);
+        using var agentClient = await LoginAsync(factory, agent.Email!);
+        var ticket = await CreateTicketAsync(factory, employeeClient);
+        await factory.SetTicketStateAsync(ticket.Id, TicketStatusNames.Cancelled);
+
+        var managerResponse = await managerClient.PostAsJsonAsync(
+            $"/api/manager/tickets/{ticket.TicketReferenceNumber}/assignment-requests",
+            new { agentUserId = agent.Id });
+        var adminResponse = await adminClient.PostAsJsonAsync(
+            $"/api/admin/tickets/{ticket.TicketReferenceNumber}/assign",
+            new { agentUserId = agent.Id });
+        var agentResponse = await agentClient.PostAsync(
+            $"/api/agent/tickets/{ticket.TicketReferenceNumber}/assignment-requests", null);
+
+        foreach (var response in new[] { managerResponse, adminResponse, agentResponse })
+        {
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+            Assert.Contains("Cancelled tickets cannot be assigned.",
+                await response.Content.ReadAsStringAsync());
+        }
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var storedTicket = await db.Tickets
+            .Include(item => item.TicketStatus)
+            .SingleAsync(item => item.ID == ticket.Id);
+        Assert.Equal(TicketStatusNames.Cancelled, storedTicket.TicketStatus.Name);
+        Assert.Null(storedTicket.AssignedToUserAccountID);
+        Assert.False(await db.TicketAssignmentRequests.AnyAsync(item =>
+            item.TicketID == ticket.Id));
+        Assert.False(await db.TicketHistory.AnyAsync(item => item.TicketID == ticket.Id &&
+            (item.ActionType == TicketHistoryActionNames.TicketAssigned ||
+             item.ActionType == TicketHistoryActionNames.AssignmentRequested)));
+        Assert.False(await db.UserNotifications.AnyAsync(item =>
+            item.TicketReferenceNumber == ticket.TicketReferenceNumber));
+        Assert.Equal(0, await db.Tickets.CountAsync(item =>
+            item.AssignedToUserAccountID == agent.Id &&
+            TicketWorkloadRules.ActiveStatuses.Contains(item.TicketStatus.Name)));
+    }
+
     private static async Task<TicketDetailsDto> CreateTicketAsync(
         ResolveHubApiFactory factory, HttpClient client)
     {

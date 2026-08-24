@@ -146,11 +146,28 @@ public sealed class TicketGovernanceTests
             "governance-manager@resolvehub.test", Password, RoleNames.Manager);
         var employee = await factory.CreateUserAsync(
             "governance-employee@resolvehub.test", Password, RoleNames.Employee);
+        var agent = await factory.CreateUserAsync(
+            "governance-agent@resolvehub.test", Password, RoleNames.ITSupportAgent);
         using var adminClient = await LoginAsync(factory, admin.Email!);
         using var managerClient = await LoginAsync(factory, manager.Email!);
         using var employeeClient = await LoginAsync(factory, employee.Email!);
         var original = await CreateTicketAsync(factory, employeeClient, "Original issue");
         var duplicate = await CreateTicketAsync(factory, employeeClient, "Duplicate issue");
+        await factory.SetTicketStateAsync(
+            duplicate.Id, TicketStatusNames.InProgress, agent.Id);
+        using (var workScope = factory.Services.CreateScope())
+        {
+            var workDb = workScope.ServiceProvider
+                .GetRequiredService<ApplicationDbContext>();
+            workDb.TicketWorkSessions.Add(new ResolveHub.Api.Entities.TicketWorkSession
+            {
+                TicketID = duplicate.Id,
+                ITAgentUserAccountID = agent.Id,
+                StartedAt = DateTime.UtcNow.AddMinutes(-20),
+                CreatedDate = DateTime.UtcNow.AddMinutes(-20)
+            });
+            await workDb.SaveChangesAsync();
+        }
 
         var report = await managerClient.PostAsJsonAsync(
             $"/api/manager/tickets/{duplicate.TicketReferenceNumber}/duplicate-reviews",
@@ -158,9 +175,14 @@ public sealed class TicketGovernanceTests
                 reason = "The requester reported the same incident twice." });
         Assert.Equal(HttpStatusCode.Created, report.StatusCode);
         var review = (await report.Content.ReadFromJsonAsync<DuplicateReviewDto>())!;
+        var repeatedReport = await managerClient.PostAsJsonAsync(
+            $"/api/manager/tickets/{duplicate.TicketReferenceNumber}/duplicate-reviews",
+            new { suggestedOriginalTicketReference = original.TicketReferenceNumber });
+        Assert.Equal(HttpStatusCode.Conflict, repeatedReport.StatusCode);
+        Assert.Contains("already pending", await repeatedReport.Content.ReadAsStringAsync());
         var beforeApproval = await adminClient.GetFromJsonAsync<AdminTicketDetailsDto>(
             $"/api/admin/tickets/{duplicate.TicketReferenceNumber}");
-        Assert.Equal(TicketStatusNames.Open, beforeApproval!.StatusName);
+        Assert.Equal(TicketStatusNames.InProgress, beforeApproval!.StatusName);
         Assert.NotNull(beforeApproval.PendingDuplicateReview);
 
         var approve = await adminClient.PostAsync(
@@ -224,6 +246,11 @@ public sealed class TicketGovernanceTests
             item.UserAccountID == admin.Id && item.Title == "Duplicate Review Pending"));
         Assert.True(await db.UserNotifications.AnyAsync(item =>
             item.UserAccountID == manager.Id && item.Title == "Duplicate Review Approved"));
+        var completedSession = await db.TicketWorkSessions.SingleAsync(item =>
+            item.TicketID == duplicate.Id);
+        Assert.NotNull(completedSession.EndedAt);
+        Assert.True(completedSession.DurationMinutes >= 19);
+        Assert.Equal(TicketStatusNames.Duplicate, completedSession.EndedReason);
     }
 
     [Fact]
@@ -256,11 +283,65 @@ public sealed class TicketGovernanceTests
             $"/api/manager/tickets/{ticket.TicketReferenceNumber}/duplicate-reviews",
             new { suggestedOriginalTicketReference = original.TicketReferenceNumber });
         var review = (await report.Content.ReadFromJsonAsync<DuplicateReviewDto>())!;
-        Assert.Equal(HttpStatusCode.NoContent, (await adminClient.PostAsync(
-            $"/api/admin/duplicate-reviews/{review.Id}/reject", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await adminClient.PostAsJsonAsync(
+            $"/api/admin/duplicate-reviews/{review.Id}/reject",
+            new { internalNote = "The incidents are unrelated." })).StatusCode);
         var snapshot = await factory.GetTicketSnapshotAsync(ticket.Id);
         Assert.Equal(TicketStatusNames.Open, snapshot.StatusName);
         Assert.False(snapshot.IsDeleted);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Assert.Equal(DuplicateReviewStatusNames.Rejected,
+            (await db.DuplicateReviews.SingleAsync(item => item.ID == review.Id)).Status);
+        Assert.True(await db.TicketHistory.AnyAsync(item => item.TicketID == ticket.Id &&
+            item.ActionType == TicketHistoryActionNames.DuplicateReviewRejected));
+        Assert.True(await db.TicketHistory.AnyAsync(item => item.TicketID == ticket.Id &&
+            item.ActionType == "Duplicate Review Note" && item.IsInternal));
+    }
+
+    [Fact]
+    public async Task DuplicateReview_RejectsDuplicateAndCancelledOriginalCandidates()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        await factory.SeedTicketLookupsAsync();
+        var admin = await factory.CreateUserAsync(
+            "candidate-admin@resolvehub.test", Password, RoleNames.Admin);
+        var manager = await factory.CreateUserAsync(
+            "candidate-manager@resolvehub.test", Password, RoleNames.Manager);
+        var employee = await factory.CreateUserAsync(
+            "candidate-owner@resolvehub.test", Password, RoleNames.Employee);
+        using var adminClient = await LoginAsync(factory, admin.Email!);
+        using var managerClient = await LoginAsync(factory, manager.Email!);
+        using var employeeClient = await LoginAsync(factory, employee.Email!);
+        var reported = await CreateTicketAsync(factory, employeeClient, "Reported issue");
+        var original = await CreateTicketAsync(factory, employeeClient, "Valid original");
+        var duplicateCandidate = await CreateTicketAsync(
+            factory, employeeClient, "Already duplicate candidate");
+        var cancelledCandidate = await CreateTicketAsync(
+            factory, employeeClient, "Cancelled candidate");
+
+        Assert.Equal(HttpStatusCode.NoContent, (await adminClient.PostAsJsonAsync(
+            $"/api/admin/tickets/{duplicateCandidate.TicketReferenceNumber}/mark-duplicate",
+            new
+            {
+                originalTicketReference = original.TicketReferenceNumber,
+                confirmed = true
+            })).StatusCode);
+        await factory.SetTicketStateAsync(cancelledCandidate.Id, TicketStatusNames.Cancelled);
+
+        var duplicateResponse = await managerClient.PostAsJsonAsync(
+            $"/api/manager/tickets/{reported.TicketReferenceNumber}/duplicate-reviews",
+            new { suggestedOriginalTicketReference = duplicateCandidate.TicketReferenceNumber });
+        Assert.Equal(HttpStatusCode.BadRequest, duplicateResponse.StatusCode);
+        Assert.Contains("A duplicate ticket cannot be selected as the original ticket.",
+            await duplicateResponse.Content.ReadAsStringAsync());
+
+        var cancelledResponse = await managerClient.PostAsJsonAsync(
+            $"/api/manager/tickets/{reported.TicketReferenceNumber}/duplicate-reviews",
+            new { suggestedOriginalTicketReference = cancelledCandidate.TicketReferenceNumber });
+        Assert.Equal(HttpStatusCode.BadRequest, cancelledResponse.StatusCode);
+        Assert.Contains("A cancelled ticket cannot be selected as the original ticket.",
+            await cancelledResponse.Content.ReadAsStringAsync());
     }
 
     [Fact]
