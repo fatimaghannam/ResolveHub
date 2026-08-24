@@ -50,11 +50,16 @@ public sealed class TicketCommentService(
             if (validation is not null) return Invalid(validation);
         }
 
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync<TicketServiceResult<TicketCommentDto>>(async () =>
+        {
+        dbContext.ChangeTracker.Clear();
         Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction = null;
         var storedPaths = new List<string>();
         try
         {
-            if (dbContext.Database.IsRelational())
+            if (dbContext.Database.IsRelational() &&
+                dbContext.Database.CurrentTransaction is null)
                 transaction = await dbContext.Database.BeginTransactionAsync(token);
             var result = await AddAsync(userId, audience, ticketId, ticketReference,
                 new AddTicketCommentRequestDto
@@ -103,6 +108,7 @@ public sealed class TicketCommentService(
         {
             if (transaction is not null) await transaction.DisposeAsync();
         }
+        });
     }
     public async Task<TicketCommentPageDto?> GetAsync(
         int userId, TicketCommentAudience audience, int? ticketId,

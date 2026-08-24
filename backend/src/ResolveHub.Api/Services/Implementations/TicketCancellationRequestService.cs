@@ -1,6 +1,5 @@
 using System.Data;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 using ResolveHub.Api.Constants;
 using ResolveHub.Api.Data;
 using ResolveHub.Api.DTOs.Tickets;
@@ -79,12 +78,34 @@ public sealed class TicketCancellationRequestService(ApplicationDbContext dbCont
         if (normalizedDecision is not ("reject" or "cancel" or "reassign"))
             return new(TicketOperationStatus.Invalid, Message: "Select a valid review decision.");
 
-        IDbContextTransaction? transaction = null;
-        try
+        if (!dbContext.Database.IsRelational() ||
+            dbContext.Database.CurrentTransaction is not null)
+            return await ReviewCoreAsync(managerId, requestId, normalizedDecision, reviewNote, token);
+
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async strategyToken =>
         {
-            if (dbContext.Database.IsRelational())
-                transaction = await dbContext.Database.BeginTransactionAsync(
-                    IsolationLevel.Serializable, token);
+            dbContext.ChangeTracker.Clear();
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable, strategyToken);
+            try
+            {
+                var result = await ReviewCoreAsync(
+                    managerId, requestId, normalizedDecision, reviewNote, strategyToken);
+                await transaction.CommitAsync(strategyToken);
+                return result;
+            }
+            catch
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+                throw;
+            }
+        }, token);
+    }
+
+    private async Task<TicketServiceResult<bool>> ReviewCoreAsync(int managerId, int requestId,
+        string normalizedDecision, string? reviewNote, CancellationToken token)
+    {
             var request = await dbContext.TicketCancellationRequests
                 .Include(item => item.Ticket).ThenInclude(ticket => ticket.TicketStatus)
                 .Include(item => item.RequestedByAgentUserAccount)
@@ -158,18 +179,7 @@ public sealed class TicketCancellationRequestService(ApplicationDbContext dbCont
                 }
             }
             await dbContext.SaveChangesAsync(token);
-            if (transaction is not null) await transaction.CommitAsync(token);
             return new(TicketOperationStatus.Success, true);
-        }
-        catch
-        {
-            if (transaction is not null) await transaction.RollbackAsync(token);
-            throw;
-        }
-        finally
-        {
-            if (transaction is not null) await transaction.DisposeAsync();
-        }
     }
 
     private async Task EndActiveStateAsync(Ticket ticket, int managerId, string outcome,

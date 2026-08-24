@@ -169,49 +169,55 @@ public sealed class AdminUserService(
         }
 
         var now = DateTime.UtcNow;
-        var user = new UserAccount
+        UserAccount user = null!;
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        var persistenceResult = await strategy.ExecuteAsync<TicketServiceResult<bool>>(async () =>
         {
-            UserName = $"user-{Guid.NewGuid():N}",
-            Email = email,
-            FirstName = firstName,
-            LastName = lastName,
-            DepartmentID = department?.ID,
-            IsActive = true,
-            EmailConfirmed = true,
-            CreatedDate = now
-        };
-        await using var transaction = dbContext.Database.IsRelational()
-            ? await dbContext.Database.BeginTransactionAsync(token)
-            : null;
-        var createResult = await userManager.CreateAsync(user);
-        if (!createResult.Succeeded)
-            return new(TicketOperationStatus.Invalid,
-                Message: string.Join(" ", createResult.Errors.Select(item => item.Description)));
+            dbContext.ChangeTracker.Clear();
+            user = new UserAccount
+            {
+                UserName = $"user-{Guid.NewGuid():N}",
+                Email = email,
+                FirstName = firstName,
+                LastName = lastName,
+                DepartmentID = department?.ID,
+                IsActive = true,
+                EmailConfirmed = true,
+                CreatedDate = now
+            };
+            await using var transaction = dbContext.Database.IsRelational() &&
+                dbContext.Database.CurrentTransaction is null
+                ? await dbContext.Database.BeginTransactionAsync(token)
+                : null;
+            var createResult = await userManager.CreateAsync(user);
+            if (!createResult.Succeeded)
+                return new(TicketOperationStatus.Invalid,
+                    Message: string.Join(" ", createResult.Errors.Select(item => item.Description)));
 
-        var roleResult = await userManager.AddToRoleAsync(user, role);
-        if (!roleResult.Succeeded)
-        {
-            await userManager.DeleteAsync(user);
-            return new(TicketOperationStatus.Invalid,
-                Message: "The selected role could not be assigned.");
-        }
+            var roleResult = await userManager.AddToRoleAsync(user, role);
+            if (!roleResult.Succeeded)
+            {
+                await userManager.DeleteAsync(user);
+                return new(TicketOperationStatus.Invalid,
+                    Message: "The selected role could not be assigned.");
+            }
 
-        dbContext.ActivityLogs.Add(new ActivityLog
-        {
-            PerformedByUserAccountID = administratorId,
-            ActionType = "User Created",
-            EntityType = "UserAccount",
-            EntityID = user.Id.ToString(),
-            Description = $"User account {user.Id} was created.",
-            NewValue = role,
-            CreatedDate = now
+            dbContext.ActivityLogs.Add(new ActivityLog
+            {
+                PerformedByUserAccountID = administratorId,
+                ActionType = "User Created",
+                EntityType = "UserAccount",
+                EntityID = user.Id.ToString(),
+                Description = $"User account {user.Id} was created.",
+                NewValue = role,
+                CreatedDate = now
+            });
+            await dbContext.SaveChangesAsync(token);
+            if (transaction is not null) await transaction.CommitAsync(token);
+            return new(TicketOperationStatus.Success, true);
         });
-        await dbContext.SaveChangesAsync(token);
-        if (transaction is not null)
-        {
-            await transaction.CommitAsync(token);
-            await transaction.DisposeAsync();
-        }
+        if (persistenceResult.Status != TicketOperationStatus.Success)
+            return new(persistenceResult.Status, Message: persistenceResult.Message);
 
         try
         {
@@ -351,9 +357,16 @@ public sealed class AdminUserService(
                     Message: "The final active Administrator cannot be deactivated.");
         }
 
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync<TicketServiceResult<bool>>(async () =>
+        {
+        dbContext.ChangeTracker.Clear();
+        user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null) return new(TicketOperationStatus.NotFound);
         var now = DateTime.UtcNow;
         var previous = user.IsActive;
-        await using var transaction = dbContext.Database.IsRelational()
+        await using var transaction = dbContext.Database.IsRelational() &&
+            dbContext.Database.CurrentTransaction is null
             ? await dbContext.Database.BeginTransactionAsync(token)
             : null;
         user.IsActive = isActive;
@@ -384,5 +397,6 @@ public sealed class AdminUserService(
         if (transaction is not null)
             await transaction.CommitAsync(token);
         return new(TicketOperationStatus.Success, true);
+        });
     }
 }

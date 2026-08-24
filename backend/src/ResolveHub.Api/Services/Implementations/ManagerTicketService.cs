@@ -1,6 +1,5 @@
 using System.Data;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 using ResolveHub.Api.Constants;
 using ResolveHub.Api.Data;
 using ResolveHub.Api.DTOs.Common;
@@ -192,6 +191,37 @@ public sealed class ManagerTicketService(
         if (!approve && string.IsNullOrWhiteSpace(declineReason))
             return new(TicketOperationStatus.Invalid,
                 Message: "A decline reason is required.");
+
+        if (!dbContext.Database.IsRelational() ||
+            dbContext.Database.CurrentTransaction is not null)
+            return await ReviewAssignmentRequestCoreAsync(
+                managerId, requestId, approve, declineReason, token);
+
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async strategyToken =>
+        {
+            dbContext.ChangeTracker.Clear();
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable, strategyToken);
+            try
+            {
+                var result = await ReviewAssignmentRequestCoreAsync(
+                    managerId, requestId, approve, declineReason, strategyToken);
+                await transaction.CommitAsync(strategyToken);
+                return result;
+            }
+            catch
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+                throw;
+            }
+        }, token);
+    }
+
+    private async Task<TicketServiceResult<bool>> ReviewAssignmentRequestCoreAsync(
+        int managerId, int requestId, bool approve, string? declineReason,
+        CancellationToken token)
+    {
         var request = await dbContext.TicketAssignmentRequests
             .Include(item => item.Ticket)
                 .ThenInclude(item => item.TicketStatus)
@@ -221,14 +251,6 @@ public sealed class ManagerTicketService(
 
         if (approve)
         {
-            IDbContextTransaction? transaction = null;
-            try
-            {
-                if (dbContext.Database.IsRelational())
-                {
-                    transaction = await dbContext.Database.BeginTransactionAsync(
-                        IsolationLevel.Serializable, token);
-                }
                 await dbContext.Entry(request.Ticket).ReloadAsync(token);
                 var currentStatus = await dbContext.TicketStatuses.AsNoTracking()
                     .Where(item => item.ID == request.Ticket.TicketStatusID)
@@ -236,8 +258,6 @@ public sealed class ManagerTicketService(
                 if (request.Ticket.AssignedToUserAccountID.HasValue ||
                     currentStatus != TicketStatusNames.Open)
                 {
-                    if (transaction is not null)
-                        await transaction.RollbackAsync(token);
                     return new(TicketOperationStatus.Conflict,
                         Message: "This ticket is no longer available for assignment.");
                 }
@@ -245,28 +265,10 @@ public sealed class ManagerTicketService(
                     managerId, request.Ticket.TicketReferenceNumber,
                     request.RequestedByUserAccountID, token, request.ID);
                 if (assignment.Status != TicketOperationStatus.Success)
-                {
-                    if (transaction is not null)
-                        await transaction.RollbackAsync(token);
                     return assignment;
-                }
                 await CompleteReviewAsync(
                     request, managerId, true, null, token);
-                if (transaction is not null)
-                    await transaction.CommitAsync(token);
                 return new(TicketOperationStatus.Success, true);
-            }
-            catch
-            {
-                if (transaction is not null)
-                    await transaction.RollbackAsync(token);
-                throw;
-            }
-            finally
-            {
-                if (transaction is not null)
-                    await transaction.DisposeAsync();
-            }
         }
 
         await CompleteReviewAsync(request, managerId, false, declineReason, token);

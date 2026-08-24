@@ -44,28 +44,29 @@ public sealed class AdminCategoryService(ApplicationDbContext dbContext) : IAdmi
     {
         var validation = Validate(request);
         if (validation is not null) return new(TicketOperationStatus.Invalid, Message: validation);
+        return await ExecuteTransactionAsync(async transactionToken =>
+        {
         var name = request.Name.Trim();
         var description = request.Description.Trim();
-        if (await DuplicateExists(name, null, token))
+        if (await DuplicateExists(name, null, transactionToken))
             return new(TicketOperationStatus.Conflict,
                 Message: "A category with this name already exists.");
 
         var now = DateTime.UtcNow;
         var nextSortOrder = (await dbContext.TicketCategories.MaxAsync(
-            category => (int?)category.SortOrder, token) ?? 0) + 1;
+            category => (int?)category.SortOrder, transactionToken) ?? 0) + 1;
         var category = new TicketCategory
         {
             Name = name, Description = description, SortOrder = nextSortOrder, IsActive = true
         };
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(token);
         dbContext.TicketCategories.Add(category);
-        await dbContext.SaveChangesAsync(token);
+        await dbContext.SaveChangesAsync(transactionToken);
         AddAudit(administratorId, category, "Category Created", null, "Active",
             $"Created the {category.Name} ticket category.", now);
-        await dbContext.SaveChangesAsync(token);
-        await transaction.CommitAsync(token);
+        await dbContext.SaveChangesAsync(transactionToken);
         return new(TicketOperationStatus.Success,
             new(category.ID, category.Name, description, 0, true));
+        }, token);
     }
 
     public async Task<TicketServiceResult<AdminCategoryDto>> UpdateAsync(
@@ -74,51 +75,81 @@ public sealed class AdminCategoryService(ApplicationDbContext dbContext) : IAdmi
     {
         var validation = Validate(request);
         if (validation is not null) return new(TicketOperationStatus.Invalid, Message: validation);
+        return await ExecuteTransactionAsync(async transactionToken =>
+        {
         var category = await dbContext.TicketCategories.SingleOrDefaultAsync(
-            item => item.ID == categoryId, token);
+            item => item.ID == categoryId, transactionToken);
         if (category is null) return new(TicketOperationStatus.NotFound);
         var name = request.Name.Trim();
         var description = request.Description.Trim();
-        if (await DuplicateExists(name, categoryId, token))
+        if (await DuplicateExists(name, categoryId, transactionToken))
             return new(TicketOperationStatus.Conflict,
                 Message: "A category with this name already exists.");
 
         var oldValue = $"{category.Name}: {category.Description}";
         category.Name = name;
         category.Description = description;
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(token);
         AddAudit(administratorId, category, "Category Updated", oldValue,
             $"{name}: {description}", $"Updated the {name} ticket category.", DateTime.UtcNow);
-        await dbContext.SaveChangesAsync(token);
-        await transaction.CommitAsync(token);
-        var activeTickets = await ActiveTicketCount(categoryId, token);
+        await dbContext.SaveChangesAsync(transactionToken);
+        var activeTickets = await ActiveTicketCount(categoryId, transactionToken);
         return new(TicketOperationStatus.Success,
             new(category.ID, name, description, activeTickets, category.IsActive));
+        }, token);
     }
 
     public async Task<TicketServiceResult<AdminCategoryDto>> SetStatusAsync(
         int administratorId, int categoryId, bool isActive, CancellationToken token)
     {
+        return await ExecuteTransactionAsync(async transactionToken =>
+        {
         var category = await dbContext.TicketCategories.SingleOrDefaultAsync(
-            item => item.ID == categoryId, token);
+            item => item.ID == categoryId, transactionToken);
         if (category is null) return new(TicketOperationStatus.NotFound);
         if (category.IsActive != isActive)
         {
             var oldValue = category.IsActive ? "Active" : "Inactive";
             var newValue = isActive ? "Active" : "Inactive";
             category.IsActive = isActive;
-            await using var transaction = await dbContext.Database.BeginTransactionAsync(token);
             AddAudit(administratorId, category,
                 isActive ? "Category Activated" : "Category Deactivated",
                 oldValue, newValue,
                 $"The {category.Name} ticket category was {(isActive ? "activated" : "deactivated")}.",
                 DateTime.UtcNow);
-            await dbContext.SaveChangesAsync(token);
-            await transaction.CommitAsync(token);
+            await dbContext.SaveChangesAsync(transactionToken);
         }
         return new(TicketOperationStatus.Success,
             new(category.ID, category.Name, category.Description ?? "",
-                await ActiveTicketCount(categoryId, token), category.IsActive));
+                await ActiveTicketCount(categoryId, transactionToken), category.IsActive));
+        }, token);
+    }
+
+    private async Task<TicketServiceResult<AdminCategoryDto>> ExecuteTransactionAsync(
+        Func<CancellationToken, Task<TicketServiceResult<AdminCategoryDto>>> operation,
+        CancellationToken token)
+    {
+        if (!dbContext.Database.IsRelational() ||
+            dbContext.Database.CurrentTransaction is not null)
+            return await operation(token);
+
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async strategyToken =>
+        {
+            dbContext.ChangeTracker.Clear();
+            await using var transaction =
+                await dbContext.Database.BeginTransactionAsync(strategyToken);
+            try
+            {
+                var result = await operation(strategyToken);
+                await transaction.CommitAsync(strategyToken);
+                return result;
+            }
+            catch
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+                throw;
+            }
+        }, token);
     }
 
     private async Task<bool> DuplicateExists(string name, int? excludedId,

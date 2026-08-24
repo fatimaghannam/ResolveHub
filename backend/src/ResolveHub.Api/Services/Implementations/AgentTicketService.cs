@@ -352,7 +352,13 @@ public sealed class AgentTicketService(
             return new(TicketOperationStatus.Invalid,
                 Message: "The additional note cannot exceed 1000 characters.");
 
-        await using var transaction = dbContext.Database.IsRelational()
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync<TicketServiceResult<AgentTicketWorkflowResultDto>>(
+            async () =>
+        {
+        dbContext.ChangeTracker.Clear();
+        await using var transaction = dbContext.Database.IsRelational() &&
+            dbContext.Database.CurrentTransaction is null
             ? await dbContext.Database.BeginTransactionAsync(token)
             : null;
         try
@@ -436,12 +442,19 @@ public sealed class AgentTicketService(
             return new(TicketOperationStatus.Conflict,
                 Message: "The pending action conflicts with another ticket update.");
         }
+        });
     }
 
     public async Task<TicketServiceResult<AgentTicketWorkflowResultDto>> ResumeWorkAsync(
         int agentId, string ticketReference, CancellationToken token)
     {
-        await using var transaction = dbContext.Database.IsRelational()
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync<TicketServiceResult<AgentTicketWorkflowResultDto>>(
+            async () =>
+        {
+        dbContext.ChangeTracker.Clear();
+        await using var transaction = dbContext.Database.IsRelational() &&
+            dbContext.Database.CurrentTransaction is null
             ? await dbContext.Database.BeginTransactionAsync(token)
             : null;
         try
@@ -517,6 +530,7 @@ public sealed class AgentTicketService(
             return new(TicketOperationStatus.Conflict,
                 Message: "The resume action conflicts with another ticket update.");
         }
+        });
     }
 
     public async Task<TicketServiceResult<AgentTicketDetailsDto>> ResolveAsync(
@@ -933,6 +947,10 @@ public sealed class AgentTicketService(
                     item.Content, item.CreatedDate, item.UpdatedDate, item.IsEdited,
                     item.Visibility.ToString())).ToList(),
             ticket.History
+                .Where(item => !(item.ActionType == TicketHistoryActionNames.CommentAdded &&
+                        item.NewValue == nameof(CommentVisibility.Private)) ||
+                    ticket.AssignedToUserAccountID == agentId ||
+                    ticket.CreatedByUserAccountID == agentId)
                 .OrderByDescending(item => item.CreatedDate)
                 .Select(item => new TicketHistoryDto(
                     item.ID, item.ActionType,
