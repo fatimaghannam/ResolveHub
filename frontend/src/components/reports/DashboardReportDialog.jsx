@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FileDown } from 'lucide-react'
+import { FileChartColumn } from 'lucide-react'
 import { downloadDashboardReport } from '../../services/dashboardReportService.js'
 
 const dateValue = (date) => new Date(date.getTime() - date.getTimezoneOffset() * 60000)
@@ -17,7 +17,7 @@ function rangeFor(preset) {
 export function DashboardReportButton() {
   const [open, setOpen] = useState(false)
   return <>
-    <button className="button button--secondary" type="button" onClick={() => setOpen(true)}><FileDown size={17} aria-hidden="true" />Generate Report</button>
+    <button className="button button--secondary dashboard-report-button" type="button" onClick={() => setOpen(true)}><FileChartColumn size={17} aria-hidden="true" />Generate Report</button>
     {open && <DashboardReportDialog onClose={() => setOpen(false)} />}
   </>
 }

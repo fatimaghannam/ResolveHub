@@ -2,9 +2,13 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using ResolveHub.Api.Constants;
+using ResolveHub.Api.Data;
 using ResolveHub.Api.DTOs.Auth;
 using ResolveHub.Api.DTOs.Reports;
+using ResolveHub.Api.DTOs.Tickets;
+using ResolveHub.Api.Entities;
 using ResolveHub.Api.Services.Interfaces;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
 using Xunit;
@@ -61,6 +65,141 @@ public sealed class DashboardReportTests
             "/api/reports/dashboard?from=2026-08-01&to=2026-08-31");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ReportData_UsesInclusivePeriodBoundariesAndHistoricalAgentActivity()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        await factory.SeedTicketLookupsAsync();
+        var admin = await factory.CreateUserAsync(
+            "period-report-admin@resolvehub.test", Password, RoleNames.Admin);
+        var employee = await factory.CreateUserAsync(
+            "period-report-requester@resolvehub.test", Password, RoleNames.Employee);
+        var activeAgent = await factory.CreateUserAsync(
+            "period-report-agent@resolvehub.test", Password, RoleNames.ITSupportAgent);
+        var idleAgent = await factory.CreateUserAsync(
+            "period-report-idle-agent@resolvehub.test", Password, RoleNames.ITSupportAgent);
+        using var employeeClient = await LoginAsync(factory, employee.Email!);
+        var before = await CreateTicketAsync(factory, employeeClient, "Before period");
+        var start = await CreateTicketAsync(factory, employeeClient, "Start boundary");
+        var end = await CreateTicketAsync(factory, employeeClient, "End boundary");
+        var after = await CreateTicketAsync(factory, employeeClient, "After period");
+        var fromUtc = new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Utc);
+        var endLateUtc = new DateTime(2026, 8, 24, 23, 59, 59, DateTimeKind.Utc);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var tickets = await context.Tickets.Where(item =>
+                item.ID == before.Id || item.ID == start.Id || item.ID == end.Id ||
+                item.ID == after.Id).ToDictionaryAsync(item => item.ID);
+            tickets[before.Id].CreatedDate = fromUtc.AddTicks(-1);
+            tickets[start.Id].CreatedDate = fromUtc;
+            tickets[end.Id].CreatedDate = endLateUtc;
+            tickets[after.Id].CreatedDate = endLateUtc.AddSeconds(1);
+            tickets[before.Id].ResolvedDate = endLateUtc;
+            context.ActivityLogs.AddRange(
+                new ActivityLog
+                {
+                    PerformedByUserAccountID = admin.Id,
+                    ActionType = TicketHistoryActionNames.TicketAssigned,
+                    EntityType = "Ticket",
+                    EntityID = start.TicketReferenceNumber,
+                    Description = "Assigned during period.",
+                    NewValue = activeAgent.Id.ToString(),
+                    CreatedDate = endLateUtc
+                },
+                new ActivityLog
+                {
+                    PerformedByUserAccountID = admin.Id,
+                    ActionType = TicketHistoryActionNames.TicketAssigned,
+                    EntityType = "Ticket",
+                    EntityID = before.TicketReferenceNumber,
+                    Description = "Assigned before period.",
+                    NewValue = activeAgent.Id.ToString(),
+                    CreatedDate = fromUtc.AddTicks(-1)
+                });
+            context.TicketWorkSessions.Add(new TicketWorkSession
+            {
+                TicketID = start.Id,
+                ITAgentUserAccountID = activeAgent.Id,
+                StartedAt = fromUtc.AddHours(-1),
+                EndedAt = fromUtc.AddHours(1),
+                DurationMinutes = 120,
+                CreatedDate = fromUtc.AddHours(-1)
+            });
+            context.TicketHistory.AddRange(
+                new TicketHistory
+                {
+                    TicketID = before.Id,
+                    PerformedByUserAccountID = activeAgent.Id,
+                    ActionType = TicketHistoryActionNames.TicketResolved,
+                    CreatedDate = endLateUtc
+                },
+                new TicketHistory
+                {
+                    TicketID = before.Id,
+                    PerformedByUserAccountID = activeAgent.Id,
+                    ActionType = TicketHistoryActionNames.TicketClosed,
+                    CreatedDate = endLateUtc
+                });
+            await context.SaveChangesAsync();
+        }
+
+        foreach (var role in new[] { RoleNames.Admin, RoleNames.Manager })
+        {
+            using var scope = factory.Services.CreateScope();
+            var service = scope.ServiceProvider.GetRequiredService<IDashboardReportService>();
+            var method = service.GetType().GetMethod(
+                "BuildDataAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            var task = (Task<DashboardReportData>)method.Invoke(service,
+                [new DashboardReportRequest
+                {
+                    From = new DateOnly(2026, 8, 1),
+                    To = new DateOnly(2026, 8, 24),
+                    TimeZone = "UTC"
+                }, admin.Email!, role, CancellationToken.None])!;
+            var report = await task;
+            var workload = Assert.Single(report.Workloads,
+                item => item.Assigned == 1 && item.Worked == 1 &&
+                    item.Resolved == 1 && item.Closed == 1);
+            var idle = Assert.Single(report.Workloads,
+                item => item.Assigned == 0 && item.Worked == 0 &&
+                    item.Resolved == 0 && item.Closed == 0);
+
+            Assert.Equal(2, report.Metrics.Single(item => item.Name == "Total Tickets").Value);
+            Assert.Equal(1, report.Metrics.Single(item => item.Name == "Resolved in Period").Value);
+            Assert.Equal(2, report.CreatedDuringPeriod);
+            Assert.Equal(1, report.ResolvedDuringPeriod);
+            Assert.Equal(2, report.Statuses.Sum(item => item.Value));
+            Assert.Equal(2, report.Categories.Sum(item => item.Value));
+            Assert.Equal(2, report.Priorities.Sum(item => item.Value));
+            Assert.Equal(2, report.Trend.Sum(item => item.Created));
+            Assert.Equal(1, report.Trend.Sum(item => item.Resolved));
+            Assert.Equal(1, workload.Assigned);
+            Assert.Equal(1, workload.Worked);
+            Assert.Equal(1, workload.Resolved);
+            Assert.Equal(1, workload.Closed);
+            Assert.Equal(0, idle.Assigned);
+            Assert.Equal(0, idle.Worked);
+            Assert.Equal(0, idle.Resolved);
+            Assert.Equal(0, idle.Closed);
+
+            var oneDayTask = (Task<DashboardReportData>)method.Invoke(service,
+                [new DashboardReportRequest
+                {
+                    From = new DateOnly(2026, 8, 24),
+                    To = new DateOnly(2026, 8, 24),
+                    TimeZone = "UTC"
+                }, admin.Email!, role, CancellationToken.None])!;
+            var oneDayReport = await oneDayTask;
+            Assert.Equal(1, oneDayReport.Metrics
+                .Single(item => item.Name == "Total Tickets").Value);
+            Assert.Equal(1, oneDayReport.Metrics
+                .Single(item => item.Name == "Resolved in Period").Value);
+            Assert.Equal(1, oneDayReport.Workloads.Sum(item => item.Assigned));
+        }
     }
 
     [Theory]
@@ -199,8 +338,8 @@ public sealed class DashboardReportTests
             .Select(index => new DashboardReportChartItem($"Long Support Category {index}", index))
             .ToArray();
         var workloads = Enumerable.Range(1, 100)
-            .Select(index => new DashboardReportWorkloadItem($"Agent {index}", index % 6, 5,
-                Math.Max(0, 5 - index % 6), "Available", 1, 1, 1)).ToArray();
+            .Select(index => new DashboardReportWorkloadItem(
+                $"Agent {index}", index % 6, 1, 1, 1)).ToArray();
         var report = new DashboardReportData(
             new DateOnly(2026, 5, 1), new DateOnly(2026, 8, 23), "Test Manager",
             RoleNames.Manager, DateTimeOffset.UtcNow,
@@ -222,6 +361,21 @@ public sealed class DashboardReportTests
 
     private static int Occurrences(string value, string pattern) =>
         value.Split(pattern).Length - 1;
+
+    private static async Task<TicketDetailsDto> CreateTicketAsync(
+        ResolveHubApiFactory factory, HttpClient client, string title)
+    {
+        var lookups = await factory.GetTicketLookupIdsAsync();
+        var response = await client.PostAsJsonAsync("/api/tickets", new
+        {
+            title,
+            description = $"Report-period test ticket: {title}.",
+            ticketCategoryId = lookups.CategoryId,
+            ticketPriorityId = lookups.PriorityId
+        });
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<TicketDetailsDto>())!;
+    }
 
     private static async Task<HttpClient> LoginAsync(
         ResolveHubApiFactory factory, string email)

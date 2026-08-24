@@ -13,8 +13,7 @@ public sealed record DashboardReportMetric(string Name, int Value);
 public sealed record DashboardReportChartItem(string Name, int Value);
 public sealed record DashboardReportTrendItem(string Label, int Created, int Resolved);
 public sealed record DashboardReportWorkloadItem(
-    string Name, int ActiveTickets, int MaximumCapacity, int SlotsRemaining,
-    string CapacityStatus, int Assigned, int InProgress, int Pending);
+    string Name, int Assigned, int Worked, int Resolved, int Closed);
 
 public sealed record DashboardReportData(
     DateOnly From, DateOnly To, string GeneratedBy, string Role,

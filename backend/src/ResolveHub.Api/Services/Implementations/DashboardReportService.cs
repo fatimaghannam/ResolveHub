@@ -32,6 +32,15 @@ public sealed class DashboardReportService(ApplicationDbContext db) : IDashboard
         DashboardReportRequest request, string generatedBy, string role,
         CancellationToken token)
     {
+        var data = await BuildDataAsync(request, generatedBy, role, token);
+        var bytes = CreatePdf(data);
+        return new(bytes, $"ResolveHub_Dashboard_Report_{data.From:yyyy-MM-dd}_to_{data.To:yyyy-MM-dd}.pdf");
+    }
+
+    private async Task<DashboardReportData> BuildDataAsync(
+        DashboardReportRequest request, string generatedBy, string role,
+        CancellationToken token)
+    {
         var from = request.From!.Value;
         var to = request.To!.Value;
         var timeZone = ResolveTimeZone(request.TimeZone);
@@ -40,7 +49,9 @@ public sealed class DashboardReportService(ApplicationDbContext db) : IDashboard
         var toExclusive = TimeZoneInfo.ConvertTimeToUtc(
             DateTime.SpecifyKind(to.AddDays(1).ToDateTime(TimeOnly.MinValue), DateTimeKind.Unspecified), timeZone);
         var tickets = db.Tickets.AsNoTracking().Where(ticket => !ticket.IsDeleted);
-        var current = await tickets.GroupBy(_ => 1).Select(group => new
+        var periodTickets = tickets.Where(ticket =>
+            ticket.CreatedDate >= fromUtc && ticket.CreatedDate < toExclusive);
+        var periodCounts = await periodTickets.GroupBy(_ => 1).Select(group => new
         {
             Total = group.Count(),
             Open = group.Count(ticket => ticket.TicketStatus.Name == TicketStatusNames.Open),
@@ -50,13 +61,9 @@ public sealed class DashboardReportService(ApplicationDbContext db) : IDashboard
             Critical = group.Count(ticket => ticket.TicketPriority.Name == "Critical" &&
                 !ticket.TicketStatus.IsFinalStatus)
         }).SingleOrDefaultAsync(token);
-        var created = await tickets.CountAsync(ticket =>
-            ticket.CreatedDate >= fromUtc && ticket.CreatedDate < toExclusive, token);
         var resolved = await tickets.CountAsync(ticket =>
             ticket.ResolvedDate >= fromUtc && ticket.ResolvedDate < toExclusive, token);
 
-        var periodTickets = tickets.Where(ticket =>
-            ticket.CreatedDate >= fromUtc && ticket.CreatedDate < toExclusive);
         var statusRows = await periodTickets.GroupBy(ticket => new
             { ticket.TicketStatus.Name, ticket.TicketStatus.SortOrder })
             .Select(group => new { group.Key.Name, Value = group.Count(), group.Key.SortOrder })
@@ -66,7 +73,7 @@ public sealed class DashboardReportService(ApplicationDbContext db) : IDashboard
             .Select(group => new { group.Key.Name, Value = group.Count(), group.Key.SortOrder })
             .OrderByDescending(item => item.Value).ThenBy(item => item.SortOrder)
             .ThenBy(item => item.Name).ToListAsync(token);
-        var priorityRows = await tickets.GroupBy(ticket => new
+        var priorityRows = await periodTickets.GroupBy(ticket => new
             { ticket.TicketPriority.Name, ticket.TicketPriority.SortOrder })
             .Select(group => new { group.Key.Name, Value = group.Count(), group.Key.SortOrder })
             .OrderBy(item => item.SortOrder).ThenBy(item => item.Name).ToListAsync(token);
@@ -76,57 +83,76 @@ public sealed class DashboardReportService(ApplicationDbContext db) : IDashboard
             .Select(ticket => new { ticket.CreatedDate, ticket.ResolvedDate }).ToListAsync(token);
         var trend = BuildTrend(from, to, trendRows.Select(item =>
             (item.CreatedDate, item.ResolvedDate)).ToList(), timeZone);
-        var workloads = await GetWorkloadsAsync(token);
+        var workloads = await GetWorkloadsAsync(fromUtc, toExclusive, token);
 
         var metrics = new List<DashboardReportMetric>();
         if (role == RoleNames.Admin)
-            metrics.Add(new("Total Users", await db.Users.CountAsync(user => user.IsActive, token)));
+            metrics.Add(new("Users Added", await db.Users.CountAsync(user =>
+                user.CreatedDate >= fromUtc && user.CreatedDate < toExclusive, token)));
         metrics.AddRange([
-            new("Total Tickets", current?.Total ?? 0),
-            new("Open Tickets", current?.Open ?? 0),
-            new("In Progress", current?.InProgress ?? 0),
-            new("Unassigned Tickets", current?.Unassigned ?? 0),
+            new("Total Tickets", periodCounts?.Total ?? 0),
+            new("Open Tickets", periodCounts?.Open ?? 0),
+            new("In Progress", periodCounts?.InProgress ?? 0),
+            new("Unassigned Tickets", periodCounts?.Unassigned ?? 0),
             new("Resolved in Period", resolved)]);
         if (role == RoleNames.Manager)
-            metrics.Add(new("Critical Tickets", current?.Critical ?? 0));
+            metrics.Add(new("Critical Tickets", periodCounts?.Critical ?? 0));
 
-        var data = new DashboardReportData(from, to, generatedBy, role,
+        return new DashboardReportData(from, to, generatedBy, role,
             TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, timeZone), metrics,
             statusRows.Select(item => new DashboardReportChartItem(item.Name, item.Value)).ToList(),
             trend, categoryRows.Select(item => new DashboardReportChartItem(item.Name, item.Value)).ToList(),
             priorityRows.Select(item => new DashboardReportChartItem(item.Name, item.Value)).ToList(),
-            workloads, created, resolved);
-        var bytes = CreatePdf(data);
-        return new(bytes, $"ResolveHub_Dashboard_Report_{from:yyyy-MM-dd}_to_{to:yyyy-MM-dd}.pdf");
+            workloads, periodCounts?.Total ?? 0, resolved);
     }
 
     private async Task<IReadOnlyCollection<DashboardReportWorkloadItem>> GetWorkloadsAsync(
-        CancellationToken token)
+        DateTime fromUtc, DateTime toExclusive, CancellationToken token)
     {
-        var active = TicketWorkloadRules.ActiveStatuses;
-        return await db.Users.AsNoTracking()
+        var agents = await db.Users.AsNoTracking()
             .Where(user => user.IsActive && user.UserAccountRoles.Any(item =>
                 item.Role.Name == RoleNames.ITSupportAgent))
             .OrderBy(user => user.FirstName).ThenBy(user => user.LastName)
-            .Select(user => new
-            {
-                Name = user.FirstName + " " + user.LastName,
-                Assigned = user.AssignedTickets.Count(ticket => !ticket.IsDeleted &&
-                    ticket.TicketStatus.Name == TicketStatusNames.Assigned),
-                InProgress = user.AssignedTickets.Count(ticket => !ticket.IsDeleted &&
-                    ticket.TicketStatus.Name == TicketStatusNames.InProgress),
-                Pending = user.AssignedTickets.Count(ticket => !ticket.IsDeleted &&
-                    ticket.TicketStatus.Name == TicketStatusNames.Pending),
-                Active = user.AssignedTickets.Count(ticket => !ticket.IsDeleted &&
-                    active.Contains(ticket.TicketStatus.Name))
-            })
-            .Select(item => new DashboardReportWorkloadItem(item.Name, item.Active,
-                TicketWorkloadRules.MaxActiveTicketsPerAgent,
-                Math.Max(0, TicketWorkloadRules.MaxActiveTicketsPerAgent - item.Active),
-                item.Active >= TicketWorkloadRules.MaxActiveTicketsPerAgent ? "Full" :
-                    item.Active == TicketWorkloadRules.MaxActiveTicketsPerAgent - 1 ? "Near Capacity" : "Available",
-                item.Assigned, item.InProgress, item.Pending))
+            .Select(user => new { user.Id, Name = user.FirstName + " " + user.LastName })
             .ToListAsync(token);
+        var assignments = await db.ActivityLogs.AsNoTracking()
+            .Where(item => item.CreatedDate >= fromUtc && item.CreatedDate < toExclusive &&
+                item.EntityType == "Ticket" &&
+                (item.ActionType == TicketHistoryActionNames.TicketAssigned ||
+                 item.ActionType == TicketHistoryActionNames.TicketReassigned) &&
+                db.Tickets.Any(ticket => !ticket.IsDeleted &&
+                    ticket.TicketReferenceNumber == item.EntityID))
+            .Select(item => new { item.EntityID, item.NewValue })
+            .ToListAsync(token);
+        var worked = await db.TicketWorkSessions.AsNoTracking()
+            .Where(item => !item.Ticket.IsDeleted && item.StartedAt < toExclusive &&
+                (item.EndedAt == null || item.EndedAt >= fromUtc))
+            .Select(item => new { item.ITAgentUserAccountID, item.TicketID })
+            .Distinct().ToListAsync(token);
+        var completed = await db.TicketHistory.AsNoTracking()
+            .Where(item => !item.Ticket.IsDeleted &&
+                item.CreatedDate >= fromUtc && item.CreatedDate < toExclusive &&
+                (item.ActionType == TicketHistoryActionNames.TicketResolved ||
+                 item.ActionType == TicketHistoryActionNames.TicketClosed))
+            .Select(item => new
+            {
+                AgentId = item.PerformedByUserAccountID,
+                item.TicketID,
+                item.ActionType
+            }).ToListAsync(token);
+
+        return agents.Select(agent => new DashboardReportWorkloadItem(
+            agent.Name,
+            assignments.Where(item => item.NewValue == agent.Id.ToString())
+                .Select(item => item.EntityID).Distinct().Count(),
+            worked.Count(item => item.ITAgentUserAccountID == agent.Id),
+            completed.Where(item => item.AgentId == agent.Id &&
+                    item.ActionType == TicketHistoryActionNames.TicketResolved)
+                .Select(item => item.TicketID).Distinct().Count(),
+            completed.Where(item => item.AgentId == agent.Id &&
+                    item.ActionType == TicketHistoryActionNames.TicketClosed)
+                .Select(item => item.TicketID).Distinct().Count()))
+            .ToList();
     }
 
     private static IReadOnlyCollection<DashboardReportTrendItem> BuildTrend(
@@ -235,30 +261,29 @@ public sealed class DashboardReportService(ApplicationDbContext db) : IDashboard
                         CategoryPdfHeight(report.Priorities), CategorySvg(report.Priorities));
                 column.Item().EnsureSpace(120).Column(section =>
                 {
-                    Section(section, "IT AGENT WORKLOAD (CURRENT)");
-                    section.Item().PaddingTop(7).Text("Workload is a current-state snapshot; historical workload snapshots are not stored.")
+                    Section(section, "IT AGENT WORKLOAD (REPORTING PERIOD)");
+                    section.Item().PaddingTop(7).Text("Distinct tickets assigned, worked, resolved, or closed during the selected reporting period.")
                         .FontSize(8).FontColor("64748B");
                     section.Item().PaddingTop(7).Table(table =>
                     {
                         table.ColumnsDefinition(columns =>
                         {
-                            columns.RelativeColumn(2.2f); columns.RelativeColumn(); columns.RelativeColumn(1.2f);
-                            columns.RelativeColumn(); columns.RelativeColumn(); columns.RelativeColumn(); columns.RelativeColumn();
+                            columns.RelativeColumn(2.2f); columns.RelativeColumn(); columns.RelativeColumn();
+                            columns.RelativeColumn(); columns.RelativeColumn();
                         });
                         table.Header(header =>
                         {
-                            foreach (var title in new[] { "Agent", "Active", "Capacity", "Slots", "Assigned", "Progress", "Pending" })
+                            foreach (var title in new[] { "Agent", "Assigned", "Worked", "Resolved", "Closed" })
                                 header.Cell().Background(BrandBlue).Padding(5).Text(title).Bold().FontColor(Colors.White);
                         });
                         foreach (var agent in report.Workloads)
                         {
-                            Cell(table, agent.Name); Cell(table, $"{agent.ActiveTickets} / {agent.MaximumCapacity}");
-                            Cell(table, agent.CapacityStatus); Cell(table, agent.SlotsRemaining.ToString());
-                            Cell(table, agent.Assigned.ToString()); Cell(table, agent.InProgress.ToString());
-                            Cell(table, agent.Pending.ToString());
+                            Cell(table, agent.Name); Cell(table, agent.Assigned.ToString());
+                            Cell(table, agent.Worked.ToString()); Cell(table, agent.Resolved.ToString());
+                            Cell(table, agent.Closed.ToString());
                         }
                         if (report.Workloads.Count == 0)
-                            table.Cell().ColumnSpan(7).Padding(8).Text("No active IT Agents are currently available.");
+                            table.Cell().ColumnSpan(5).Padding(8).Text("No active IT Agents are available.");
                     });
                 });
                 column.Item().PaddingTop(8).AlignCenter().Text("END OF REPORT").FontSize(8).Bold().FontColor("64748B");

@@ -106,6 +106,47 @@ public sealed class ManagerWorkflowTests
     }
 
     [Fact]
+    public async Task AdminAndManagerDashboards_CountOnlyAssignedStatusTickets()
+    {
+        await using var factory = new ResolveHubApiFactory();
+        await factory.SeedTicketLookupsAsync();
+        var manager = await factory.CreateUserAsync(
+            "dashboard-count-manager@resolvehub.test", Password, RoleNames.Manager);
+        var administrator = await factory.CreateUserAsync(
+            "dashboard-count-admin@resolvehub.test", Password, RoleNames.Admin);
+        var employee = await factory.CreateUserAsync(
+            "dashboard-count-requester@resolvehub.test", Password, RoleNames.Employee);
+        var agent = await factory.CreateUserAsync(
+            "dashboard-count-agent@resolvehub.test", Password, RoleNames.ITSupportAgent);
+        using var managerClient = await LoginAsync(factory, manager.Email!);
+        using var adminClient = await LoginAsync(factory, administrator.Email!);
+        using var employeeClient = await LoginAsync(factory, employee.Email!);
+        await CreateTicketAsync(factory, employeeClient);
+        var assigned = await CreateTicketAsync(factory, employeeClient);
+        var inProgress = await CreateTicketAsync(factory, employeeClient);
+        await factory.SetTicketStateAsync(
+            assigned.Id, TicketStatusNames.Assigned, agent.Id);
+        await factory.SetTicketStateAsync(
+            inProgress.Id, TicketStatusNames.InProgress, agent.Id);
+
+        var adminDashboard = await adminClient
+            .GetFromJsonAsync<AdminDashboardSummaryDto>("/api/admin/dashboard");
+        var managerDashboard = await managerClient
+            .GetFromJsonAsync<ManagerDashboardDto>("/api/manager/dashboard");
+
+        Assert.Equal(3, adminDashboard!.TotalTickets);
+        Assert.Equal(1, adminDashboard!.AssignedTickets);
+        Assert.Contains(adminDashboard.TicketCountsByStatus,
+            item => item.Name == TicketStatusNames.Open && item.Value == 1);
+        Assert.Contains(adminDashboard.TicketCountsByStatus,
+            item => item.Name == TicketStatusNames.Assigned && item.Value == 1);
+        Assert.Contains(adminDashboard.TicketCountsByStatus,
+            item => item.Name == TicketStatusNames.InProgress && item.Value == 1);
+        Assert.Equal(3, managerDashboard!.TotalTickets);
+        Assert.Equal(1, managerDashboard!.AssignedTickets);
+    }
+
+    [Fact]
     public async Task Manager_DashboardListsTickets_AndAssignsOnlyActiveAgents()
     {
         await using var factory = new ResolveHubApiFactory();

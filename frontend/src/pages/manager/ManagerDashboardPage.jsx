@@ -2,7 +2,7 @@ import {
   AlertTriangle,
   CircleCheckBig,
   Clock3,
-  FolderOpen,
+  ListChecks,
   Ticket,
   UserRoundMinus,
 } from 'lucide-react'
@@ -18,7 +18,7 @@ import { DashboardReportButton } from '../../components/reports/DashboardReportD
 
 const statistics = [
   ['Total Tickets', 'totalTickets', Ticket, 'cyan'],
-  ['Open Tickets', 'openTickets', FolderOpen, 'amber'],
+  ['Assigned Tickets', 'assignedTickets', ListChecks, 'blue'],
   ['In Progress', 'inProgressTickets', Clock3, 'blue'],
   ['Unassigned', 'unassignedTickets', UserRoundMinus, 'red'],
   ['Resolved This Month', 'resolvedThisMonth', CircleCheckBig, 'green'],

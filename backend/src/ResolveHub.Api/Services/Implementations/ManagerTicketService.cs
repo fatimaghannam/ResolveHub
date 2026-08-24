@@ -408,7 +408,7 @@ public sealed class ManagerTicketService(
         var counts = await tickets.GroupBy(_ => 1).Select(group => new
         {
             Total = group.Count(),
-            Open = group.Count(ticket => ticket.TicketStatus.Name == TicketStatusNames.Open),
+            Assigned = group.Count(ticket => ticket.TicketStatus.Name == TicketStatusNames.Assigned),
             InProgress = group.Count(ticket => ticket.TicketStatus.Name == TicketStatusNames.InProgress),
             Unassigned = group.Count(ticket =>
                 ticket.AssignedToUserAccountID == null && !ticket.TicketStatus.IsFinalStatus),
@@ -479,7 +479,7 @@ public sealed class ManagerTicketService(
 
         return new ManagerDashboardDto(
             counts?.Total ?? 0,
-            counts?.Open ?? 0,
+            counts?.Assigned ?? 0,
             counts?.InProgress ?? 0,
             counts?.Unassigned ?? 0,
             counts?.Resolved ?? 0,

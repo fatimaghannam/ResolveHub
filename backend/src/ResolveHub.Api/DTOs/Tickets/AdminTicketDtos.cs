@@ -152,7 +152,7 @@ public sealed record AdminMonthlyTrendDto(string Month, int Created, int Resolve
 public sealed record AdminDashboardSummaryDto(
     int TotalUsers,
     int TotalTickets,
-    int OpenTickets,
+    int AssignedTickets,
     int InProgress,
     int UnassignedTickets,
     int ResolvedThisMonth,

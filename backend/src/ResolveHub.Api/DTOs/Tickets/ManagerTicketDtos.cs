@@ -28,7 +28,7 @@ public sealed record ManagerAgentWorkloadDto(
 
 public sealed record ManagerDashboardDto(
     int TotalTickets,
-    int OpenTickets,
+    int AssignedTickets,
     int InProgressTickets,
     int UnassignedTickets,
     int ResolvedThisMonth,

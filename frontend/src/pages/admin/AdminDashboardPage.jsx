@@ -3,7 +3,7 @@ import {
   ClipboardCheck,
   Clock3,
   FilePlus2,
-  FolderOpen,
+  ListChecks,
   Tags,
   Ticket,
   UserPlus,
@@ -27,7 +27,7 @@ import { DashboardReportButton } from '../../components/reports/DashboardReportD
 const statistics = [
   ['Total Users', 'totalUsers', Users, 'blue'],
   ['Total Tickets', 'totalTickets', Ticket, 'cyan'],
-  ['Open Tickets', 'openTickets', FolderOpen, 'amber'],
+  ['Assigned Tickets', 'assignedTickets', ListChecks, 'blue'],
   ['In Progress', 'inProgress', Clock3, 'blue'],
   ['Unassigned Tickets', 'unassignedTickets', UserRoundMinus, 'red'],
   ['Resolved This Month', 'resolvedThisMonth', CircleCheckBig, 'green'],
