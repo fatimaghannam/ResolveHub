@@ -91,32 +91,49 @@ public sealed class TicketDraftService(
             TicketCategoryId = draft.TicketCategoryID ?? 0,
             TicketPriorityId = draft.TicketPriorityID ?? 0
         };
-        await using var transaction = dbContext.Database.IsRelational()
-            ? await dbContext.Database.BeginTransactionAsync(token)
-            : null;
-        try
+        if (!dbContext.Database.IsRelational() ||
+            dbContext.Database.CurrentTransaction is not null)
+            return await SubmitCoreAsync(draft, userId, request, token);
+
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async strategyToken =>
         {
-            var result = await ticketService.CreateTicketAsync(
-                userId, request, token);
-            if (result.Status != TicketOperationStatus.Success)
+            dbContext.ChangeTracker.Clear();
+            var currentDraft = await dbContext.TicketDrafts.SingleOrDefaultAsync(
+                item => item.ID == id && item.UserAccountID == userId, strategyToken);
+            if (currentDraft is null) return new(TicketOperationStatus.NotFound);
+            await using var transaction =
+                await dbContext.Database.BeginTransactionAsync(strategyToken);
+            try
             {
-                if (transaction is not null)
+                var result = await SubmitCoreAsync(
+                    currentDraft, userId, request, strategyToken);
+                if (result.Status == TicketOperationStatus.Success)
+                    await transaction.CommitAsync(strategyToken);
+                else
                     await transaction.RollbackAsync(CancellationToken.None);
                 return result;
             }
-
-            dbContext.TicketDrafts.Remove(draft);
-            await dbContext.SaveChangesAsync(token);
-            if (transaction is not null)
-                await transaction.CommitAsync(token);
-            return result;
-        }
-        catch
-        {
-            if (transaction is not null)
+            catch
+            {
                 await transaction.RollbackAsync(CancellationToken.None);
-            throw;
-        }
+                throw;
+            }
+        }, token);
+    }
+
+    private async Task<TicketServiceResult<TicketDetailsDto>> SubmitCoreAsync(
+        TicketDraft draft, int userId, CreateTicketRequestDto request,
+        CancellationToken token)
+    {
+        var result = await ticketService.CreateTicketAsync(
+            userId, request, token);
+        if (result.Status != TicketOperationStatus.Success)
+            return result;
+
+        dbContext.TicketDrafts.Remove(draft);
+        await dbContext.SaveChangesAsync(token);
+        return result;
     }
 
     private async Task<string?> ValidateAsync(

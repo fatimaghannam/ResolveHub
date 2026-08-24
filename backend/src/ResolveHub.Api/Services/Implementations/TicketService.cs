@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 using ResolveHub.Api.Constants;
 using ResolveHub.Api.Data;
 using ResolveHub.Api.DTOs.Common;
@@ -138,64 +137,71 @@ public sealed class TicketService(ApplicationDbContext dbContext)
         if (openStatusId == 0)
             throw new InvalidOperationException("The Open ticket status is not configured.");
 
-        IDbContextTransaction? ownedTransaction = null;
-        if (dbContext.Database.IsRelational() &&
-            dbContext.Database.CurrentTransaction is null)
+        if (!dbContext.Database.IsRelational() ||
+            dbContext.Database.CurrentTransaction is not null)
         {
-            ownedTransaction =
-                await dbContext.Database.BeginTransactionAsync(cancellationToken);
+            return await CreateTicketCoreAsync(
+                userId, request, openStatusId, cancellationToken);
         }
 
-        await using (ownedTransaction)
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async strategyToken =>
         {
+            dbContext.ChangeTracker.Clear();
+            await using var transaction =
+                await dbContext.Database.BeginTransactionAsync(strategyToken);
             try
             {
-                var now = DateTime.UtcNow;
-                var ticket = new Ticket
-                {
-                    TicketReferenceNumber = $"PENDING-{Guid.NewGuid():N}"[..32],
-                    CreatedByUserAccountID = userId,
-                    TicketCategoryID = request.TicketCategoryId,
-                    TicketPriorityID = request.TicketPriorityId,
-                    TicketStatusID = openStatusId,
-                    Title = request.Title.Trim(),
-                    Description = request.Description.Trim(),
-                    CreatedDate = now,
-                    UpdatedDate = now,
-                    IsDeleted = false
-                };
-
-                dbContext.Tickets.Add(ticket);
-                await dbContext.SaveChangesAsync(cancellationToken);
-                ticket.TicketReferenceNumber = $"RH-{now.Year}-{ticket.ID:D4}";
-                dbContext.TicketHistory.Add(new TicketHistory
-                {
-                    TicketID = ticket.ID,
-                    PerformedByUserAccountID = userId,
-                    ActionType = TicketHistoryActionNames.TicketCreated,
-                    NewValue = ticket.TicketReferenceNumber,
-                    Description = "Ticket created.",
-                    CreatedDate = now
-                });
-                await dbContext.SaveChangesAsync(cancellationToken);
-
-                var details = await GetTicketAsync(
-                        userId, ticket.ID, cancellationToken)
-                    ?? throw new InvalidOperationException(
-                        "The created ticket could not be loaded.");
-
-                if (ownedTransaction is not null)
-                    await ownedTransaction.CommitAsync(cancellationToken);
-
-                return new(TicketOperationStatus.Success, details);
+                var result = await CreateTicketCoreAsync(
+                    userId, request, openStatusId, strategyToken);
+                await transaction.CommitAsync(strategyToken);
+                return result;
             }
             catch
             {
-                if (ownedTransaction is not null)
-                    await ownedTransaction.RollbackAsync(CancellationToken.None);
+                await transaction.RollbackAsync(CancellationToken.None);
                 throw;
             }
-        }
+        }, cancellationToken);
+    }
+
+    private async Task<TicketServiceResult<TicketDetailsDto>> CreateTicketCoreAsync(
+        int userId, CreateTicketRequestDto request, int openStatusId,
+        CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        var ticket = new Ticket
+        {
+            TicketReferenceNumber = $"PENDING-{Guid.NewGuid():N}"[..32],
+            CreatedByUserAccountID = userId,
+            TicketCategoryID = request.TicketCategoryId,
+            TicketPriorityID = request.TicketPriorityId,
+            TicketStatusID = openStatusId,
+            Title = request.Title.Trim(),
+            Description = request.Description.Trim(),
+            CreatedDate = now,
+            UpdatedDate = now,
+            IsDeleted = false
+        };
+
+        dbContext.Tickets.Add(ticket);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        ticket.TicketReferenceNumber = $"RH-{now.Year}-{ticket.ID:D4}";
+        dbContext.TicketHistory.Add(new TicketHistory
+        {
+            TicketID = ticket.ID,
+            PerformedByUserAccountID = userId,
+            ActionType = TicketHistoryActionNames.TicketCreated,
+            NewValue = ticket.TicketReferenceNumber,
+            Description = "Ticket created.",
+            CreatedDate = now
+        });
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var details = await GetTicketAsync(userId, ticket.ID, cancellationToken)
+            ?? throw new InvalidOperationException(
+                "The created ticket could not be loaded.");
+        return new(TicketOperationStatus.Success, details);
     }
 
     public async Task<TicketServiceResult<TicketDetailsDto>> UpdateTicketAsync(
