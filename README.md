@@ -713,12 +713,6 @@ Potential future enhancements include:
 * Advanced notification preferences
 * Mobile application support
 
-### AI-Assisted Duplicate Detection
-
-A future enhancement could compare new tickets with existing requests using semantic similarity and suggest possible duplicates before submission.
-
-AI would provide the recommendation, while the existing controlled duplicate-review workflow would remain responsible for the final decision.
-
 ---
 
 ## License
