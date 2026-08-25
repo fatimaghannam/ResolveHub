@@ -594,8 +594,6 @@ ResolveHub/
 │       ├── App.jsx
 │       └── main.jsx
 │
-├── database/
-├── docs/
 ├── LICENSE
 └── README.md
 ```
