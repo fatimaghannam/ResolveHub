@@ -43,7 +43,7 @@ Built with **React, ASP.NET Core, SQL Server, Entity Framework Core, and JWT aut
 
 * Create, edit, search, filter, and track IT support tickets
 * Unique ticket references using `RH-YYYY-NNNN`
-* Ticket categories, priorities, statuses, and departments
+* Ticket categories, priorities, and statuses
 * Draft ticket support
 * Ticket and comment attachments
 * Public and private comments
@@ -706,15 +706,12 @@ The frontend, backend, and database are deployed independently while communicati
 Potential future enhancements include:
 
 * AI-assisted duplicate-ticket detection
-* AI category and priority recommendations
 * Knowledge-base recommendations
 * SLA policies and automatic escalation
 * Email-to-ticket functionality
 * Real-time updates using SignalR
 * Advanced notification preferences
-* Additional reporting options
 * Mobile application support
-* Expanded automated test coverage
 
 ### AI-Assisted Duplicate Detection
 
